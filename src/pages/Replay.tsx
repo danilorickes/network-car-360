@@ -18,7 +18,12 @@ import { ExporterService } from '@/lib/obd/exporter-service'
 import { Diagnostic360Pipeline } from '@/lib/diagnostic/diagnostic-pipeline'
 import { diagnosticService } from '@/services/diagnostic'
 import { Diagnostic360View } from '@/components/diagnostic/Diagnostic360View'
+import { Diagnostic360InvestigationView } from '@/components/diagnostic/Diagnostic360InvestigationView'
 import { vehicleService } from '@/services/vehicles'
+import { investigationService } from '@/services/investigations'
+import { VehicleHistoryEngine } from '@/lib/diagnostic/vehicle-history-engine'
+import { SimulatorCaseE4 } from '@/lib/diagnostic/simulator-case-e4'
+import { DiagnosticInvestigationModel, VehicleHistoryComparison } from '@/types/investigation'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
 import {
@@ -58,7 +63,17 @@ export default function Replay() {
     import('@/types/diagnostic').Diagnostic360Report | null
   >(null)
   const [temporalPoints, setTemporalPoints] = useState<TemporalComparisonPoint[]>([])
-  const [activeTab, setActiveTab] = useState<'replay' | 'blackbox' | 'diagnostic'>('diagnostic')
+  const [activeTab, setActiveTab] = useState<
+    'investigation' | 'diagnostic' | 'replay' | 'blackbox'
+  >('investigation')
+
+  // Estado da Ordem de Diagnóstico 360 (OS-ME001-E4)
+  const [investigationData, setInvestigationData] = useState<DiagnosticInvestigationModel | null>(
+    null,
+  )
+  const [vehicleHistoryComp, setVehicleHistoryComp] = useState<VehicleHistoryComparison | null>(
+    null,
+  )
 
   // Estados do Replay contínuo
   const [isPlaying, setIsPlaying] = useState(false)
@@ -132,9 +147,10 @@ export default function Replay() {
         setSessionRecord(sess)
 
         // Carrega veículo associado se houver
+        let loadedVeh: VehicleModel | null = null
         if (sess.vehicle) {
-          const veh = await vehicleService.getById(sess.vehicle)
-          setVehicleRecord(veh)
+          loadedVeh = await vehicleService.getById(sess.vehicle)
+          setVehicleRecord(loadedVeh)
         } else {
           setVehicleRecord(null)
         }
@@ -171,6 +187,36 @@ export default function Replay() {
           setSelectedBlackBox(null)
           setTemporalPoints([])
         }
+
+        // Carrega ou inicializa a Investigação 360 do Veículo (OS-ME001-E4)
+        const targetVeh = loadedVeh || {
+          id: sess.vehicle || 'd6e3ocunr12tcvu',
+          plate: 'BRA2E20',
+          make: 'Ford',
+          model: 'EcoSport',
+          version: 'Freestyle 1.5 AT',
+          odometer_km: 48500,
+        }
+
+        // Histórico do mesmo veículo
+        if (targetVeh.id) {
+          VehicleHistoryEngine.analyzeVehicleHistory({
+            vehicleId: targetVeh.id,
+            currentSessionId: sess.id,
+            currentDtcs: dtcList.map((d) => d.dtc_code),
+          }).then((comp) => setVehicleHistoryComp(comp))
+        }
+
+        // Busca investigação existente ou cria o caso simulado da EcoSport
+        investigationService.getByVehicleId(targetVeh.id).then((invList) => {
+          if (invList.length > 0) {
+            setInvestigationData(invList[0])
+          } else {
+            const caseData = SimulatorCaseE4.createEcoSportMisfireCase(targetVeh as VehicleModel)
+            setInvestigationData(caseData)
+            investigationService.create(caseData).catch(() => {})
+          }
+        })
 
         initEngine(rawList, evList)
       } catch (err) {
@@ -404,8 +450,21 @@ export default function Replay() {
         </div>
       </div>
 
-      {/* Tabs: Diagnóstico 360 vs Replay Contínuo vs. Caixa-Preta do Sintoma */}
+      {/* Tabs: Ordem de Investigação 360 (E4) vs Diagnóstico 360 (E3) vs Replay Contínuo vs. Caixa-Preta */}
       <div className="flex items-center space-x-2 border-b border-[#263340] pb-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab('investigation')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 whitespace-nowrap ${
+            activeTab === 'investigation'
+              ? 'bg-[#FFB300] text-black shadow'
+              : 'text-[#9AA7B4] hover:text-white hover:bg-[#131A22]'
+          }`}
+        >
+          <ShieldCheck className="w-3.5 h-3.5" />
+          <span>Ordem de Investigação 360 (OS-ME001-E4)</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('diagnostic')}
@@ -416,7 +475,7 @@ export default function Replay() {
           }`}
         >
           <Sparkles className="w-3.5 h-3.5" />
-          <span>Diagnóstico 360 (Motor Inteligente OS-ME001-E3)</span>
+          <span>Síntese do Motor Diagnóstico (E3)</span>
         </button>
 
         <button
@@ -450,6 +509,31 @@ export default function Replay() {
           )}
         </button>
       </div>
+
+      {/* Seção Nova: ORDEM DE INVESTIGAÇÃO 360 (OS-ME001-E4) */}
+      {activeTab === 'investigation' && investigationData && (
+        <Diagnostic360InvestigationView
+          investigation={investigationData}
+          historyComparison={vehicleHistoryComp}
+          onSaveInvestigation={async (updated) => {
+            setInvestigationData(updated)
+            if (
+              updated.id &&
+              !updated.id.startsWith('sim_case') &&
+              !updated.id.startsWith('local_inv')
+            ) {
+              await investigationService.update(updated.id, updated)
+            }
+          }}
+          onPrintReport={() => {
+            ExporterService.printInvestigationReport({
+              investigation: investigationData,
+              vehicle: vehicleRecord,
+              historyComparison: vehicleHistoryComp,
+            })
+          }}
+        />
+      )}
 
       {/* Seção 1: REPLAY CONTÍNUO */}
       {activeTab === 'replay' && (

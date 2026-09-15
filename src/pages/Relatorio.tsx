@@ -17,8 +17,8 @@ import { Button } from '@/components/ui/button'
 
 export default function Relatorio() {
   const [activeTab, setActiveTab] = useState<
-    'checklist' | 'relatorio_e2' | 'arquitetura' | 'instrucoes' | 'evidencias'
-  >('relatorio_e2')
+    'relatorio_e4' | 'checklist' | 'relatorio_e2' | 'arquitetura' | 'instrucoes' | 'evidencias'
+  >('relatorio_e4')
 
   const rfChecklistEtapa2 = [
     {
@@ -107,6 +107,17 @@ export default function Relatorio() {
         <div className="inline-flex rounded-md p-1 bg-[#131A22] border border-[#263340] overflow-x-auto max-w-full">
           <button
             type="button"
+            onClick={() => setActiveTab('relatorio_e4')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
+              activeTab === 'relatorio_e4'
+                ? 'bg-[#FFB300] text-black shadow font-bold'
+                : 'text-[#9AA7B4] hover:text-white'
+            }`}
+          >
+            RELATÓRIO — ME001-E4 (NOVO)
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('relatorio_e2')}
             className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
               activeTab === 'relatorio_e2'
@@ -162,6 +173,99 @@ export default function Relatorio() {
           </button>
         </div>
       </div>
+
+      {/* Aba 0: RELATÓRIO OFICIAL ME001-E4 */}
+      {activeTab === 'relatorio_e4' && (
+        <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-6 text-xs text-gray-300 leading-relaxed max-w-4xl">
+          <div className="border-b border-[#263340] pb-4">
+            <span className="text-[10px] uppercase tracking-wider text-[#FFB300] font-mono font-bold">
+              DOCUMENTO TÉCNICO OFICIAL DE ENTREGA — ETAPA 4 (OS-ME001-E4)
+            </span>
+            <h2 className="text-xl font-bold text-white mt-1">RELATÓRIO — ME001-E4 — THEO</h2>
+            <p className="text-[#9AA7B4] mt-0.5">
+              Network Car Diagnóstico 360 Completo • Versão 0.0.7 • Autor: Theo (Desenvolvedor) •
+              Para: Danilo (Network Soluções)
+            </p>
+          </div>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
+              1. Resumo Executivo da Entrega (Etapa 4)
+            </h3>
+            <p>
+              Em cumprimento estrito à Ordem de Serviço <strong>OS-ME001-E4</strong>, foi
+              implementado o<strong> Diagnóstico 360 Completo</strong>, transformando o motor
+              diagnóstico em um fluxo integrado de investigação automotiva:
+            </p>
+            <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] font-mono text-[11px] text-[#FFB300]">
+              Veículo → Queixa do cliente → Avaliação do mecânico → Scanner/OBD → Teste de rodagem →
+              Sintomas → Motor Diagnóstico → Hipóteses → Testes de confirmação → Resultado →
+              Intervenção → Validação Pós-Reparo → Relatório / Prontuário.
+            </div>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
+              2. Separação Epistemológica: Relato vs Medido vs Inferido vs Confirmado
+            </h3>
+            <ul className="list-disc pl-5 space-y-1">
+              <li>
+                <strong>Relato do Cliente (Peso 0.35):</strong> Percepção subjetiva com regime,
+                velocidade e sintomas assinalados. Nunca convertido automaticamente em fato
+                comprovado.
+              </li>
+              <li>
+                <strong>Constatação Técnica do Mecânico (Peso 0.65):</strong> Registro estruturado
+                das observações do especialista.
+              </li>
+              <li>
+                <strong>Telemetria RAW & Scanner OBD (Peso 1.0):</strong> Dados físicos medidos pela
+                ECU, PIDs e DTCs. RAW mantido rigorosamente append-only.
+              </li>
+              <li>
+                <strong>Histórico do Mesmo Veículo (Peso 0.6):</strong> Comparação temporal
+                individual (STFT baseline, tensão média histórica, primeira ocorrência vs
+                recorrência de falha). Veículos distintos nunca são misturados.
+              </li>
+              <li>
+                <strong>Testes de Confirmação e Critério de Diagnóstico:</strong> Uma hipótese
+                JAMAIS assume estado "CONFIRMADA" apenas por alta pontuação matemática. Exige
+                protocolo executado e critério auditável registrado pelo mecânico.
+              </li>
+            </ul>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
+              3. Matriz Antes vs Depois e Validação Pós-Reparo
+            </h3>
+            <p>
+              Foi implementado o módulo de intervenção com registro de peças substituídas e execução
+              de reteste, gerando a matriz comparativa:
+              <strong> Antes do Reparo ↔ Depois do Reparo</strong> com status formalizado:{' '}
+              <em>"Falha não reproduzida"</em>, <em>"Falha permanece"</em> ou{' '}
+              <em>"Resultado inconclusivo"</em>.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
+              4. Transparência de Hardware Real
+            </h3>
+            <div className="bg-amber-950/40 border border-amber-800 p-3 rounded">
+              <span className="font-bold text-amber-300">Classificação Obrigatória:</span>
+              <p className="text-gray-300 mt-1">
+                Funcionalidades dependentes do ELM327 físico (Web Serial / BLE) mantêm o rótulo:
+                <br />
+                <strong className="text-white">
+                  "IMPLEMENTADA — AGUARDANDO VALIDAÇÃO EM HARDWARE REAL"
+                </strong>
+                .
+              </p>
+            </div>
+          </section>
+        </div>
+      )}
 
       {/* Aba 1: RELATÓRIO OFICIAL ME001-E2 */}
       {activeTab === 'relatorio_e2' && (

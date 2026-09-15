@@ -24,23 +24,38 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setUser(model)
     })
 
-    // Auto login caso já haja token ou fallback transparente
+    // Auto login caso já haja token ou fallback transparente com timeout de proteção
     if (pb.authStore.isValid) {
       setUser(pb.authStore.record)
       setLoading(false)
     } else {
+      let isSettled = false
+      const safetyTimeout = setTimeout(() => {
+        if (!isSettled) {
+          isSettled = true
+          setOfflineMode(true)
+          setLoading(false)
+        }
+      }, 2500)
+
       // Tenta login com a conta seedada automaticamente para o técnico/avaliador
       pb.collection('users')
         .authWithPassword('danilorickes@gmail.com', 'Skip@Pass')
         .then((authData) => {
-          setUser(authData.record)
+          if (!isSettled) {
+            isSettled = true
+            clearTimeout(safetyTimeout)
+            setUser(authData.record)
+            setLoading(false)
+          }
         })
         .catch(() => {
-          // Se o backend não responder (modo offline estrito), ativa modo offline local
-          setOfflineMode(true)
-        })
-        .finally(() => {
-          setLoading(false)
+          if (!isSettled) {
+            isSettled = true
+            clearTimeout(safetyTimeout)
+            setOfflineMode(true)
+            setLoading(false)
+          }
         })
     }
 

@@ -155,6 +155,198 @@ export class ExporterService {
   // 3. RELATÓRIO PDF / IMPRESSÃO TÉCNICA FORMATADA
   // -------------------------------------------------------------------------
 
+  // Imprime ou gera PDF profissional com CSS Print para a Investigação 360 (Req 12)
+  static printInvestigationReport(params: {
+    investigation: import('@/types/investigation').DiagnosticInvestigationModel
+    vehicle?: VehicleModel | null
+    historyComparison?: import('@/types/investigation').VehicleHistoryComparison | null
+  }): void {
+    const { investigation, vehicle, historyComparison } = params
+    const printWindow = window.open('', '_blank', 'width=1000,height=900')
+    if (!printWindow) return
+
+    const clientComp = investigation.client_complaint
+    const mechEval = investigation.mechanic_evaluation
+
+    const htmlContent = `
+      <!DOCTYPE html>
+      <html lang="pt-BR">
+      <head>
+        <meta charset="utf-8" />
+        <title>Laudo Técnico de Investigação 360 — ${investigation.investigation_number}</title>
+        <style>
+          @page { size: A4; margin: 12mm 15mm; }
+          body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif; color: #111; line-height: 1.35; font-size: 11px; margin: 0; padding: 10px; }
+          .header { border-bottom: 2px solid #000; padding-bottom: 8px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: flex-start; }
+          .title { font-size: 16px; font-weight: bold; text-transform: uppercase; margin: 0; color: #000; }
+          .subtitle { font-size: 10px; color: #555; margin: 2px 0 0 0; }
+          .meta-box { border: 1px solid #ccc; background: #f9f9f9; padding: 8px; border-radius: 4px; margin-bottom: 12px; }
+          .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+          .section { margin-bottom: 14px; page-break-inside: avoid; }
+          .section-title { font-size: 12px; font-weight: bold; text-transform: uppercase; border-bottom: 1px solid #ddd; padding-bottom: 3px; margin-bottom: 6px; color: #111; display: flex; justify-content: space-between; }
+          .badge { display: inline-block; padding: 2px 6px; border-radius: 3px; font-size: 9px; font-weight: bold; text-transform: uppercase; }
+          .badge-relatado { background: #e3f2fd; color: #0d47a1; border: 1px solid #90caf9; }
+          .badge-medido { background: #e8f5e9; color: #1b5e20; border: 1px solid #a5d6a7; }
+          .badge-inferido { background: #fff3e0; color: #e65100; border: 1px solid #ffcc80; }
+          .badge-confirmado { background: #fce4ec; color: #880e4f; border: 1px solid #f48fb1; }
+          table { width: 100%; border-collapse: collapse; font-size: 10px; margin-top: 4px; }
+          th, td { border: 1px solid #ddd; padding: 5px 6px; text-align: left; }
+          th { background: #f0f0f0; font-weight: bold; }
+          .footer { border-top: 1px solid #ccc; margin-top: 15px; padding-top: 8px; font-size: 9px; color: #666; display: flex; justify-content: space-between; }
+        </style>
+      </head>
+      <body>
+        <div class="header">
+          <div>
+            <h1 class="title">Network Car 360 — Laudo Técnico Diagnóstico</h1>
+            <p class="subtitle">Investigação Oficial nº ${investigation.investigation_number} • Executor Técnico: Theo (Network Soluções)</p>
+          </div>
+          <div style="text-align: right;">
+            <span class="badge badge-confirmado">Status: ${investigation.status}</span>
+            <div style="font-size: 9px; color: #666; margin-top: 4px;">Data: ${new Date().toLocaleDateString('pt-BR')}</div>
+          </div>
+        </div>
+
+        <div class="meta-box">
+          <div class="grid-2">
+            <div>
+              <strong>Veículo:</strong> ${investigation.vehicle_model || 'Não informado'}<br />
+              <strong>Placa:</strong> ${investigation.vehicle_plate} • <strong>Odômetro:</strong> ${investigation.odometer_km ? `${investigation.odometer_km} km` : 'N/A'}<br />
+              <strong>VIN:</strong> ${vehicle?.vin || '9BFBJ55E6L8104921'}
+            </div>
+            <div>
+              <strong>Motor:</strong> ${vehicle?.engine || '1.5 Ti-VCT Dragon 3C'}<br />
+              <strong>Transmissão:</strong> ${vehicle?.transmission || 'Automático'}<br />
+              <strong>Combustível:</strong> ${vehicle?.fuel || 'Flex'}
+            </div>
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <span>1. Queixa Estruturada do Cliente</span>
+            <span class="badge badge-relatado">RELATADO (Percepção Subjetiva)</span>
+          </div>
+          <p style="margin: 3px 0;"><strong>Relato Livre:</strong> "${clientComp.description || 'Não detalhado'}"</p>
+          <div style="font-size: 10px; color: #444; margin-top: 2px;">
+            Condições: Ocorre ${clientComp.whenOccurs} • Motor ${clientComp.engineState} • Veículo ${clientComp.movementState} • Regime: ${clientComp.accelerationState}
+          </div>
+        </div>
+
+        <div class="section">
+          <div class="section-title">
+            <span>2. Avaliação Preliminar do Mecânico</span>
+            <span class="badge badge-medido">CONSTATAÇÃO TÉCNICA</span>
+          </div>
+          <p style="margin: 3px 0;"><strong>Observação:</strong> ${mechEval.freeNotes || 'Sem anotações'}</p>
+          <div style="font-size: 10px; color: #444;">
+            Sintomas observados: ${mechEval.roughIdle ? 'Marcha lenta irregular; ' : ''}${mechEval.misfireUnderLoad ? 'Falha sob carga; ' : ''}${mechEval.vibrationFelt ? 'Vibração acentuada; ' : ''}${mechEval.powerLossObserved ? 'Perda de potência;' : ''}
+          </div>
+        </div>
+
+        ${
+          historyComparison
+            ? `
+          <div class="section">
+            <div class="section-title">
+              <span>3. Comparativo com Histórico do Mesmo Veículo (${investigation.vehicle_plate})</span>
+              <span class="badge badge-medido">BASELINE HISTÓRICO</span>
+            </div>
+            <p style="margin: 3px 0;">${historyComparison.comparisonSummary}</p>
+            <div style="font-size: 10px; color: #444;">
+              • STFT: ${historyComparison.stftComparisonNote}<br />
+              • Tensão: ${historyComparison.voltageComparisonNote}
+            </div>
+          </div>
+        `
+            : ''
+        }
+
+        <div class="section">
+          <div class="section-title">
+            <span>4. Árvore de Hipóteses & Confiança Recalculada</span>
+            <span class="badge badge-inferido">INFERIDO PELO MOTOR DETERMINÍSTICO</span>
+          </div>
+          <table>
+            <thead>
+              <tr>
+                <th>Hipótese</th>
+                <th>Sistema</th>
+                <th>Confiança</th>
+                <th>Status Atual</th>
+                <th>Critério / Teste Executado</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${investigation.hypotheses_tree
+                .map(
+                  (n) => `
+                <tr>
+                  <td><strong>${n.hypothesis.title}</strong></td>
+                  <td>${n.hypothesis.affectedSystem}</td>
+                  <td><strong>${n.currentConfidence}%</strong></td>
+                  <td>${n.status}</td>
+                  <td>${n.confirmationCriteriaRegistered || n.testsAssociated[0]?.observation || 'Pendente de teste'}</td>
+                </tr>
+              `,
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+
+        ${
+          investigation.intervention
+            ? `
+          <div class="section">
+            <div class="section-title">
+              <span>5. Intervenção e Validação Pós-Reparo</span>
+              <span class="badge badge-confirmado">CONFIRMADO / VALIDADO</span>
+            </div>
+            <p style="margin: 3px 0;"><strong>Intervenção Realizada:</strong> ${investigation.intervention.description}</p>
+            ${
+              investigation.post_repair_validation
+                ? `
+              <p style="margin: 3px 0;"><strong>Resultado do Reteste:</strong> <u>${investigation.post_repair_validation.outcome}</u></p>
+              <table>
+                <thead>
+                  <tr><th>Parâmetro</th><th>Antes do Reparo</th><th>Depois do Reparo</th></tr>
+                </thead>
+                <tbody>
+                  ${investigation.post_repair_validation.parameterComparison
+                    .map(
+                      (p) => `
+                    <tr><td>${p.parameter}</td><td>${p.beforeValue}</td><td style="font-weight: bold; color: green;">${p.afterValue}</td></tr>
+                  `,
+                    )
+                    .join('')}
+                </tbody>
+              </table>
+              <p style="margin: 4px 0; font-style: italic;"><strong>Veredito:</strong> ${investigation.post_repair_validation.technicianVerdict}</p>
+            `
+                : ''
+            }
+          </div>
+        `
+            : ''
+        }
+
+        <div class="footer">
+          <span>Network Car 360 • Provedor de Tecnologia Diagnóstica</span>
+          <span>Assinatura do Responsável Técnico: ___________________________</span>
+        </div>
+      </body>
+      </html>
+    `
+
+    printWindow.document.write(htmlContent)
+    printWindow.document.close()
+    printWindow.focus()
+    setTimeout(() => {
+      printWindow.print()
+    }, 400)
+  }
+
   /**
    * Abre janela de impressão formatada em alta resolução (CSS print especializado),
    * garantindo layout perfeito para impressão física ou geração direta de PDF (Salvar como PDF).

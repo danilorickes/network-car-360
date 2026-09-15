@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T03:06:29.913Z",
+  "generatedAt": "2026-09-15T03:22:42.534Z",
   "collections": [
     {
       "name": "users",
@@ -788,6 +788,258 @@
       "indexes": [
         "CREATE INDEX idx_diag_analyses_session ON diagnostic_analyses (session_id)",
         "CREATE INDEX idx_diag_analyses_event ON diagnostic_analyses (event_id)"
+      ]
+    },
+    {
+      "name": "diagnostic_investigations",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "investigation_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "vehicle_plate",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "vehicle_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "odometer_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "ABERTA",
+            "EM_INVESTIGACAO",
+            "TESTES_PENDENTES",
+            "REPARO_PENDENTE",
+            "VALIDACAO_POS_REPARO",
+            "CONCLUIDA",
+            "FECHADA"
+          ]
+        },
+        {
+          "name": "client_complaint",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "mechanic_evaluation",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "initial_session",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "sessions"
+        },
+        {
+          "name": "retest_session",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "sessions"
+        },
+        {
+          "name": "hypotheses_tree",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tests_log",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "intervention",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "post_repair_validation",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timeline",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "final_conclusion",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_diag_investigation_number ON diagnostic_investigations (investigation_number)",
+        "CREATE INDEX idx_diag_investigation_vehicle ON diagnostic_investigations (vehicle)",
+        "CREATE INDEX idx_diag_investigation_status ON diagnostic_investigations (status)"
+      ]
+    },
+    {
+      "name": "confirmation_tests",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "investigation",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "diagnostic_investigations"
+        },
+        {
+          "name": "test_code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "target_hypothesis_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "target_component",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "PENDENTE",
+            "EM_EXECUCAO",
+            "POSITIVO",
+            "NEGATIVO",
+            "INCONCLUSIVO",
+            "NAO_REALIZADO"
+          ]
+        },
+        {
+          "name": "responsible",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "measured_value",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "measured_unit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "observation",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "attachment_meta",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "executed_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_conf_test_investigation ON confirmation_tests (investigation)",
+        "CREATE INDEX idx_conf_test_status ON confirmation_tests (status)"
       ]
     }
   ]
