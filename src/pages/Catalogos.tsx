@@ -90,7 +90,7 @@ export default function Catalogos() {
 
     try {
       await serviceCatalogService.create({
-        workshop_id: (user as any)?.workshop_id || 'wsnetmatriz0001',
+        workshop_id: (user as any)?.workshop_id,
         code: srvCode.trim() || `SRV-${Date.now().toString().slice(-4)}`,
         description: srvDesc.trim(),
         category: srvCategory.trim() || 'Geral',
@@ -122,7 +122,7 @@ export default function Catalogos() {
 
     try {
       await partsCatalogService.create({
-        workshop_id: (user as any)?.workshop_id || 'wsnetmatriz0001',
+        workshop_id: (user as any)?.workshop_id,
         code: prtCode.trim().toUpperCase(),
         description: prtDesc.trim(),
         manufacturer: prtManufacturer.trim(),

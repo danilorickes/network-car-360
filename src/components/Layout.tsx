@@ -493,7 +493,7 @@ export default function Layout() {
             <span className="font-mono text-[#FFB300] bg-[#FFB300]/10 px-2 py-0.5 rounded border border-[#FFB300]/30">
               ME001-E5 — Etapa 5
             </span>
-            <span>Versão 0.0.9 (Operação da Oficina & OS Comercial)</span>
+            <span>Versão 0.0.10 (Operação da Oficina & Segurança Multitenant)</span>
           </div>
         </div>
       </footer>

@@ -9,16 +9,25 @@ import {
   WorkOrderItem,
 } from '@/types/commercial'
 
-const DEFAULT_WORKSHOP_ID = 'wsnetmatriz0001'
+// Obtém o workshop_id do usuário autenticado no authStore
+export function getAuthenticatedWorkshopId(): string {
+  const authRecord = pb.authStore.record
+  if (authRecord && (authRecord as any).workshop_id) {
+    return (authRecord as any).workshop_id
+  }
+  return ''
+}
 
 // -------------------------------------------------------------
 // CLIENTES (Requisito 2 & 3)
 // -------------------------------------------------------------
 export const clientService = {
-  async getAll(workshopId = DEFAULT_WORKSHOP_ID): Promise<ClientModel[]> {
+  async getAll(workshopId?: string): Promise<ClientModel[]> {
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    const filter = wsId ? `workshop_id = "${wsId}"` : undefined
     try {
       return await pb.collection('clients').getFullList<ClientModel>({
-        filter: `workshop_id = "${workshopId}"`,
+        filter,
         sort: 'name',
       })
     } catch (e) {
@@ -35,12 +44,16 @@ export const clientService = {
     }
   },
 
-  async search(query: string, workshopId = DEFAULT_WORKSHOP_ID): Promise<ClientModel[]> {
+  async search(query: string, workshopId?: string): Promise<ClientModel[]> {
     const q = query.trim()
-    if (!q) return this.getAll(workshopId)
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    if (!q) return this.getAll(wsId)
+    const filter = wsId
+      ? `workshop_id = "${wsId}" && (name ~ "${q}" || phone ~ "${q}" || document ~ "${q}")`
+      : `(name ~ "${q}" || phone ~ "${q}" || document ~ "${q}")`
     try {
       return await pb.collection('clients').getFullList<ClientModel>({
-        filter: `workshop_id = "${workshopId}" && (name ~ "${q}" || phone ~ "${q}" || document ~ "${q}")`,
+        filter,
         sort: 'name',
       })
     } catch {
@@ -49,9 +62,10 @@ export const clientService = {
   },
 
   async create(data: Omit<ClientModel, 'id' | 'created' | 'updated'>): Promise<ClientModel> {
+    const wsId = data.workshop_id || getAuthenticatedWorkshopId()
     return await pb.collection('clients').create<ClientModel>({
       ...data,
-      workshop_id: data.workshop_id || DEFAULT_WORKSHOP_ID,
+      workshop_id: wsId,
     })
   },
 
@@ -64,10 +78,12 @@ export const clientService = {
 // CATÁLOGO DE SERVIÇOS (Requisito 7)
 // -------------------------------------------------------------
 export const serviceCatalogService = {
-  async getAll(workshopId = DEFAULT_WORKSHOP_ID): Promise<ServiceCatalogModel[]> {
+  async getAll(workshopId?: string): Promise<ServiceCatalogModel[]> {
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    const filter = wsId ? `workshop_id = "${wsId}"` : undefined
     try {
       return await pb.collection('service_catalog').getFullList<ServiceCatalogModel>({
-        filter: `workshop_id = "${workshopId}"`,
+        filter,
         sort: 'description',
       })
     } catch {
@@ -78,9 +94,10 @@ export const serviceCatalogService = {
   async create(
     data: Omit<ServiceCatalogModel, 'id' | 'created' | 'updated'>,
   ): Promise<ServiceCatalogModel> {
+    const wsId = data.workshop_id || getAuthenticatedWorkshopId()
     return await pb.collection('service_catalog').create<ServiceCatalogModel>({
       ...data,
-      workshop_id: data.workshop_id || DEFAULT_WORKSHOP_ID,
+      workshop_id: wsId,
     })
   },
 
@@ -93,10 +110,12 @@ export const serviceCatalogService = {
 // CATÁLOGO DE PEÇAS (Requisito 8)
 // -------------------------------------------------------------
 export const partsCatalogService = {
-  async getAll(workshopId = DEFAULT_WORKSHOP_ID): Promise<PartsCatalogModel[]> {
+  async getAll(workshopId?: string): Promise<PartsCatalogModel[]> {
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    const filter = wsId ? `workshop_id = "${wsId}"` : undefined
     try {
       return await pb.collection('parts_catalog').getFullList<PartsCatalogModel>({
-        filter: `workshop_id = "${workshopId}"`,
+        filter,
         sort: 'description',
       })
     } catch {
@@ -107,9 +126,10 @@ export const partsCatalogService = {
   async create(
     data: Omit<PartsCatalogModel, 'id' | 'created' | 'updated'>,
   ): Promise<PartsCatalogModel> {
+    const wsId = data.workshop_id || getAuthenticatedWorkshopId()
     return await pb.collection('parts_catalog').create<PartsCatalogModel>({
       ...data,
-      workshop_id: data.workshop_id || DEFAULT_WORKSHOP_ID,
+      workshop_id: wsId,
     })
   },
 
@@ -122,10 +142,12 @@ export const partsCatalogService = {
 // RECEPÇÃO / ENTRADA RÁPIDA (Requisito 4)
 // -------------------------------------------------------------
 export const receptionService = {
-  async getAll(workshopId = DEFAULT_WORKSHOP_ID): Promise<VehicleReceptionModel[]> {
+  async getAll(workshopId?: string): Promise<VehicleReceptionModel[]> {
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    const filter = wsId ? `workshop_id = "${wsId}"` : undefined
     try {
       return await pb.collection('vehicle_receptions').getFullList<VehicleReceptionModel>({
-        filter: `workshop_id = "${workshopId}"`,
+        filter,
         sort: '-entry_date',
         expand: 'client,vehicle',
       })
@@ -147,13 +169,15 @@ export const receptionService = {
   async create(
     data: Omit<VehicleReceptionModel, 'id' | 'reception_number' | 'created' | 'updated'>,
   ): Promise<VehicleReceptionModel> {
-    const total = await pb.collection('vehicle_receptions').getList(1, 1)
+    const wsId = data.workshop_id || getAuthenticatedWorkshopId()
+    const filter = wsId ? `workshop_id = "${wsId}"` : undefined
+    const total = await pb.collection('vehicle_receptions').getList(1, 1, { filter })
     const recNumber = `REC-${new Date().getFullYear()}-${String(total.totalItems + 1).padStart(4, '0')}`
 
     return await pb.collection('vehicle_receptions').create<VehicleReceptionModel>({
       ...data,
       reception_number: recNumber,
-      workshop_id: data.workshop_id || DEFAULT_WORKSHOP_ID,
+      workshop_id: wsId,
       status: data.status || 'ABERTO',
     })
   },
@@ -163,10 +187,12 @@ export const receptionService = {
 // ORDEM DE SERVIÇO COMERCIAL (Requisitos 5, 6, 9, 10, 11, 18, 19, 20)
 // -------------------------------------------------------------
 export const workOrderService = {
-  async getAll(workshopId = DEFAULT_WORKSHOP_ID): Promise<WorkOrderModel[]> {
+  async getAll(workshopId?: string): Promise<WorkOrderModel[]> {
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    const filter = wsId ? `workshop_id = "${wsId}"` : undefined
     try {
       return await pb.collection('work_orders').getFullList<WorkOrderModel>({
-        filter: `workshop_id = "${workshopId}"`,
+        filter,
         sort: '-sequential_num',
         expand: 'client,vehicle,diagnostic_investigation,reception',
       })
@@ -186,13 +212,14 @@ export const workOrderService = {
     }
   },
 
-  async getByVehiclePlate(
-    plate: string,
-    workshopId = DEFAULT_WORKSHOP_ID,
-  ): Promise<WorkOrderModel[]> {
+  async getByVehiclePlate(plate: string, workshopId?: string): Promise<WorkOrderModel[]> {
+    const wsId = workshopId || getAuthenticatedWorkshopId()
+    const filter = wsId
+      ? `workshop_id = "${wsId}" && vehicle_plate = "${plate.trim().toUpperCase()}"`
+      : `vehicle_plate = "${plate.trim().toUpperCase()}"`
     try {
       return await pb.collection('work_orders').getFullList<WorkOrderModel>({
-        filter: `workshop_id = "${workshopId}" && vehicle_plate = "${plate.trim().toUpperCase()}"`,
+        filter,
         sort: '-sequential_num',
         expand: 'client,vehicle',
       })
@@ -206,21 +233,14 @@ export const workOrderService = {
     data: Partial<WorkOrderModel> & { client: string; vehicle: string; vehicle_plate: string },
     actorInfo: { id?: string; name: string; role?: string },
   ): Promise<WorkOrderModel> {
-    const workshopId = data.workshop_id || DEFAULT_WORKSHOP_ID
-
-    // Conta total de ordens para sequencial
-    const countRes = await pb.collection('work_orders').getList(1, 1)
-    const seq = (countRes.totalItems || 0) + 1
-    const orderNumber = `OS #${String(seq).padStart(6, '0')}`
+    const workshopId = data.workshop_id || getAuthenticatedWorkshopId()
 
     const { servicesSubtotal, partsSubtotal, approvedTotal, generalTotal } = calculateTotals(
       data.items || [],
     )
 
-    const payload = {
+    const payload: any = {
       workshop_id: workshopId,
-      order_number: orderNumber,
-      sequential_num: seq,
       client: data.client,
       vehicle: data.vehicle,
       reception: data.reception || null,
@@ -241,6 +261,10 @@ export const workOrderService = {
       budget_validity_days: data.budget_validity_days || 10,
       budget_history: [],
     }
+
+    // Se fornecido explicitamente (ex: em teste unitário mockado), repassa
+    if (data.order_number) payload.order_number = data.order_number
+    if (data.sequential_num) payload.sequential_num = data.sequential_num
 
     const created = await pb.collection('work_orders').create<WorkOrderModel>(payload)
 

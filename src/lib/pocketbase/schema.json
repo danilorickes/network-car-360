@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T11:37:54.881Z",
+  "generatedAt": "2026-09-15T11:59:32.766Z",
   "collections": [
     {
       "name": "users",
@@ -398,11 +398,11 @@
       "name": "vehicles",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
-        "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "delete": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id"
       },
       "fields": [
         {
@@ -1072,11 +1072,11 @@
       "name": "workshops",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && id = @request.auth.workshop_id",
+        "create": null,
+        "update": "@request.auth.id != '' && id = @request.auth.workshop_id && @request.auth.role = 'ADMINISTRADOR'",
+        "delete": null
       },
       "fields": [
         {
@@ -1136,11 +1136,11 @@
       "name": "clients",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "delete": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id"
       },
       "fields": [
         {
@@ -1222,11 +1222,11 @@
       "name": "service_catalog",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "delete": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id"
       },
       "fields": [
         {
@@ -1298,11 +1298,11 @@
       "name": "parts_catalog",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "delete": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id"
       },
       "fields": [
         {
@@ -1389,11 +1389,11 @@
       "name": "vehicle_receptions",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "delete": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id"
       },
       "fields": [
         {
@@ -1491,11 +1491,11 @@
       "name": "work_orders",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "delete": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id"
       },
       "fields": [
         {
@@ -1693,11 +1693,11 @@
       "name": "work_order_audits",
       "type": "base",
       "apiRules": {
-        "list": "",
-        "view": "",
-        "create": "",
-        "update": "",
-        "delete": ""
+        "list": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && @request.auth.workshop_id != '' && workshop_id = @request.auth.workshop_id",
+        "create": "@request.auth.id != '' && @request.auth.workshop_id != ''",
+        "update": null,
+        "delete": null
       },
       "fields": [
         {
@@ -1780,6 +1780,46 @@
         "CREATE INDEX idx_wo_audits_order ON work_order_audits (work_order)",
         "CREATE INDEX idx_wo_audits_workshop ON work_order_audits (workshop_id)"
       ]
+    },
+    {
+      "name": "workshop_sequences",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != '' && workshop_id = @request.auth.workshop_id",
+        "view": "@request.auth.id != '' && workshop_id = @request.auth.workshop_id",
+        "create": null,
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "next_os_number",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_ws_seq_workshop ON workshop_sequences (workshop_id)"]
     }
   ]
 }

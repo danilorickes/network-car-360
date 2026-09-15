@@ -108,7 +108,7 @@ export default function Recepcao() {
     try {
       // 1. Cria a entrada rápida na oficina
       const reception = await receptionService.create({
-        workshop_id: (user as any)?.workshop_id || 'wsnetmatriz0001',
+        workshop_id: (user as any)?.workshop_id,
         client: selectedClientId,
         vehicle: selectedVehicleId,
         vehicle_plate: veh.plate,
@@ -128,7 +128,7 @@ export default function Recepcao() {
       // 2. Criação automática de OS Comercial preliminar vinculada (Requisito 4 & 5)
       const newWorkOrder = await workOrderService.create(
         {
-          workshop_id: (user as any)?.workshop_id || 'wsnetmatriz0001',
+          workshop_id: (user as any)?.workshop_id,
           client: selectedClientId,
           vehicle: selectedVehicleId,
           vehicle_plate: veh.plate,

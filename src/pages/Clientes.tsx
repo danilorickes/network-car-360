@@ -99,7 +99,7 @@ export default function Clientes() {
 
     try {
       await clientService.create({
-        workshop_id: (user as any)?.workshop_id || 'wsnetmatriz0001',
+        workshop_id: (user as any)?.workshop_id,
         name: formName.trim(),
         document: formDoc.trim(),
         phone: formPhone.trim(),
