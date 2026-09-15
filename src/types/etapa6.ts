@@ -240,6 +240,34 @@ export interface TripDiaryEntryModel {
 }
 
 // CopilotContext para Nina
+// -------------------------------------------------------------
+// OS-ME001-E6.2: ASSISTENTE PERSONALIZÁVEL (IDENTIDADE, VOZ, ESTILO)
+// -------------------------------------------------------------
+export type AssistantStyle = 'OBJETIVO' | 'AMIGAVEL' | 'TECNICO'
+
+export interface AvailableTtsVoice {
+  voiceURI: string
+  name: string
+  lang: string
+  default: boolean
+  localService?: boolean
+}
+
+export interface AssistantIdentityConfig {
+  /** Nome livre configurável pelo condutor/oficina. Se não configurado, exibe ASSISTENTE */
+  name: string
+  /** Wake word configurável (ex: "luna", "nina", "copiloto"). Case-insensitive */
+  wakeWord: string
+  /** URI ou nome da voz TTS selecionada dentre as vozes reais do dispositivo/navegador */
+  selectedVoiceUri?: string
+  /** Estilo de resposta do assistente: Objetivo / Amigável / Técnico */
+  style: AssistantStyle
+  /** Se o usuário customizou a identidade (false = denominação neutra 'ASSISTENTE' antes da personalização) */
+  isCustomized: boolean
+  /** Data da última atualização da identidade */
+  updatedAtUtc?: string
+}
+
 export interface CopilotContext {
   vehicleName: string
   vehiclePlate: string
@@ -261,11 +289,13 @@ export interface CopilotContext {
   tripDuration?: string
   tripDistance?: string
   locationLabel?: string
+  assistantIdentity?: AssistantIdentityConfig
   userPreferences?: {
     musicStyle?: string
     voiceVolume?: number
     allowLocation?: boolean
     bulletinConfig?: NinaBulletinConfig
+    assistantIdentity?: AssistantIdentityConfig
   }
 }
 // Perfil de Homologação Guiada: Ford EcoSport 2020 1.5 Dragon 3Cil

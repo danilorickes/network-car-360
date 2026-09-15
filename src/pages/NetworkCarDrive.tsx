@@ -30,11 +30,19 @@ import { DrivingContextEstimator } from '@/lib/diagnostic/driving-context-estima
 import { IndividualBaselineLearner } from '@/lib/diagnostic/individual-baseline-learner'
 import { VehicleSafetyMonitor } from '@/lib/diagnostic/vehicle-safety-monitor'
 import { TripSessionManager } from '@/lib/trip/trip-session-manager'
-import { NinaCopilotService, NinaMessage } from '@/lib/nina/nina-copilot-service'
 import {
-  NinaPeriodicBulletinService,
+  AssistantCopilotService,
+  AssistantMessage,
+} from '@/lib/assistant/assistant-copilot-service'
+import {
+  AssistantPeriodicBulletinService,
   BulletinContextInput,
-} from '@/lib/nina/nina-periodic-bulletin-service'
+} from '@/lib/assistant/assistant-periodic-bulletin-service'
+import {
+  loadAssistantIdentity,
+  getAssistantDisplayName,
+} from '@/lib/assistant/assistant-identity-store'
+import { AssistantSettingsModal } from '@/components/assistant/AssistantSettingsModal'
 import {
   TRAVEL_QUIZ_QUESTIONS,
   EXTERNAL_MEDIA_SHORTCUTS,
@@ -51,16 +59,23 @@ import {
   NinaBulletinPayload,
   BulletinIntervalOption,
   BulletinDetailLevel,
+  AssistantIdentityConfig,
 } from '@/types/etapa6'
 
 export const NetworkCarDrive: React.FC = () => {
   const { toast } = useToast()
   const { telemetry, selectedVehicle, connectTransport, disconnectTransport } = useTelemetry()
 
-  // Abas principais do Network Car Drive: CARRO | VIAGEM | ENTRETENIMENTO | NINA
+  // Abas principais do Network Car Drive: CARRO | VIAGEM | ENTRETENIMENTO | ASSISTENTE
   const [activeTab, setActiveTab] = useState<'CARRO' | 'VIAGEM' | 'ENTRETENIMENTO' | 'NINA'>(
     'CARRO',
   )
+
+  // OS-ME001-E6.2: Identidade Dinâmica da Assistente ("Minha Assistente")
+  const [assistantIdentity, setAssistantIdentity] = useState<AssistantIdentityConfig>(() =>
+    loadAssistantIdentity(selectedVehicle?.plate),
+  )
+  const [assistantModalOpen, setAssistantModalOpen] = useState(false)
 
   // Modos de Condução e Interface Automotiva
   const [isNightMode, setIsNightMode] = useState(true)
@@ -74,8 +89,8 @@ export const NetworkCarDrive: React.FC = () => {
   const baselineLearnerRef = useRef<IndividualBaselineLearner | null>(null)
   const safetyMonitorRef = useRef(new VehicleSafetyMonitor())
   const tripManagerRef = useRef(new TripSessionManager())
-  const ninaRef = useRef<NinaCopilotService | null>(null)
-  const bulletinServiceRef = useRef<NinaPeriodicBulletinService | null>(null)
+  const assistantRef = useRef<AssistantCopilotService | null>(null)
+  const bulletinServiceRef = useRef<AssistantPeriodicBulletinService | null>(null)
 
   // Estados dinâmicos de monitoramento contínuo
   const [drivingContext, setDrivingContext] = useState<DrivingContextInfo>({
@@ -103,10 +118,10 @@ export const NetworkCarDrive: React.FC = () => {
   const [customMinutesInput, setCustomMinutesInput] = useState<string>('15')
   const [isAudioDucked, setIsAudioDucked] = useState<boolean>(false)
 
-  // Estados da Nina
-  const [ninaInput, setNinaInput] = useState('')
-  const [ninaMessages, setNinaMessages] = useState<NinaMessage[]>([])
-  const [isNinaLoading, setIsNinaLoading] = useState(false)
+  // Estados da Assistente
+  const [assistantInput, setAssistantInput] = useState('')
+  const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([])
+  const [isAssistantLoading, setIsAssistantLoading] = useState(false)
 
   // Estados dos Jogos de Viagem
   const [quizActive, setQuizActive] = useState(false)
@@ -124,72 +139,89 @@ export const NetworkCarDrive: React.FC = () => {
     const plate = selectedVehicle?.plate || 'PADRAO'
     baselineLearnerRef.current = new IndividualBaselineLearner(plate)
 
+    // Recarrega identidade para a placa ativa
+    const activeIdentity = loadAssistantIdentity(plate)
+    setAssistantIdentity(activeIdentity)
+
+    if (assistantRef.current) {
+      assistantRef.current.setVehiclePlate(plate)
+      assistantRef.current.setIdentity(activeIdentity)
+    }
+
     if (bulletinServiceRef.current) {
       bulletinServiceRef.current.setVehiclePlate(plate)
+      bulletinServiceRef.current.setIdentity(activeIdentity)
       setBulletinConfig(bulletinServiceRef.current.getConfig())
     }
   }, [selectedVehicle?.plate])
 
-  // Ducking helper: reduz / interrompe entretenimento enquanto a Nina fala e devolve controle depois
+  // Ducking helper: reduz / interrompe entretenimento enquanto a assistente fala e devolve controle depois
   const executeDuckingSpeech = (text: string, onDone?: () => void) => {
     setIsAudioDucked(true)
-    ninaRef.current?.speak(text, () => {
+    assistantRef.current?.speak(text, () => {
       setIsAudioDucked(false)
       onDone?.()
     })
   }
 
-  // Inicializa Nina Service e Bulletin Service
+  // Inicializa Assistant Service e Bulletin Service
   useEffect(() => {
     const plate = selectedVehicle?.plate || 'PADRAO'
-    const bulletinService = new NinaPeriodicBulletinService(plate, {
-      onBulletinGenerated: (bulletin) => {
-        setRecentBulletins((prev) => [bulletin, ...prev.slice(0, 9)])
-        // Executa fala do boletim com Ducking de áudio
-        executeDuckingSpeech(bulletin.text)
-        // Adiciona à lista de mensagens da Nina
-        const msg: NinaMessage = {
-          id: `msg_bulletin_${Date.now()}`,
-          role: 'assistant',
-          content: `📢 [Boletim ${bulletin.detailLevel}] ${bulletin.text}`,
-          timestamp: bulletin.timestampUtc,
-        }
-        setNinaMessages((prev) => [...prev, msg])
+    const loadedIdentity = loadAssistantIdentity(plate)
+    setAssistantIdentity(loadedIdentity)
+
+    const bulletinService = new AssistantPeriodicBulletinService(
+      plate,
+      {
+        onBulletinGenerated: (bulletin) => {
+          setRecentBulletins((prev) => [bulletin, ...prev.slice(0, 9)])
+          // Executa fala do boletim com Ducking de áudio
+          executeDuckingSpeech(bulletin.text)
+          // Adiciona à lista de mensagens da Assistente
+          const msg: AssistantMessage = {
+            id: `msg_bulletin_${Date.now()}`,
+            role: 'assistant',
+            content: `📢 [Boletim ${bulletin.detailLevel}] ${bulletin.text}`,
+            timestamp: bulletin.timestampUtc,
+          }
+          setAssistantMessages((prev) => [...prev, msg])
+        },
+        onConfigChanged: (cfg) => {
+          setBulletinConfig(cfg)
+        },
       },
-      onConfigChanged: (cfg) => {
-        setBulletinConfig(cfg)
-      },
-    })
+      loadedIdentity,
+    )
     bulletinServiceRef.current = bulletinService
     setBulletinConfig(bulletinService.getConfig())
 
-    const nina = new NinaCopilotService({
+    const asst = new AssistantCopilotService(plate, loadedIdentity, {
       onListeningStateChange: (listening) => setIsListeningVoice(listening),
       onSpeakingStateChange: (speaking) => setIsSpeakingVoice(speaking),
       onSpeechRecognized: (text) => {
-        // Tenta primeiro interpretar como comando de boletim
+        // Tenta primeiro interpretar como comando de boletim com wake word configurado
         const cmdRes = bulletinServiceRef.current?.parseVoiceCommand(text)
         if (cmdRes && cmdRes.handled) {
           executeDuckingSpeech(cmdRes.replyText)
-          const cmdMsg: NinaMessage = {
+          const cmdMsg: AssistantMessage = {
             id: `msg_cmd_${Date.now()}`,
             role: 'assistant',
             content: cmdRes.replyText,
             timestamp: new Date().toISOString(),
           }
-          setNinaMessages((prev) => [...prev, cmdMsg])
+          setAssistantMessages((prev) => [...prev, cmdMsg])
         } else {
-          // Encaminha comando geral à Nina
-          handleSendNinaMessage(text)
+          // Encaminha comando geral à assistente
+          handleSendAssistantMessage(text)
         }
       },
     })
-    ninaRef.current = nina
-    setNinaMessages(nina.getMessages())
+    assistantRef.current = asst
+    setAssistantMessages(asst.getMessages())
 
     return () => {
-      nina.stopListening()
-      nina.stopSpeaking()
+      asst.stopListening()
+      asst.stopSpeaking()
       bulletinService.destroy()
     }
   }, [])
@@ -276,7 +308,7 @@ export const NetworkCarDrive: React.FC = () => {
     // Prioridade de segurança máxima: se houver alerta crítico, interrompe voz ou quiz
     // E alerta crítico independe do temporizador de boletins (sempre emitido)
     if (safetyRes.overallLevel === 'CRITICO') {
-      ninaRef.current?.stopSpeaking()
+      assistantRef.current?.stopSpeaking()
       if (quizActive) setQuizActive(false)
     }
 
@@ -380,13 +412,13 @@ export const NetworkCarDrive: React.FC = () => {
     }
   }
 
-  // Interação com Nina Copiloto
-  const handleSendNinaMessage = async (textToSend?: string) => {
-    const text = textToSend || ninaInput
-    if (!text.trim() || !ninaRef.current) return
+  // Interação com a Copiloto / Assistente
+  const handleSendAssistantMessage = async (textToSend?: string) => {
+    const text = textToSend || assistantInput
+    if (!text.trim() || !assistantRef.current) return
 
-    setNinaInput('')
-    setIsNinaLoading(true)
+    setAssistantInput('')
+    setIsAssistantLoading(true)
 
     const copilotContext: CopilotContext = {
       vehicleName: selectedVehicle
@@ -410,24 +442,25 @@ export const NetworkCarDrive: React.FC = () => {
       tripTitle: activeTrip?.title,
       tripDuration: activeTrip ? `${Math.floor(activeTrip.duration_seconds / 60)} min` : undefined,
       tripDistance: activeTrip ? `${activeTrip.distance_km} km` : undefined,
+      assistantIdentity,
     }
 
     try {
-      await ninaRef.current.sendMessage(text, copilotContext, true)
-      setNinaMessages(ninaRef.current.getMessages())
+      await assistantRef.current.sendMessage(text, copilotContext, true)
+      setAssistantMessages(assistantRef.current.getMessages())
     } finally {
-      setIsNinaLoading(false)
+      setIsAssistantLoading(false)
     }
   }
 
-  // Ação de voz "Nina, Anima a viagem"
+  // Ação de voz "Anima a viagem"
   const handleStartEntertainmentMode = () => {
     setQuizActive(true)
     setQuizQuestionIndex(0)
     setQuizScore(0)
     setQuizSelectedOption(null)
     setActiveTab('ENTRETENIMENTO')
-    ninaRef.current?.speak(
+    assistantRef.current?.speak(
       'Modo diversão ativado! Vamos jogar um quiz de viagem com perguntas automotivas e de estrada.',
     )
   }
@@ -439,9 +472,9 @@ export const NetworkCarDrive: React.FC = () => {
     const isCorrect = index === currentQuiz.correctIndex
     if (isCorrect) {
       setQuizScore((prev) => prev + 10)
-      ninaRef.current?.speak(`Correto! ${currentQuiz.explanation}`)
+      assistantRef.current?.speak(`Correto! ${currentQuiz.explanation}`)
     } else {
-      ninaRef.current?.speak(`Não foi dessa vez. ${currentQuiz.explanation}`)
+      assistantRef.current?.speak(`Não foi dessa vez. ${currentQuiz.explanation}`)
     }
 
     setTimeout(() => {
@@ -450,7 +483,7 @@ export const NetworkCarDrive: React.FC = () => {
         setQuizSelectedOption(null)
       } else {
         setQuizActive(false)
-        ninaRef.current?.speak(
+        assistantRef.current?.speak(
           `Fim do quiz! Sua pontuação final foi de ${quizScore + (isCorrect ? 10 : 0)} pontos! Parabéns.`,
         )
       }
@@ -541,10 +574,10 @@ export const NetworkCarDrive: React.FC = () => {
           </div>
           <Button
             size="sm"
-            onClick={() => ninaRef.current?.speak(safetyAlerts[0].message)}
+            onClick={() => assistantRef.current?.speak(safetyAlerts[0].message)}
             className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
           >
-            Ouvir Nina
+            Ouvir Alerta
           </Button>
         </div>
       )}
@@ -643,11 +676,15 @@ export const NetworkCarDrive: React.FC = () => {
               <div className="flex items-center space-x-3">
                 <Button
                   size="lg"
-                  onClick={() => handleSendNinaMessage('Nina, como está o carro?')}
+                  onClick={() =>
+                    handleSendAssistantMessage(
+                      `${assistantIdentity.name || 'Assistente'}, como está o carro?`,
+                    )
+                  }
                   className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-extrabold text-sm shadow-lg px-6 h-12 rounded-xl"
                 >
                   <Bot className="w-5 h-5 mr-2" />
-                  Nina, como está o carro?
+                  {assistantIdentity.name || 'Assistente'}, como está o carro?
                 </Button>
               </div>
             </div>
@@ -786,8 +823,9 @@ export const NetworkCarDrive: React.FC = () => {
               <div className="space-y-2">
                 {diaryEntries.length === 0 ? (
                   <div className="text-center py-6 text-xs text-gray-400">
-                    Nenhum momento registrado ainda nesta viagem. Use o comando &quot;Nina, marca
-                    esse momento&quot; ou o formulário acima.
+                    Nenhum momento registrado ainda nesta viagem. Use o comando &quot;
+                    {assistantIdentity.name || 'Assistente'}, marca esse momento&quot; ou o
+                    formulário acima.
                   </div>
                 ) : (
                   diaryEntries.map((d, i) => (
@@ -823,14 +861,14 @@ export const NetworkCarDrive: React.FC = () => {
               <div className="space-y-1">
                 <span className="text-xs font-bold text-purple-300 uppercase tracking-widest flex items-center space-x-1.5">
                   <Sparkles className="w-4 h-4 text-[#FFB300]" />
-                  <span>Modo Diversão Nina</span>
+                  <span>Modo Diversão {getAssistantDisplayName(assistantIdentity)}</span>
                 </span>
                 <div className="text-lg font-bold text-white">
                   Jogos de Viagem Por Voz para Motorista e Passageiros
                 </div>
                 <p className="text-xs text-gray-300">
-                  Participe sem tirar as mãos do volante nem os olhos da pista! A Nina faz perguntas
-                  e pontua por voz.
+                  Participe sem tirar as mãos do volante nem os olhos da pista! A assistente faz
+                  perguntas e pontua por voz.
                 </p>
               </div>
 
@@ -840,7 +878,7 @@ export const NetworkCarDrive: React.FC = () => {
                 className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-11 px-6 rounded-xl shadow-lg"
               >
                 <Flame className="w-4 h-4 mr-1.5" />
-                Nina, anima a viagem!
+                {assistantIdentity.name || 'Assistente'}, anima a viagem!
               </Button>
             </div>
 
@@ -900,7 +938,8 @@ export const NetworkCarDrive: React.FC = () => {
                   <Volume2 className="w-4 h-4 text-amber-400" />
                   <span>
                     <strong>Áudio Ducking Ativo:</strong> Entretenimento atenuado temporariamente
-                    para boletim prioritário de voz da Nina.
+                    para boletim prioritário de voz da assistente (
+                    {getAssistantDisplayName(assistantIdentity)}).
                   </span>
                 </div>
                 <span className="text-[10px] font-mono bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
@@ -943,10 +982,10 @@ export const NetworkCarDrive: React.FC = () => {
           </div>
         )}
 
-        {/* ======================= ABA: NINA COPILOTO ======================= */}
+        {/* ======================= ABA: ASSISTENTE PERSONALIZÁVEL ======================= */}
         {activeTab === 'NINA' && (
           <div className="space-y-4 max-w-4xl mx-auto flex flex-col h-[calc(100vh-180px)]">
-            {/* Header da Nina */}
+            {/* Header da Assistente */}
             <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 flex items-center justify-between">
               <div className="flex items-center space-x-3">
                 <div className="w-10 h-10 rounded-full bg-[#FFB300]/20 border border-[#FFB300] flex items-center justify-center text-[#FFB300]">
@@ -954,17 +993,22 @@ export const NetworkCarDrive: React.FC = () => {
                 </div>
                 <div>
                   <div className="flex items-center space-x-2">
-                    <span className="font-bold text-white text-sm">Nina Copiloto Inteligente</span>
+                    <span className="font-bold text-white text-sm">
+                      {getAssistantDisplayName(assistantIdentity)}
+                    </span>
                     <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold">
                       NATIVE AGENT
                     </span>
-                    <span className="text-[10px] bg-[#FFB300]/20 text-[#FFB300] border border-[#FFB300]/40 px-1.5 py-0.5 rounded font-mono font-bold">
-                      E6.1 VOICE
+                    <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-1.5 py-0.5 rounded font-mono font-bold">
+                      E6.2 CUSTOMIZÁVEL
+                    </span>
+                    <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-1.5 py-0.5 rounded font-mono">
+                      {assistantIdentity.style}
                     </span>
                   </div>
                   <p className="text-xs text-gray-400">
-                    Contexto real do veículo • Wake word &quot;Nina...&quot; • Alertas locais
-                    prioritários
+                    Wake word: &quot;{assistantIdentity.wakeWord || assistantIdentity.name}&quot; •
+                    Estilo {assistantIdentity.style} • Alertas locais prioritários
                   </p>
                 </div>
               </div>
@@ -972,11 +1016,22 @@ export const NetworkCarDrive: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <Button
                   size="sm"
+                  variant="outline"
+                  onClick={() => setAssistantModalOpen(true)}
+                  className="text-xs h-8 border-[#2B394A] text-cyan-300 hover:text-white hover:bg-[#1C2633]"
+                  title="Configurar Nome, Wake Word, Voz e Estilo da Assistente"
+                >
+                  <Sparkles className="w-3.5 h-3.5 mr-1 text-[#FFB300]" />
+                  Minha Assistente
+                </Button>
+
+                <Button
+                  size="sm"
                   onClick={() => {
                     if (isListeningVoice) {
-                      ninaRef.current?.stopListening()
+                      assistantRef.current?.stopListening()
                     } else {
-                      ninaRef.current?.startListening()
+                      assistantRef.current?.startListening()
                     }
                   }}
                   className={`text-xs h-8 ${
@@ -998,13 +1053,13 @@ export const NetworkCarDrive: React.FC = () => {
               </div>
             </div>
 
-            {/* NC-E6.1-VOICE: PAINEL DE CONTROLE DOS BOLETINS PERIÓDICOS (PT-BR / BOTÕES GRANDES) */}
+            {/* NC-E6.1 / E6.2: PAINEL DE CONTROLE DOS BOLETINS PERIÓDICOS (PT-BR / BOTÕES GRANDES) */}
             <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 space-y-3">
               <div className="flex items-center justify-between border-b border-[#202B37] pb-2">
                 <div className="flex items-center space-x-2">
                   <Volume2 className="w-4 h-4 text-[#FFB300]" />
                   <span className="text-xs font-bold text-white uppercase tracking-wider">
-                    Boletins Periódicos por Voz da Nina
+                    Boletins Periódicos por Voz ({getAssistantDisplayName(assistantIdentity)})
                   </span>
                 </div>
                 <div className="flex items-center space-x-2">
@@ -1047,6 +1102,7 @@ export const NetworkCarDrive: React.FC = () => {
                             activeAlerts: safetyAlerts.map((a) => a.title),
                             isTripActive: Boolean(activeTrip),
                             tripTitle: activeTrip?.title,
+                            assistantIdentity,
                           },
                           supportedPids:
                             supportedList.length > 0
@@ -1161,45 +1217,51 @@ export const NetworkCarDrive: React.FC = () => {
                 </div>
               </div>
 
-              {/* Dica de Comandos de Voz da Nina */}
+              {/* Dica de Comandos de Voz da Assistente */}
               <div className="bg-[#0B0F14] p-2.5 rounded-lg border border-[#202B37] text-[11px] text-gray-400 flex flex-wrap items-center justify-between gap-1">
                 <span>Comandos de voz aceitos:</span>
                 <span className="text-[#FFB300] font-mono">
-                  &quot;Nina, me avisa a cada 20 minutos&quot;
+                  &quot;{assistantIdentity.wakeWord || 'nina'}, me avisa a cada 20 minutos&quot;
                 </span>
                 <span className="text-cyan-400 font-mono">
-                  &quot;Nina, deixa os boletins mais detalhados&quot;
+                  &quot;{assistantIdentity.wakeWord || 'nina'}, deixa os boletins mais
+                  detalhados&quot;
                 </span>
                 <span className="text-red-400 font-mono">
-                  &quot;Nina, desativa os boletins&quot;
+                  &quot;{assistantIdentity.wakeWord || 'nina'}, desativa os boletins&quot;
                 </span>
               </div>
             </div>
 
             {/* Chat Messages */}
             <div className="flex-1 bg-[#0B0F14] border border-[#202B37] rounded-xl p-4 overflow-y-auto space-y-3">
-              {ninaMessages.length === 0 ? (
+              {assistantMessages.length === 0 ? (
                 <div className="flex flex-col items-center justify-center h-full text-center space-y-2 text-xs text-gray-400">
                   <Bot className="w-8 h-8 text-[#FFB300]" />
-                  <p className="font-semibold text-white">Olá! Eu sou a Nina, sua copiloto.</p>
+                  <p className="font-semibold text-white">
+                    Olá! Eu sou{' '}
+                    {assistantIdentity.isCustomized ? assistantIdentity.name : 'sua assistente'},
+                    sua copiloto no Network Car.
+                  </p>
                   <p className="max-w-md">
                     Experimente perguntar por voz ou texto:
                     <br />
                     <span className="text-[#FFB300] font-mono">
-                      &quot;Nina, como está o carro?&quot;
+                      &quot;{assistantIdentity.wakeWord || 'assistente'}, como está o carro?&quot;
                     </span>
                     <br />
                     <span className="text-cyan-400 font-mono">
-                      &quot;Nina, aconteceu alguma coisa diferente?&quot;
+                      &quot;{assistantIdentity.wakeWord || 'assistente'}, aconteceu alguma coisa
+                      diferente?&quot;
                     </span>
                     <br />
                     <span className="text-purple-400 font-mono">
-                      &quot;Nina, anima a viagem!&quot;
+                      &quot;{assistantIdentity.wakeWord || 'assistente'}, anima a viagem!&quot;
                     </span>
                   </p>
                 </div>
               ) : (
-                ninaMessages.map((msg) => (
+                assistantMessages.map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
@@ -1225,17 +1287,17 @@ export const NetworkCarDrive: React.FC = () => {
             <div className="flex items-center space-x-2">
               <input
                 type="text"
-                placeholder="Converse com a Nina ou digite um comando..."
-                value={ninaInput}
-                disabled={isNinaLoading}
-                onChange={(e) => setNinaInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendNinaMessage()}
+                placeholder={`Converse com ${getAssistantDisplayName(assistantIdentity)} ou digite um comando...`}
+                value={assistantInput}
+                disabled={isAssistantLoading}
+                onChange={(e) => setAssistantInput(e.target.value)}
+                onKeyDown={(e) => e.key === 'Enter' && handleSendAssistantMessage()}
                 className="flex-1 bg-[#121A24] border border-[#202B37] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#FFB300]"
               />
               <Button
                 size="sm"
-                disabled={isNinaLoading || !ninaInput.trim()}
-                onClick={() => handleSendNinaMessage()}
+                disabled={isAssistantLoading || !assistantInput.trim()}
+                onClick={() => handleSendAssistantMessage()}
                 className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold h-10 px-4 rounded-xl"
               >
                 Enviar
@@ -1296,9 +1358,27 @@ export const NetworkCarDrive: React.FC = () => {
           }`}
         >
           <Bot className="w-5 h-5 mb-1" />
-          <span className="text-xs uppercase tracking-wider">NINA</span>
+          <span className="text-xs uppercase tracking-wider">
+            {getAssistantDisplayName(assistantIdentity, true)}
+          </span>
         </button>
       </nav>
+
+      {/* Modal de Personalização da Assistente */}
+      <AssistantSettingsModal
+        open={assistantModalOpen}
+        onOpenChange={setAssistantModalOpen}
+        vehiclePlate={selectedVehicle?.plate}
+        onIdentitySaved={(newIdentity) => {
+          setAssistantIdentity(newIdentity)
+          assistantRef.current?.setIdentity(newIdentity)
+          bulletinServiceRef.current?.setIdentity(newIdentity)
+          toast({
+            title: 'Assistente Configurada',
+            description: `Identidade atualizada para "${newIdentity.name}" (Wake Word: "${newIdentity.wakeWord}", Estilo: ${newIdentity.style}).`,
+          })
+        }}
+      />
     </div>
   )
 }

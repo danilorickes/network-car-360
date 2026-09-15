@@ -27,12 +27,62 @@ import {
   Layers,
 } from 'lucide-react'
 import { detectPlatformCapabilities } from '@/lib/obd/platform-detector'
+import { AssistantIdentityConfig, AssistantStyle, AvailableTtsVoice } from '@/types/etapa6'
+import {
+  DEFAULT_ASSISTANT_IDENTITY,
+  loadAssistantIdentity,
+  saveAssistantIdentity,
+  getAvailableTtsVoices,
+  getAssistantDisplayName,
+} from '@/lib/assistant/assistant-identity-store'
+import { Bot, Sparkles, Volume2, Mic, CheckCircle2 } from 'lucide-react'
 
 export default function Configuracoes() {
-  const { activeScenario, setActiveScenario } = useTelemetry()
+  const { activeScenario, setActiveScenario, selectedVehicle } = useTelemetry()
   const { toast } = useToast()
   const [config, setConfig] = useState<AppConfig>(loadAppConfig())
   const platform = detectPlatformCapabilities()
+
+  // OS-ME001-E6.2: Identidade da Assistente Personalizável por Veículo / Usuário / Oficina
+  const [assistantIdentity, setAssistantIdentity] = useState<AssistantIdentityConfig>(() =>
+    loadAssistantIdentity(selectedVehicle?.plate),
+  )
+  const [availableVoices, setAvailableVoices] = useState<AvailableTtsVoice[]>([])
+  const [testSpeaking, setTestSpeaking] = useState(false)
+
+  React.useEffect(() => {
+    setAssistantIdentity(loadAssistantIdentity(selectedVehicle?.plate))
+    getAvailableTtsVoices().then((voices) => setAvailableVoices(voices))
+  }, [selectedVehicle?.plate])
+
+  const handleTestVoice = () => {
+    if (typeof window === 'undefined' || !('speechSynthesis' in window)) return
+    const synth = window.speechSynthesis
+    synth.cancel()
+
+    const nameToSay = assistantIdentity.name.trim() || 'sua assistente'
+    const textToSay =
+      assistantIdentity.style === 'OBJETIVO'
+        ? `Olá! Sou ${nameToSay}. Telemetria veicular pronta.`
+        : assistantIdentity.style === 'TECNICO'
+          ? `Olá! Sou ${nameToSay}. Diagnóstico local e baselines estatísticos em operação nominal.`
+          : `Olá! Sou ${nameToSay}, sua copiloto inteligente no Network Car!`
+
+    const utt = new SpeechSynthesisUtterance(textToSay)
+    utt.lang = 'pt-BR'
+    utt.rate = 1.05
+
+    if (assistantIdentity.selectedVoiceUri) {
+      const v = synth.getVoices().find((x) => x.voiceURI === assistantIdentity.selectedVoiceUri)
+      if (v) utt.voice = v
+    }
+
+    utt.onstart = () => setTestSpeaking(true)
+    utt.onend = () => setTestSpeaking(false)
+    utt.onerror = () => setTestSpeaking(false)
+
+    synth.speak(utt)
+  }
 
   const handleChange = (key: keyof AppConfig, value: any) => {
     setConfig((prev) => ({
@@ -43,10 +93,11 @@ export default function Configuracoes() {
 
   const handleSave = () => {
     saveAppConfig(config)
+    saveAssistantIdentity(assistantIdentity, selectedVehicle?.plate)
     toast({
       title: 'Configurações Salvas',
       description:
-        'Parâmetros atualizados no armazenamento local (localStorage). Nenhum caminho hardcoded no código.',
+        'Parâmetros operacionais e assistente atualizados no armazenamento local (localStorage).',
     })
   }
 
@@ -92,6 +143,228 @@ export default function Configuracoes() {
             <Save className="w-3.5 h-3.5 mr-1" />
             Salvar Alterações
           </Button>
+        </div>
+      </div>
+
+      {/* OS-ME001-E6.2: Seção MINHA ASSISTENTE PERSONALIZÁVEL */}
+      <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#263340] pb-3">
+          <div className="flex items-center space-x-2">
+            <Bot className="w-5 h-5 text-[#FFB300]" />
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                <span>Minha Assistente (OS-ME001-E6.2)</span>
+                {assistantIdentity.isCustomized ? (
+                  <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-1.5 py-0.2 rounded font-mono font-normal">
+                    PERSONALIZADA
+                  </span>
+                ) : (
+                  <span className="text-[10px] bg-gray-800 text-gray-300 border border-gray-700 px-1.5 py-0.2 rounded font-mono font-normal">
+                    NEUTRO (ASSISTENTE)
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-[#9AA7B4]">
+                Configure nome, wake word de ativação, voz real TTS e estilo de resposta por
+                condutor e veículo.
+              </p>
+            </div>
+          </div>
+          <div className="text-right text-xs text-gray-400 font-mono">
+            Placa vinculada:{' '}
+            <strong className="text-cyan-400">{selectedVehicle?.plate || 'PADRÃO'}</strong>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+          {/* Nome e Wake Word */}
+          <div className="space-y-3">
+            <div>
+              <label className="block text-[#9AA7B4] mb-1 font-medium">Nome da Assistente:</label>
+              <Input
+                value={assistantIdentity.name}
+                placeholder="Ex.: Luna, Nina, Sofia, Jarvis..."
+                onChange={(e) => {
+                  const val = e.target.value
+                  setAssistantIdentity((prev) => ({
+                    ...prev,
+                    name: val,
+                    wakeWord:
+                      prev.wakeWord === prev.name.toLowerCase() ? val.toLowerCase() : prev.wakeWord,
+                    isCustomized: true,
+                  }))
+                }}
+                className="bg-[#0B0F14] border-[#263340] text-white"
+              />
+              <span className="text-[10px] text-gray-500">
+                Nome livre exibido na interface ({getAssistantDisplayName(assistantIdentity)}).
+              </span>
+            </div>
+
+            <div>
+              <label className="block text-[#9AA7B4] mb-1 font-medium flex items-center justify-between">
+                <span>Wake Word (Palavra de ativação por voz):</span>
+                <Mic className="w-3.5 h-3.5 text-[#FFB300]" />
+              </label>
+              <Input
+                value={assistantIdentity.wakeWord}
+                placeholder="Ex.: luna, nina, copiloto..."
+                onChange={(e) =>
+                  setAssistantIdentity((prev) => ({
+                    ...prev,
+                    wakeWord: e.target.value.toLowerCase(),
+                    isCustomized: true,
+                  }))
+                }
+                className="bg-[#0B0F14] border-[#263340] text-white font-mono"
+              />
+              <span className="text-[10px] text-cyan-400">
+                Ex.: &quot;{assistantIdentity.wakeWord || 'luna'}, como está o carro?&quot;
+              </span>
+            </div>
+          </div>
+
+          {/* Voz Real do Dispositivo / Navegador */}
+          <div className="space-y-3">
+            <div>
+              <div className="flex items-center justify-between mb-1">
+                <label className="text-[#9AA7B4] font-medium flex items-center space-x-1.5">
+                  <Volume2 className="w-3.5 h-3.5 text-cyan-400" />
+                  <span>Voz do Dispositivo (SpeechSynthesis):</span>
+                </label>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  disabled={testSpeaking}
+                  onClick={handleTestVoice}
+                  className="text-[11px] h-6 px-2 border-[#263340] text-cyan-300 hover:text-white"
+                >
+                  {testSpeaking ? 'Testando...' : 'Testar Voz'}
+                </Button>
+              </div>
+
+              {availableVoices.length === 0 ? (
+                <div className="bg-[#0B0F14] border border-[#263340] rounded p-2 text-[11px] text-gray-400">
+                  Nenhuma voz TTS externa detectada no sintetizador. O sistema operacional usará a
+                  voz padrão pt-BR instalada.
+                </div>
+              ) : (
+                <select
+                  value={assistantIdentity.selectedVoiceUri || ''}
+                  onChange={(e) =>
+                    setAssistantIdentity((prev) => ({
+                      ...prev,
+                      selectedVoiceUri: e.target.value || undefined,
+                      isCustomized: true,
+                    }))
+                  }
+                  className="w-full bg-[#0B0F14] border border-[#263340] rounded px-3 py-2 text-xs text-white focus:outline-none focus:border-[#FFB300]"
+                >
+                  <option value="">Padrão do Sistema Operacional (Recomendado)</option>
+                  {availableVoices.map((v) => (
+                    <option key={v.voiceURI} value={v.voiceURI}>
+                      {v.name} ({v.lang}) {v.default ? '— Padrão' : ''}
+                    </option>
+                  ))}
+                </select>
+              )}
+              <span className="text-[10px] text-gray-500 block mt-1">
+                Apenas vozes reais presentes no dispositivo. Independente de nome e estilo.
+              </span>
+            </div>
+
+            {/* Estilo de Resposta */}
+            <div>
+              <label className="block text-[#9AA7B4] mb-1 font-medium">Estilo de Resposta:</label>
+              <div className="grid grid-cols-3 gap-2">
+                {(
+                  [
+                    { style: 'OBJETIVO', label: 'Objetivo', desc: 'Curto e direto' },
+                    { style: 'AMIGAVEL', label: 'Amigável', desc: 'Acolhedor (Danilo)' },
+                    { style: 'TECNICO', label: 'Técnico', desc: 'Foco em ECU/sensores' },
+                  ] as { style: AssistantStyle; label: string; desc: string }[]
+                ).map((item) => (
+                  <button
+                    key={item.style}
+                    type="button"
+                    onClick={() =>
+                      setAssistantIdentity((prev) => ({
+                        ...prev,
+                        style: item.style,
+                        isCustomized: true,
+                      }))
+                    }
+                    className={`p-2 rounded border text-left transition-all ${
+                      assistantIdentity.style === item.style
+                        ? 'bg-[#1C2633] border-[#FFB300] text-white'
+                        : 'bg-[#0B0F14] border-[#263340] text-gray-400 hover:bg-[#151D28]'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-0.5">
+                      <span className="font-bold text-xs text-white">{item.label}</span>
+                      {assistantIdentity.style === item.style && (
+                        <CheckCircle2 className="w-3 h-3 text-[#FFB300]" />
+                      )}
+                    </div>
+                    <span className="text-[10px] text-gray-400 block">{item.desc}</span>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* Atalhos Rápidos */}
+        <div className="pt-2 border-t border-[#263340] flex items-center justify-between text-[11px]">
+          <span className="text-gray-400">Predefinições de identidade:</span>
+          <div className="flex items-center space-x-2">
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const ninaSaved = saveAssistantIdentity(
+                  {
+                    name: 'Nina',
+                    wakeWord: 'nina',
+                    style: 'AMIGAVEL',
+                    selectedVoiceUri: undefined,
+                  },
+                  selectedVehicle?.plate,
+                )
+                setAssistantIdentity(ninaSaved)
+                toast({
+                  title: 'Padrão Nina Aplicado',
+                  description: 'Configuração utilizada originalmente pelo Danilo restaurada.',
+                })
+              }}
+              className="text-xs h-7 px-2 text-[#FFB300] hover:bg-[#1C2633]"
+            >
+              <Sparkles className="w-3 h-3 mr-1" />
+              Padrão Nina (Danilo)
+            </Button>
+            <Button
+              type="button"
+              size="sm"
+              variant="ghost"
+              onClick={() => {
+                const neutro = saveAssistantIdentity(
+                  { ...DEFAULT_ASSISTANT_IDENTITY, isCustomized: false },
+                  selectedVehicle?.plate,
+                )
+                setAssistantIdentity(neutro)
+                toast({
+                  title: 'Denominação Neutra',
+                  description: 'Assistente restaurada para a denominação padrão neutra.',
+                })
+              }}
+              className="text-xs h-7 px-2 text-gray-400 hover:text-white hover:bg-[#1C2633]"
+            >
+              <RotateCcw className="w-3 h-3 mr-1" />
+              Denominação Neutra
+            </Button>
+          </div>
         </div>
       </div>
 

@@ -1,4 +1,5 @@
-// Endpoint do Copiloto Nina no PocketBase pb_hooks
+// Endpoint da Copiloto/Assistente Inteligente no PocketBase pb_hooks
+// OS-ME001-E6.2: Suporta identidade configurável ("Minha Assistente", nome livre e estilo)
 // Conecta com o agente nativo 'nina-copiloto' via $ai.agent("nina-copiloto").chat(...)
 // e responde estruturado com segurança determinística e validação de contexto
 
@@ -12,7 +13,7 @@ routerAdd(
       const userId = authUser ? authUser.id : null
 
       if (!userId) {
-        return e.json(401, { error: 'Autenticação necessária para consultar a Copiloto Nina' })
+        return e.json(401, { error: 'Autenticação necessária para consultar a assistente' })
       }
 
       const message = body.message || ''
@@ -20,9 +21,22 @@ routerAdd(
         return e.json(400, { error: 'Mensagem vazia' })
       }
 
+      // Identidade e estilo da assistente
+      const assistantName =
+        body.assistant_name ||
+        (body.context && body.context.assistantIdentity && body.context.assistantIdentity.name) ||
+        'Nina'
+      const assistantStyle =
+        body.style ||
+        (body.context && body.context.assistantIdentity && body.context.assistantIdentity.style) ||
+        'AMIGAVEL'
+
       // Contexto estruturado recebido do cliente (telemetria resumida, viagem, alertas locais)
       const copilotContext = body.context || {}
       const contextSummary =
+        `[IDENTIDADE DA ASSISTENTE]\n` +
+        `Nome da Assistente: ${assistantName}\n` +
+        `Estilo de Comunicação: ${assistantStyle} (Objetivo = ultra conciso; Amigável = acolhedor e próximo; Técnico = preciso em termos de engenharia e telemetria)\n\n` +
         `[CONTEXTO ATUAL DO VEÍCULO]\n` +
         `Veículo: ${copilotContext.vehicleName || 'Desconhecido'} (${copilotContext.vehiclePlate || 'S/P'})\n` +
         `Conexão: ${copilotContext.connectionStatus || 'DESCONECTADO'} | Transporte: ${copilotContext.transportType || 'N/D'}\n` +
@@ -38,7 +52,7 @@ routerAdd(
         `Alertas Ativos: ${Array.isArray(copilotContext.activeAlerts) && copilotContext.activeAlerts.length > 0 ? copilotContext.activeAlerts.join('; ') : 'Nenhum'}\n` +
         `Viagem Ativa: ${copilotContext.isTripActive ? 'Sim - ' + (copilotContext.tripTitle || '') + ' (' + (copilotContext.tripDuration || '') + ', ' + (copilotContext.tripDistance || '') + ')' : 'Não'}\n`
 
-      const promptWithContext = `${contextSummary}\nPergunta/Comando do condutor ou passageiro: "${message}"`
+      const promptWithContext = `${contextSummary}\nVocê está respondendo como ${assistantName}. Mantenha rigorosamente o estilo ${assistantStyle}.\nPergunta/Comando do condutor ou passageiro: "${message}"`
 
       let agentResult = null
       try {
@@ -49,13 +63,30 @@ routerAdd(
         })
       } catch (agentErr) {
         // Fallback robusto se a API de AI estiver temporariamente sem quota ou offline
-        const simulatedReply =
-          'Entendido. Estou acompanhando os parâmetros locais em tempo real. ' +
-          (copilotContext.safetyLevel === 'CRITICO'
-            ? 'ATENÇÃO: Há um alerta crítico de segurança no veículo. Recomendo verificar com prioridade máxima.'
-            : copilotContext.safetyLevel === 'ATENCAO'
-              ? 'O motor de segurança identificou um ponto de atenção nos sensores, mas o carro segue em monitoramento.'
-              : 'O funcionamento dos sensores disponíveis está dentro dos padrões normais de condução.')
+        let simulatedReply = ''
+        if (assistantStyle === 'OBJETIVO') {
+          simulatedReply =
+            copilotContext.safetyLevel === 'CRITICO'
+              ? 'ATENÇÃO: Alerta crítico ativo no veículo. Pare em local seguro imediatamente.'
+              : copilotContext.safetyLevel === 'ATENCAO'
+                ? 'Ponto de atenção na telemetria. Monitoramento em curso.'
+                : 'Sensores veiculares normais. Telemetria estável.'
+        } else if (assistantStyle === 'TECNICO') {
+          simulatedReply =
+            copilotContext.safetyLevel === 'CRITICO'
+              ? 'ALERTA DE SEGURANÇA: SafetyMonitor disparou limiar crítico. Interrompa a condução para preservar componentes vitais.'
+              : copilotContext.safetyLevel === 'ATENCAO'
+                ? 'Telemetria reporta advertência de sensores. Desvio em análise contínua.'
+                : 'Parâmetros de injeção, arrefecimento e tensão dentro das tolerâncias nominais do modelo.'
+        } else {
+          simulatedReply =
+            'Entendido. Estou acompanhando os parâmetros locais em tempo real. ' +
+            (copilotContext.safetyLevel === 'CRITICO'
+              ? 'ATENÇÃO: Há um alerta crítico de segurança no veículo. Recomendo verificar com prioridade máxima.'
+              : copilotContext.safetyLevel === 'ATENCAO'
+                ? 'O motor de segurança identificou um ponto de atenção nos sensores, mas o carro segue em monitoramento.'
+                : 'O funcionamento dos sensores disponíveis está dentro dos padrões normais de condução.')
+        }
 
         return e.json(200, {
           conversation_id: body.conversation_id || 'conv_local_fallback',
@@ -73,7 +104,7 @@ routerAdd(
         fallback_mode: false,
       })
     } catch (err) {
-      return e.json(500, { error: 'Falha no processamento da Copiloto Nina: ' + err.message })
+      return e.json(500, { error: 'Falha no processamento da assistente: ' + err.message })
     }
   },
   $apis.requireAuth(),
