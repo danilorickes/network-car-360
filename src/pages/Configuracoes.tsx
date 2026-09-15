@@ -35,13 +35,19 @@ import {
   getAvailableTtsVoices,
   getAssistantDisplayName,
 } from '@/lib/assistant/assistant-identity-store'
-import { Bot, Sparkles, Volume2, Mic, CheckCircle2 } from 'lucide-react'
+import { getDriveStartupPreference, setDriveStartupPreference } from '@/lib/drive-startup-pref'
+import { Bot, Sparkles, Volume2, Mic, CheckCircle2, Car, Compass } from 'lucide-react'
 
 export default function Configuracoes() {
   const { activeScenario, setActiveScenario, selectedVehicle } = useTelemetry()
   const { toast } = useToast()
   const [config, setConfig] = useState<AppConfig>(loadAppConfig())
   const platform = detectPlatformCapabilities()
+
+  // OS-ME001-E6.3.1: Preferência "Iniciar diretamente no Network Car Drive"
+  const [driveStartupEnabled, setDriveStartupEnabled] = useState<boolean>(() =>
+    getDriveStartupPreference(),
+  )
 
   // OS-ME001-E6.2: Identidade da Assistente Personalizável por Veículo / Usuário / Oficina
   const [assistantIdentity, setAssistantIdentity] = useState<AssistantIdentityConfig>(() =>
@@ -94,10 +100,11 @@ export default function Configuracoes() {
   const handleSave = () => {
     saveAppConfig(config)
     saveAssistantIdentity(assistantIdentity, selectedVehicle?.plate)
+    setDriveStartupPreference(driveStartupEnabled)
     toast({
       title: 'Configurações Salvas',
       description:
-        'Parâmetros operacionais e assistente atualizados no armazenamento local (localStorage).',
+        'Parâmetros operacionais, assistente e preferência de inicialização Drive salvos com sucesso.',
     })
   }
 
@@ -143,6 +150,73 @@ export default function Configuracoes() {
             <Save className="w-3.5 h-3.5 mr-1" />
             Salvar Alterações
           </Button>
+        </div>
+      </div>
+
+      {/* OS-ME001-E6.3.1: Preferência de Inicialização no Network Car Drive */}
+      <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-4">
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-b border-[#263340] pb-3">
+          <div className="flex items-center space-x-2">
+            <Car className="w-5 h-5 text-[#FFB300]" />
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                <span>Inicialização Automotiva (OS-ME001-E6.3.1)</span>
+                {driveStartupEnabled && (
+                  <span className="text-[10px] bg-amber-950 text-[#FFB300] border border-amber-800 px-1.5 py-0.2 rounded font-mono font-normal">
+                    DRIVE DIRETO ATIVO
+                  </span>
+                )}
+              </h2>
+              <p className="text-xs text-[#9AA7B4]">
+                Ideal para centrais multimídia Android e tablets fixados no painel do veículo.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-[#0B0F14] border border-[#263340] rounded-xl p-4">
+          <div className="space-y-1">
+            <span className="font-bold text-sm text-white flex items-center space-x-2">
+              <span>Iniciar diretamente no Network Car Drive</span>
+              <Compass className="w-4 h-4 text-cyan-400" />
+            </span>
+            <p className="text-xs text-gray-400 max-w-xl">
+              Quando habilitado, após o login ou ao recarregar a aplicação, o sistema abre
+              diretamente na interface automotivafullscreen (/network-car-drive) em vez do Painel
+              Live técnico. Persistido por usuário e oficina.
+            </p>
+          </div>
+
+          <div className="flex items-center space-x-3 shrink-0">
+            <button
+              type="button"
+              role="switch"
+              aria-checked={driveStartupEnabled}
+              onClick={() => {
+                const next = !driveStartupEnabled
+                setDriveStartupEnabled(next)
+                setDriveStartupPreference(next)
+                toast({
+                  title: next ? 'Inicialização Drive Ativada' : 'Inicialização Padrão Restaurada',
+                  description: next
+                    ? 'Próximos logins e aberturas direcionarão para o Network Car Drive.'
+                    : 'Aberturas direcionarão para o Painel Live.',
+                })
+              }}
+              className={`relative inline-flex h-6 w-11 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${
+                driveStartupEnabled ? 'bg-[#FFB300]' : 'bg-[#263340]'
+              }`}
+            >
+              <span
+                className={`pointer-events-none inline-block h-5 w-5 transform rounded-full bg-black shadow ring-0 transition duration-200 ease-in-out ${
+                  driveStartupEnabled ? 'translate-x-5' : 'translate-x-0'
+                }`}
+              />
+            </button>
+            <span className="text-xs font-mono font-bold text-white min-w-[50px]">
+              {driveStartupEnabled ? 'ATIVO' : 'INATIVO'}
+            </span>
+          </div>
         </div>
       </div>
 

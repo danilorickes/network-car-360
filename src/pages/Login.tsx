@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '@/contexts/AuthContext'
 import {
   Activity,
@@ -15,9 +16,12 @@ import {
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert'
+import { getDriveStartupPreference } from '@/lib/drive-startup-pref'
 
 export default function Login() {
   const { login, backendStatus, backendError, checkBackendHealth } = useAuth()
+  const navigate = useNavigate()
+  const location = useLocation()
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [errorMessage, setErrorMessage] = useState<string | null>(null)
@@ -39,7 +43,14 @@ export default function Login() {
     const result = await login(email, password)
     setSubmitting(false)
 
-    if (!result.success) {
+    if (result.success) {
+      // Redireciona para o destino pretendido preservado (state.from)
+      // ou para o Drive caso a preferência de inicialização esteja ativa, senão "/"
+      const fromPath = (location.state as any)?.from
+      const defaultTarget = getDriveStartupPreference() ? '/network-car-drive' : '/'
+      const target = fromPath && fromPath !== '/login' ? fromPath : defaultTarget
+      navigate(target, { replace: true })
+    } else {
       setErrorMessage(result.error || 'Falha ao autenticar. Verifique suas credenciais.')
     }
   }

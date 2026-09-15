@@ -6,6 +6,11 @@ import {
   getAssistantDisplayName,
   DEFAULT_ASSISTANT_IDENTITY,
 } from '@/lib/assistant/assistant-identity-store'
+import {
+  getDriveStartupPreference,
+  setDriveStartupPreference,
+  getDriveStartupStorageKey,
+} from '@/lib/drive-startup-pref'
 
 describe('OS-ME001-E6.3 — Validações da Experiência Embarcada Network Car Drive', () => {
   beforeEach(() => {
@@ -113,6 +118,25 @@ describe('OS-ME001-E6.3 — Validações da Experiência Embarcada Network Car D
         const aspectRatio = res.width / res.height
         expect(aspectRatio).toBeGreaterThan(1.4) // Widescreen automotivo horizontal
       })
+    })
+  })
+
+  describe('OS-ME001-E6.3.1: Preferência de Inicialização no Network Car Drive', () => {
+    it('deve retornar falso por padrão quando nenhuma preferência foi gravada', () => {
+      expect(getDriveStartupPreference()).toBe(false)
+    })
+
+    it('deve persistir e recuperar valor ativado usando prefixo e isolamento multitenant nc_drive_startup_pref_*', () => {
+      const key = getDriveStartupStorageKey()
+      expect(key.startsWith('nc_drive_startup_pref_')).toBe(true)
+
+      setDriveStartupPreference(true)
+      expect(getDriveStartupPreference()).toBe(true)
+      expect(localStorage.getItem(key)).toBe('true')
+
+      setDriveStartupPreference(false)
+      expect(getDriveStartupPreference()).toBe(false)
+      expect(localStorage.getItem(key)).toBe('false')
     })
   })
 })

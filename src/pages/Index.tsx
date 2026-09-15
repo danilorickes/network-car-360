@@ -1,14 +1,33 @@
 import React from 'react'
 import { useTelemetry } from '@/contexts/TelemetryContext'
 import { PID_DEFINITIONS } from '@/lib/obd/pid-decoder'
+import { Link } from 'react-router-dom'
 import { ConnectionControlPanel } from '@/components/live/ConnectionControlPanel'
 import { GaugeCard } from '@/components/live/GaugeCard'
 import { SymptomMarkerButton } from '@/components/live/SymptomMarkerButton'
 import { MiniLiveChart } from '@/components/live/MiniLiveChart'
-import { AlertTriangle, CheckCircle2 } from 'lucide-react'
+import {
+  AlertTriangle,
+  CheckCircle2,
+  Car,
+  Compass,
+  Music,
+  Bot,
+  ChevronRight,
+  Gauge,
+} from 'lucide-react'
+import {
+  loadAssistantIdentity,
+  getAssistantDisplayName,
+} from '@/lib/assistant/assistant-identity-store'
 
 export default function Index() {
-  const { telemetry, recentHistory } = useTelemetry()
+  const { telemetry, recentHistory, selectedVehicle } = useTelemetry()
+  const assistantIdentity = React.useMemo(
+    () => loadAssistantIdentity(selectedVehicle?.plate),
+    [selectedVehicle?.plate],
+  )
+  const assistantTabName = getAssistantDisplayName(assistantIdentity, true)
 
   // Separar PIDs prioritários (destacados no grid) e secundários
   const priorityPids = ['0x0C', '0x0D', '0x05', '0x04', '0x11']
@@ -34,6 +53,72 @@ export default function Index() {
     <div className="space-y-6">
       {/* Connection & Session Controller */}
       <ConnectionControlPanel />
+
+      {/* Item C OS-ME001-E6.3.1: Atalho em Destaque para o Modo Condução Network Car Drive (E6.3) */}
+      <div
+        data-testid="card-drive-shortcut"
+        className="bg-gradient-to-r from-[#111A24] via-[#162230] to-[#111A24] border-2 border-[#FFB300]/60 hover:border-[#FFB300] rounded-xl p-4 sm:p-5 shadow-xl transition-all relative overflow-hidden group"
+      >
+        <div className="absolute top-0 right-0 w-48 h-48 bg-[#FFB300]/5 rounded-full blur-3xl pointer-events-none" />
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4 relative z-10">
+          <div className="space-y-2">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="bg-[#FFB300] text-black font-extrabold text-[11px] px-2.5 py-0.5 rounded uppercase tracking-wider font-mono">
+                Experiência Embarcada E6.3
+              </span>
+              <span className="text-cyan-400 font-mono text-xs font-semibold bg-cyan-950/60 border border-cyan-800/60 px-2 py-0.5 rounded">
+                Touch Automotivo • Widescreen
+              </span>
+              {telemetry.transportType === 'SIMULADOR' && (
+                <span className="text-amber-400 font-mono text-[11px] font-bold bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded">
+                  DADOS SIMULADOS DISPONÍVEIS
+                </span>
+              )}
+            </div>
+
+            <div>
+              <h2 className="text-lg sm:text-xl font-black text-white tracking-wide flex items-center space-x-2">
+                <Car className="w-6 h-6 text-[#FFB300]" />
+                <span>Modo Condução Network Car Drive</span>
+              </h2>
+              <p className="text-xs text-[#9AA7B4] max-w-2xl mt-0.5">
+                Interface automotiva fullscreen dedicada para multimídias Android, tablets e uso em
+                trânsito com 4 áreas especializadas e segurança determinística sem nuvem:
+              </p>
+            </div>
+
+            {/* 4 Áreas da Interface E6.3 */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 pt-1 font-mono text-xs">
+              <div className="bg-[#0B0F14]/80 border border-[#263340] rounded-lg px-2.5 py-1.5 flex items-center space-x-2">
+                <Gauge className="w-3.5 h-3.5 text-cyan-400 shrink-0" />
+                <span className="text-gray-200 font-bold truncate">CARRO</span>
+              </div>
+              <div className="bg-[#0B0F14]/80 border border-[#263340] rounded-lg px-2.5 py-1.5 flex items-center space-x-2">
+                <Compass className="w-3.5 h-3.5 text-[#FFB300] shrink-0" />
+                <span className="text-gray-200 font-bold truncate">VIAGEM</span>
+              </div>
+              <div className="bg-[#0B0F14]/80 border border-[#263340] rounded-lg px-2.5 py-1.5 flex items-center space-x-2">
+                <Music className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                <span className="text-gray-200 font-bold truncate">DIVERSÃO</span>
+              </div>
+              <div className="bg-[#0B0F14]/80 border border-[#263340] rounded-lg px-2.5 py-1.5 flex items-center space-x-2">
+                <Bot className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
+                <span className="text-gray-200 font-bold truncate">{assistantTabName}</span>
+              </div>
+            </div>
+          </div>
+
+          {/* Botão Touch Grande para /network-car-drive */}
+          <Link
+            to="/network-car-drive"
+            className="w-full lg:w-auto shrink-0 bg-[#FFB300] hover:bg-[#e5a000] text-black font-black text-sm sm:text-base px-6 py-3.5 rounded-xl flex items-center justify-center space-x-2 shadow-lg shadow-[#FFB300]/20 hover:scale-[1.02] active:scale-[0.98] transition-all"
+          >
+            <Car className="w-5 h-5 fill-current" />
+            <span>Abrir Network Car Drive</span>
+            <ChevronRight className="w-5 h-5 stroke-[3]" />
+          </Link>
+        </div>
+      </div>
 
       {/* Link de Diagnóstico 360 se houver relatório recente gerado na sessão ativa */}
       {telemetry.sessionState === 'ENCERRADO' && (

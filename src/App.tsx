@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -27,13 +27,16 @@ import Layout from './components/Layout'
 import { NetworkCarDrive } from './pages/NetworkCarDrive'
 import { HomologacaoHardware } from './pages/HomologacaoHardware'
 import { SimuladorDrive } from './pages/SimuladorDrive'
+import { getDriveStartupPreference } from './lib/drive-startup-pref'
 
 // Rota protegida em conformidade com auditoria NC-E4-SEC-01:
 // - Exige autenticação válida para visualização de dados protegidos.
 // - Timeout impede loader infinito, porém JAMAIS concede acesso anônimo/offline indevido.
-// - Quando não autenticado (ou backend indisponível), redireciona explicitamente para /login.
+// - Quando não autenticado (ou backend indisponível), redireciona explicitamente para /login
+//   preservando o caminho original pretendido (state: { from: location.pathname }).
 export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading, backendStatus } = useAuth()
+  const location = useLocation()
 
   if (loading) {
     return (
@@ -53,23 +56,27 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     )
   }
 
-  // Falha de backend ou ausência de usuário: redireciona para Login
-  // O componente Login renderiza o estado explícito de indisponibilidade ou formulário
+  // Falha de backend ou ausência de usuário: redireciona para Login preservando intenção de rota
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/login" state={{ from: location.pathname }} replace />
   }
 
   // Quando autenticado, garante renderização imediata e segura dos filhos protegidos
   return <>{children}</>
 }
 
-// Rota pública para Login: se o usuário já estiver autenticado, redireciona para "/"
+// Rota pública para Login: se o usuário já estiver autenticado,
+// redireciona para location.state?.from || (preferência de inicialização Drive ? '/network-car-drive' : '/')
 const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth()
+  const location = useLocation()
 
-  // Se já há usuário autenticado no authStore, redireciona de imediato sem prender em loading
+  // Se já há usuário autenticado no authStore, redireciona de imediato respeitando o retorno pretendido ou a preferência Drive
   if (user) {
-    return <Navigate to="/" replace />
+    const fromPath = (location.state as any)?.from
+    const defaultTarget = getDriveStartupPreference() ? '/network-car-drive' : '/'
+    const target = fromPath && fromPath !== '/login' ? fromPath : defaultTarget
+    return <Navigate to={target} replace />
   }
 
   if (loading) {
@@ -106,6 +113,7 @@ const App = () => (
             />
 
             {/* E6: Interface Automotiva Network Car Drive (Fullscreen / Standalone) */}
+            {/* Item A da OS-ME001-E6.3.1: tanto /drive quanto /network-car-drive renderizam diretamente o componente, sem Navigate intermediário */}
             <Route
               path="/drive"
               element={
@@ -114,7 +122,14 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
-            <Route path="/network-car-drive" element={<Navigate to="/drive" replace />} />
+            <Route
+              path="/network-car-drive"
+              element={
+                <ProtectedRoute>
+                  <NetworkCarDrive />
+                </ProtectedRoute>
+              }
+            />
 
             <Route element={<Layout />}>
               {/* E6: Homologação de Hardware e Simulador Drive Integrados ao Painel */}
