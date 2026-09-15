@@ -10,7 +10,19 @@ import {
   SelectValue,
 } from '@/components/ui/select'
 import { RealSerialTransport } from '@/lib/obd/transports/real-serial-transport'
-import { Play, Square, Wifi, WifiOff, AlertTriangle, RefreshCw, Radio } from 'lucide-react'
+import { BluetoothTransport } from '@/lib/obd/transports/bluetooth-transport'
+import { detectPlatformCapabilities } from '@/lib/obd/platform-detector'
+import {
+  Play,
+  Square,
+  Wifi,
+  WifiOff,
+  AlertTriangle,
+  RefreshCw,
+  Radio,
+  Bluetooth,
+  Smartphone,
+} from 'lucide-react'
 
 export const ConnectionControlPanel: React.FC = () => {
   const {
@@ -29,10 +41,14 @@ export const ConnectionControlPanel: React.FC = () => {
 
   const [vehicleNameInput, setVehicleNameInput] = useState('Ford EcoSport 2020 1.5 Dragon 3C')
   const isWebSerialAvailable = RealSerialTransport.isWebSerialSupported()
+  const isWebBluetoothAvailable = BluetoothTransport.isWebBluetoothSupported()
+  const platform = detectPlatformCapabilities()
 
   const isConnected = telemetry.connectionState === 'CONECTADO'
   const isTesting = telemetry.sessionState === 'TESTE ATIVO'
   const isSimulator = telemetry.transportType === 'SIMULADOR'
+  const isBluetooth = telemetry.transportType === 'OBD REAL BLUETOOTH'
+  const isSerial = telemetry.transportType === 'OBD REAL'
 
   return (
     <div className="bg-[#131A22] border border-[#263340] rounded-lg p-4 md:p-5 mb-6 space-y-4">
@@ -58,16 +74,33 @@ export const ConnectionControlPanel: React.FC = () => {
               disabled={isTesting}
               onClick={() => setTransportType('OBD REAL')}
               className={`px-3 py-1 text-xs font-semibold rounded transition-all ${
-                !isSimulator ? 'bg-purple-600 text-white shadow' : 'text-[#9AA7B4] hover:text-white'
+                isSerial ? 'bg-purple-600 text-white shadow' : 'text-[#9AA7B4] hover:text-white'
               }`}
             >
-              OBD REAL (ELM327)
+              USB/SERIAL (ELM327)
+            </button>
+            <button
+              type="button"
+              disabled={isTesting}
+              onClick={() => setTransportType('OBD REAL BLUETOOTH')}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-all flex items-center space-x-1 ${
+                isBluetooth ? 'bg-cyan-600 text-white shadow' : 'text-[#9AA7B4] hover:text-white'
+              }`}
+            >
+              <Bluetooth className="w-3.5 h-3.5 mr-0.5 inline" />
+              <span>BLUETOOTH (BLE/Android)</span>
             </button>
           </div>
 
-          {!isSimulator && !isWebSerialAvailable && (
+          {isSerial && !isWebSerialAvailable && (
             <span className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800 px-2 py-0.5 rounded">
-              Aviso: Web Serial requer Google Chrome ou MS Edge
+              Aviso: Web Serial requer Google Chrome ou MS Edge no Desktop
+            </span>
+          )}
+
+          {isBluetooth && !isWebBluetoothAvailable && (
+            <span className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800 px-2 py-0.5 rounded">
+              Aviso: Web Bluetooth requer navegador compatível (Chrome Android/Desktop)
             </span>
           )}
 
@@ -224,6 +257,25 @@ export const ConnectionControlPanel: React.FC = () => {
               {pid}
             </span>
           ))}
+        </div>
+      )}
+
+      {/* Banner de Orientação da Plataforma (Android/Desktop) */}
+      {(isBluetooth || isSerial || platform.isAndroid) && (
+        <div className="bg-[#0B0F14] border border-[#263340] rounded p-2.5 text-xs text-[#9AA7B4] flex items-start space-x-2">
+          {platform.isAndroid ? (
+            <Smartphone className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+          ) : (
+            <Radio className="w-4 h-4 text-[#FFB300] shrink-0 mt-0.5" />
+          )}
+          <div className="space-y-0.5">
+            <span className="font-semibold text-white">
+              {platform.isAndroid
+                ? 'Ambiente Android / Multimídia:'
+                : 'Estratégia de Conexão Física:'}
+            </span>
+            <p className="text-gray-400">{platform.guidanceText}</p>
+          </div>
         </div>
       )}
 

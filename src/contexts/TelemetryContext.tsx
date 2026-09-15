@@ -11,11 +11,13 @@ import {
 import { OBDTransport } from '@/lib/obd/transports/obd-transport'
 import { SimulatedTransport, SimulatorScenario } from '@/lib/obd/transports/simulated-transport'
 import { RealSerialTransport } from '@/lib/obd/transports/real-serial-transport'
+import { BluetoothTransport } from '@/lib/obd/transports/bluetooth-transport'
 import { SamplerScheduler } from '@/lib/obd/sampler-scheduler'
 import { RawRecorder } from '@/lib/obd/raw-recorder'
 import { EventMarker } from '@/lib/obd/event-marker'
 import { DtcService } from '@/lib/obd/dtc-service'
 import { loadAppConfig } from '@/lib/config-store'
+import { offlineStorage } from '@/lib/obd/offline-storage'
 import pb from '@/lib/pocketbase/client'
 import { useToast } from '@/hooks/use-toast'
 
@@ -78,7 +80,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   const dtcTimerRef = useRef<any>(null)
   const durationTimerRef = useRef<any>(null)
 
-  // Instancia transporte padrão (Simulador)
+  // Instancia transporte padrão (Simulador) e inicializa verificação offline
   useEffect(() => {
     const sim = new SimulatedTransport(activeScenario)
     sim.on('statusChange', (status, msg) => {
@@ -90,8 +92,21 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     })
     transportRef.current = sim
 
+    // NC-02: Instancia recorder e reidrata amostras pendentes do IndexedDB na inicialização
+    const rec = new RawRecorder()
+    recorderRef.current = rec
+    rec.rehydratePendingQueue().then((rehydratedCount) => {
+      if (rehydratedCount > 0) {
+        toast({
+          title: 'Dados Offline Recuperados (NC-02)',
+          description: `${rehydratedCount} amostra(s) pendente(s) reidratada(s) do IndexedDB para sincronização.`,
+        })
+      }
+    })
+
     return () => {
       sim.disconnect().catch(() => {})
+      rec.destroy()
     }
   }, [])
 
@@ -127,6 +142,16 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }))
         })
         transportRef.current = sim
+      } else if (type === 'OBD REAL BLUETOOTH') {
+        const bt = new BluetoothTransport()
+        bt.on('statusChange', (status, msg) => {
+          setTelemetry((prev) => ({
+            ...prev,
+            connectionState: status,
+            lastError: status === 'FALHA' ? msg : undefined,
+          }))
+        })
+        transportRef.current = bt
       } else {
         const real = new RealSerialTransport(config.baudRate, config.reconnectAttempts)
         real.on('statusChange', (status, msg) => {
@@ -225,7 +250,9 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const transportDetail =
       adapterType === 'SIMULADOR'
         ? `Simulador (${activeScenario})`
-        : 'Web Serial — ELM327 (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
+        : adapterType === 'OBD REAL BLUETOOTH'
+          ? 'Web Bluetooth — ELM327 BLE (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
+          : 'Web Serial — ELM327 USB (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
 
     // Cria registro de sessão no PocketBase
     let pbSessId: string | null = null
@@ -251,8 +278,13 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
 
     // Inicializa subsistemas
-    const recorder = new RawRecorder(pbSessId || undefined)
-    recorderRef.current = recorder
+    let recorder = recorderRef.current
+    if (!recorder) {
+      recorder = new RawRecorder(pbSessId || undefined)
+      recorderRef.current = recorder
+    } else if (pbSessId) {
+      recorder.setDbSessionId(pbSessId)
+    }
 
     const eventMarker = new EventMarker(
       sessionUid,

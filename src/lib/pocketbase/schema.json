@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T01:51:40.302Z",
+  "generatedAt": "2026-09-15T02:45:11.816Z",
   "collections": [
     {
       "name": "users",
@@ -72,7 +72,7 @@
           "type": "select",
           "required": true,
           "system": false,
-          "selectValues": ["SIMULADOR", "OBD REAL"]
+          "selectValues": ["SIMULADOR", "OBD REAL", "OBD REAL BLUETOOTH"]
         },
         {
           "name": "transport_detail",

@@ -10,7 +10,7 @@ export type EventType =
   | 'outro/livre'
 
 export type SessionStatus = 'ATIVO' | 'ENCERRADO' | 'INTERROMPIDO'
-export type AdapterType = 'SIMULADOR' | 'OBD REAL'
+export type AdapterType = 'SIMULADOR' | 'OBD REAL' | 'OBD REAL BLUETOOTH'
 export type DtcStatus = 'ATIVO' | 'PENDENTE'
 
 export interface PidDefinition {
