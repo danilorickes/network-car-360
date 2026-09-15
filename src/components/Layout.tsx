@@ -181,16 +181,21 @@ export default function Layout() {
 
             {/* User / Offline info */}
             {user && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={logout}
-                title="Desconectar do sistema"
-                className="hidden lg:flex text-xs text-[#9AA7B4] hover:text-white hover:bg-[#1A232E] px-2"
-              >
-                <LogOut className="w-3.5 h-3.5 mr-1" />
-                Sair
-              </Button>
+              <div className="hidden lg:flex items-center space-x-2">
+                <span className="text-xs text-gray-300 font-mono bg-[#1A232E] px-2 py-1 rounded border border-[#263340]">
+                  {user.email || user.name || 'Operador Autenticado'}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={logout}
+                  title="Desconectar do sistema"
+                  className="text-xs text-[#9AA7B4] hover:text-white hover:bg-[#1A232E] px-2"
+                >
+                  <LogOut className="w-3.5 h-3.5 mr-1" />
+                  Sair
+                </Button>
+              </div>
             )}
 
             {/* Mobile menu trigger */}
@@ -311,6 +316,25 @@ export default function Layout() {
             >
               Relatório / Evidências
             </NavLink>
+            {user && (
+              <div className="pt-2 border-t border-[#263340] flex items-center justify-between">
+                <span className="text-xs text-gray-400 font-mono truncate max-w-[200px]">
+                  {user.email || user.name}
+                </span>
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    logout()
+                    setMobileMenuOpen(false)
+                  }}
+                  className="text-xs text-red-400 hover:text-red-300 hover:bg-red-950/40 px-2"
+                >
+                  <LogOut className="w-3.5 h-3.5 mr-1" />
+                  Sair
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </header>
