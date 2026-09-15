@@ -109,7 +109,7 @@ export default function Layout() {
               }
             >
               <PlayCircle className="w-4 h-4" />
-              <span>Replay</span>
+              <span>Replay & Diagnóstico 360</span>
             </NavLink>
 
             <NavLink
@@ -295,7 +295,7 @@ export default function Layout() {
               onClick={() => setMobileMenuOpen(false)}
               className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
             >
-              Replay
+              Replay & Diagnóstico 360
             </NavLink>
             <NavLink
               to="/configuracoes"
@@ -328,9 +328,9 @@ export default function Layout() {
           </div>
           <div className="flex items-center space-x-3">
             <span className="font-mono text-[#FFB300] bg-[#FFB300]/10 px-2 py-0.5 rounded border border-[#FFB300]/30">
-              ME001-E2 — Etapa 2
+              ME001-E3 — Etapa 3
             </span>
-            <span>Versão 2.0.0 (Diagnóstico 360 Live)</span>
+            <span>Versão 3.0.0 (Motor de Inteligência Diagnóstica)</span>
           </div>
         </div>
       </footer>

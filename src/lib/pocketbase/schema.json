@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T02:50:56.315Z",
+  "generatedAt": "2026-09-15T03:06:29.913Z",
   "collections": [
     {
       "name": "users",
@@ -694,6 +694,100 @@
       "indexes": [
         "CREATE UNIQUE INDEX idx_evidence_event_id ON diagnostic_evidences (event_id)",
         "CREATE INDEX idx_evidence_session ON diagnostic_evidences (session)"
+      ]
+    },
+    {
+      "name": "diagnostic_analyses",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "session",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "sessions"
+        },
+        {
+          "name": "event",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "session_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "event_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "symptom_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "safety_level",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["INFORMATIVO", "ATENCAO", "CRITICO"]
+        },
+        {
+          "name": "hypotheses_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "top_hypothesis_title",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "top_hypothesis_confidence",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "report_json",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_diag_analyses_session ON diagnostic_analyses (session_id)",
+        "CREATE INDEX idx_diag_analyses_event ON diagnostic_analyses (event_id)"
       ]
     }
   ]

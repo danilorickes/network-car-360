@@ -35,6 +35,30 @@ export default function Index() {
       {/* Connection & Session Controller */}
       <ConnectionControlPanel />
 
+      {/* Link de Diagnóstico 360 se houver relatório recente gerado na sessão ativa */}
+      {telemetry.sessionState === 'ENCERRADO' && (
+        <div className="bg-[#1A232E] border border-[#FFB300] p-4 rounded-lg flex flex-col sm:flex-row items-center justify-between gap-3 shadow-lg">
+          <div className="flex items-center space-x-3">
+            <div className="w-10 h-10 rounded-full bg-[#FFB300]/20 text-[#FFB300] flex items-center justify-center shrink-0">
+              <CheckCircle2 className="w-6 h-6" />
+            </div>
+            <div>
+              <span className="font-bold text-sm text-white">Sessão Encerrada com Sucesso</span>
+              <p className="text-xs text-[#9AA7B4]">
+                A telemetria completa e as caixas-pretas registradas estão prontas para a síntese do
+                Diagnóstico 360.
+              </p>
+            </div>
+          </div>
+          <a
+            href={`/replay${telemetry.activeSessionId ? `?session=${telemetry.activeSessionId}` : ''}`}
+            className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs px-4 py-2 rounded-lg flex items-center space-x-1.5 shrink-0 shadow"
+          >
+            <span>Abrir Diagnóstico 360</span>
+          </a>
+        </div>
+      )}
+
       {/* DTC & MIL Warning Alert Strip (se houver DTCs detectados) */}
       {telemetry.milOn || telemetry.dtcList.length > 0 ? (
         <div className="bg-amber-950/40 border-l-4 border-amber-500 p-3 rounded text-xs flex flex-wrap items-center justify-between gap-2">

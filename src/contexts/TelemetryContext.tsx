@@ -24,6 +24,9 @@ import { RawRecorder } from '@/lib/obd/raw-recorder'
 import { EventMarker } from '@/lib/obd/event-marker'
 import { DtcService } from '@/lib/obd/dtc-service'
 import { BlackBoxBuilder } from '@/lib/obd/blackbox-builder'
+import { Diagnostic360Pipeline } from '@/lib/diagnostic/diagnostic-pipeline'
+import { diagnosticService } from '@/services/diagnostic'
+import { Diagnostic360Report } from '@/types/diagnostic'
 import { vehicleService, obdCapabilityService } from '@/services/vehicles'
 import { loadAppConfig, saveAppConfig } from '@/lib/config-store'
 import pb from '@/lib/pocketbase/client'
@@ -51,6 +54,7 @@ interface TelemetryContextType {
   bufferedSamples: RawSampleModel[]
   sessionEvents: EventModel[]
   blackBoxPackages: BlackBoxPackage[]
+  latestDiagnosticReport: Diagnostic360Report | null
 }
 
 const initialTelemetry: TelemetryState = {
@@ -84,6 +88,9 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   >([])
   const [sessionEvents, setSessionEvents] = useState<EventModel[]>([])
   const [blackBoxPackages, setBlackBoxPackages] = useState<BlackBoxPackage[]>([])
+  const [latestDiagnosticReport, setLatestDiagnosticReport] = useState<Diagnostic360Report | null>(
+    null,
+  )
 
   // Instâncias de baixo nível
   const transportRef = useRef<OBDTransport | null>(null)
@@ -648,9 +655,17 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         totalEvents: prev.totalEvents + 1,
       }))
 
+      // Executa motor inteligente diagnóstico 360 automaticamente
+      const diag = Diagnostic360Pipeline.executeAnalysis({
+        blackBox: pkg,
+        allSessionSamples: currentSamples,
+      })
+      setLatestDiagnosticReport(diag)
+      diagnosticService.saveReport(diag, dbSessionIdRef.current || undefined, ev.id).catch(() => {})
+
       toast({
-        title: 'SINTOMA REGISTRADO COM CAIXA-PRETA',
-        description: `Evento "${type}" gravado! Caixa-preta de ±${config.windowPreMs / 1000}s e ${pkg.facts.length} evidências congeladas.`,
+        title: 'DIAGNÓSTICO 360 DISPONÍVEL',
+        description: `Evento "${type}" analisado: ${diag.hypotheses.length} hipótese(s) e nível de segurança [${diag.safetyOverall}].`,
       })
 
       return ev
@@ -684,6 +699,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         bufferedSamples: recorderRef.current?.getSamplesCopy() || [],
         sessionEvents,
         blackBoxPackages,
+        latestDiagnosticReport,
       }}
     >
       {children}

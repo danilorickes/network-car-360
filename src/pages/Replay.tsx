@@ -15,6 +15,9 @@ import { MiniLiveChart } from '@/components/live/MiniLiveChart'
 import { ReplayEngine } from '@/lib/obd/replay-engine'
 import { BlackBoxBuilder, TemporalComparisonPoint } from '@/lib/obd/blackbox-builder'
 import { ExporterService } from '@/lib/obd/exporter-service'
+import { Diagnostic360Pipeline } from '@/lib/diagnostic/diagnostic-pipeline'
+import { diagnosticService } from '@/services/diagnostic'
+import { Diagnostic360View } from '@/components/diagnostic/Diagnostic360View'
 import { vehicleService } from '@/services/vehicles'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -48,11 +51,14 @@ export default function Replay() {
   const [dtcs, setDtcs] = useState<DtcModel[]>([])
   const [loading, setLoading] = useState(false)
 
-  // Caixa-Preta do evento selecionado
+  // Caixa-Preta e Diagnóstico 360 do evento selecionado
   const [selectedEventId, setSelectedEventId] = useState<string | null>(eventQueryId || null)
   const [selectedBlackBox, setSelectedBlackBox] = useState<BlackBoxPackage | null>(null)
+  const [diagnosticReport, setDiagnosticReport] = useState<
+    import('@/types/diagnostic').Diagnostic360Report | null
+  >(null)
   const [temporalPoints, setTemporalPoints] = useState<TemporalComparisonPoint[]>([])
-  const [activeTab, setActiveTab] = useState<'replay' | 'blackbox'>('replay')
+  const [activeTab, setActiveTab] = useState<'replay' | 'blackbox' | 'diagnostic'>('diagnostic')
 
   // Estados do Replay contínuo
   const [isPlaying, setIsPlaying] = useState(false)
@@ -200,6 +206,14 @@ export default function Replay() {
       communicationState: 'CONECTADO',
     })
     setSelectedBlackBox(pkg)
+
+    // Executa pipeline determinístico do Diagnóstico 360
+    const diag = Diagnostic360Pipeline.executeAnalysis({
+      blackBox: pkg,
+      allSessionSamples: sampleList,
+    })
+    setDiagnosticReport(diag)
+    diagnosticService.saveReport(diag, sess.id, event.id).catch(() => {})
   }
 
   const initEngine = (sampleList: RawSampleModel[], eventList: EventModel[]) => {
@@ -390,12 +404,25 @@ export default function Replay() {
         </div>
       </div>
 
-      {/* Tabs: Replay Contínuo vs. Caixa-Preta do Sintoma */}
-      <div className="flex items-center space-x-2 border-b border-[#263340] pb-2">
+      {/* Tabs: Diagnóstico 360 vs Replay Contínuo vs. Caixa-Preta do Sintoma */}
+      <div className="flex items-center space-x-2 border-b border-[#263340] pb-2 overflow-x-auto">
+        <button
+          type="button"
+          onClick={() => setActiveTab('diagnostic')}
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 whitespace-nowrap ${
+            activeTab === 'diagnostic'
+              ? 'bg-[#FFB300] text-black shadow'
+              : 'text-[#9AA7B4] hover:text-white hover:bg-[#131A22]'
+          }`}
+        >
+          <Sparkles className="w-3.5 h-3.5" />
+          <span>Diagnóstico 360 (Motor Inteligente OS-ME001-E3)</span>
+        </button>
+
         <button
           type="button"
           onClick={() => setActiveTab('replay')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 ${
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 whitespace-nowrap ${
             activeTab === 'replay'
               ? 'bg-[#FFB300] text-black shadow'
               : 'text-[#9AA7B4] hover:text-white hover:bg-[#131A22]'
@@ -408,7 +435,7 @@ export default function Replay() {
         <button
           type="button"
           onClick={() => setActiveTab('blackbox')}
-          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 ${
+          className={`px-4 py-2 text-xs font-bold rounded-lg transition-all flex items-center space-x-2 whitespace-nowrap ${
             activeTab === 'blackbox'
               ? 'bg-[#FFB300] text-black shadow'
               : 'text-[#9AA7B4] hover:text-white hover:bg-[#131A22]'
@@ -608,6 +635,52 @@ export default function Replay() {
 
           {/* Mini Gráfico */}
           <MiniLiveChart data={chartHistory} />
+        </div>
+      )}
+
+      {/* Seção 0: DIAGNÓSTICO 360 (NOVA ÁREA ETAPA 3) */}
+      {activeTab === 'diagnostic' && (
+        <div className="space-y-6">
+          {/* Seletor de Ocorrência se houver múltiplos sintomas */}
+          {events.length > 1 && (
+            <div className="bg-[#131A22] border border-[#263340] rounded-lg p-3 flex flex-wrap items-center gap-2">
+              <span className="text-xs font-bold text-[#9AA7B4] uppercase mr-2">
+                Selecionar Ocorrência para Diagnóstico 360:
+              </span>
+              {events.map((ev, idx) => (
+                <button
+                  key={ev.id || ev.event_id}
+                  type="button"
+                  onClick={() => inspectEventBlackBox(ev, samples, dtcs, sessionRecord!)}
+                  className={`px-3 py-1.5 rounded text-xs font-bold transition-all border ${
+                    selectedEventId === ev.event_id
+                      ? 'bg-red-950 text-red-200 border-red-500'
+                      : 'bg-[#0B0F14] text-gray-300 border-[#263340]'
+                  }`}
+                >
+                  #{idx + 1} {ev.event_type} (+{(ev.ts_mono_offset_ms / 1000).toFixed(1)}s)
+                </button>
+              ))}
+            </div>
+          )}
+
+          {diagnosticReport ? (
+            <Diagnostic360View
+              report={diagnosticReport}
+              onNavigateToRawOffset={(offset) => {
+                setActiveTab('replay')
+                if (totalDurationMs > 0 && replayEngineRef.current) {
+                  const pct = (offset / totalDurationMs) * 100
+                  replayEngineRef.current.seek(pct)
+                  setCurrentProgressPct(pct)
+                }
+              }}
+            />
+          ) : (
+            <div className="bg-[#131A22] border border-[#263340] rounded-lg p-10 text-center text-xs text-[#9AA7B4]">
+              Nenhum sintoma ou ocorrência disponível para análise diagnóstica 360.
+            </div>
+          )}
         </div>
       )}
 
