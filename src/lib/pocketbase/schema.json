@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T11:59:32.766Z",
+  "generatedAt": "2026-09-15T12:17:38.886Z",
   "collections": [
     {
       "name": "users",
@@ -1820,6 +1820,450 @@
         }
       ],
       "indexes": ["CREATE UNIQUE INDEX idx_ws_seq_workshop ON workshop_sequences (workshop_id)"]
+    },
+    {
+      "name": "hardware_homologations",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "manufacturer",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "hardware_version",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "firmware_version",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "transport",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["BLE", "BLUETOOTH_CLASSIC", "USB_SERIAL", "SIMULADOR"]
+        },
+        {
+          "name": "platform",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "NAO_TESTADO",
+            "EM_TESTE",
+            "COMPATIVEL",
+            "COMPATIVEL_COM_LIMITACOES",
+            "INCOMPATIVEL"
+          ]
+        },
+        {
+          "name": "tested_vehicles",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "supported_pids",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sample_rate_hz",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "stability_score",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "field_test_report",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_hw_mfg_model ON hardware_homologations (manufacturer, model)",
+        "CREATE INDEX idx_hw_status ON hardware_homologations (status)"
+      ]
+    },
+    {
+      "name": "trip_sessions",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "trip_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "vehicle_plate",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["EM_ANDAMENTO", "PAUSADA", "CONCLUIDA", "CANCELADA"]
+        },
+        {
+          "name": "started_at",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "ended_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "duration_seconds",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "distance_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avg_speed_kmh",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "max_speed_kmh",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estimated_fuel_liters",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_calculation_mode",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "stop_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_events_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "critical_alerts_count",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "telemetry_summary",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "trip_summary_report",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_trip_id ON trip_sessions (trip_id)",
+        "CREATE INDEX idx_trip_status ON trip_sessions (status)",
+        "CREATE INDEX idx_trip_started ON trip_sessions (started_at)"
+      ]
+    },
+    {
+      "name": "trip_diary_entries",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "trip",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "trip_sessions"
+        },
+        {
+          "name": "trip_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entry_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PARADA", "PONTO_TURISTICO", "FOTO", "COMENTARIO", "MOMENTO_ESPECIAL"]
+        },
+        {
+          "name": "title",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "location_label",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "latitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "longitude",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "has_location_consent",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "odometer_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "photo_url",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_diary_trip ON trip_diary_entries (trip_id)",
+        "CREATE INDEX idx_diary_type ON trip_diary_entries (entry_type)"
+      ]
+    },
+    {
+      "name": "vehicle_baselines",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "vehicle_plate",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "driving_context",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "MOTOR_FRIO",
+            "MARCHA_LENTA_FRIA",
+            "MARCHA_LENTA_QUENTE",
+            "TRANSITO_URBANO",
+            "ACELERACAO",
+            "VELOCIDADE_ESTABILIZADA",
+            "DESACELERACAO",
+            "CARGA_ELEVADA",
+            "ESTRADA",
+            "PARADA_PROLONGADA",
+            "DESCONHECIDO"
+          ]
+        },
+        {
+          "name": "samples_count",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "stats_by_pid",
+          "type": "json",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "last_updated_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_base_veh_ctx ON vehicle_baselines (vehicle_plate, driving_context)"
+      ]
     }
   ]
 }

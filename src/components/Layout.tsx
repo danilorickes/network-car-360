@@ -154,6 +154,46 @@ export default function Layout() {
             <span className="h-4 w-[1px] bg-[#263340] mx-1" />
 
             <NavLink
+              to="/drive"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-bold transition-colors flex items-center space-x-1.5 bg-[#FFB300]/10 text-[#FFB300] border border-[#FFB300]/40 hover:bg-[#FFB300] hover:text-black`
+              }
+            >
+              <Car className="w-3.5 h-3.5" />
+              <span>Drive E6</span>
+            </NavLink>
+
+            <NavLink
+              to="/homologacao-hardware"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <ShieldAlert className="w-3.5 h-3.5 text-cyan-400" />
+              <span>Homologação</span>
+            </NavLink>
+
+            <NavLink
+              to="/simulador-drive"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <PlaySquare className="w-3.5 h-3.5 text-blue-400" />
+              <span>Simulador Drive</span>
+            </NavLink>
+
+            <span className="h-4 w-[1px] bg-[#263340] mx-1" />
+
+            <NavLink
               to="/"
               className={({ isActive }) =>
                 `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${

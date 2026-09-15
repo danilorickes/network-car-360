@@ -27,8 +27,11 @@ import {
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
 
+import { ConnectionWizardModal } from './ConnectionWizardModal'
+
 export const ConnectionControlPanel: React.FC = () => {
   const navigate = useNavigate()
+  const [showDiscoveryWizard, setShowDiscoveryWizard] = useState(false)
   const {
     telemetry,
     vehicles,
@@ -245,6 +248,17 @@ export const ConnectionControlPanel: React.FC = () => {
             Testes de Resiliência & Diagnóstico:
           </label>
           <div className="flex flex-wrap items-center gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => setShowDiscoveryWizard(true)}
+              className="border-[#FFB300]/50 text-[#FFB300] hover:bg-[#FFB300]/10 text-xs"
+              title="Assistente passo a passo de descoberta de adaptador, protocolo e PIDs"
+            >
+              <Radio className="w-3.5 h-3.5 mr-1" />
+              Assistente OBD
+            </Button>
+
             {isSimulator && isConnected && (
               <>
                 <Button
@@ -361,6 +375,15 @@ export const ConnectionControlPanel: React.FC = () => {
           </span>
         </div>
       )}
+
+      {/* Modal do Assistente de Descoberta OBD */}
+      <ConnectionWizardModal
+        open={showDiscoveryWizard}
+        onClose={() => setShowDiscoveryWizard(false)}
+        onConnectionSuccess={(res) => {
+          setShowDiscoveryWizard(false)
+        }}
+      />
     </div>
   )
 }

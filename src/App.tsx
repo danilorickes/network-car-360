@@ -23,6 +23,11 @@ import PainelOficina from './pages/PainelOficina'
 import SimuladorOperacional from './pages/SimuladorOperacional'
 import Layout from './components/Layout'
 
+// E6: Hardware Real, Modo Viagem, Homologação e Condução
+import { NetworkCarDrive } from './pages/NetworkCarDrive'
+import { HomologacaoHardware } from './pages/HomologacaoHardware'
+import { SimuladorDrive } from './pages/SimuladorDrive'
+
 // Rota protegida em conformidade com auditoria NC-E4-SEC-01:
 // - Exige autenticação válida para visualização de dados protegidos.
 // - Timeout impede loader infinito, porém JAMAIS concede acesso anônimo/offline indevido.
@@ -89,7 +94,34 @@ const App = () => (
               }
             />
 
+            {/* E6: Interface Automotiva Network Car Drive (Fullscreen / Standalone) */}
+            <Route
+              path="/drive"
+              element={
+                <ProtectedRoute>
+                  <NetworkCarDrive />
+                </ProtectedRoute>
+              }
+            />
+
             <Route element={<Layout />}>
+              {/* E6: Homologação de Hardware e Simulador Drive Integrados ao Painel */}
+              <Route
+                path="/homologacao-hardware"
+                element={
+                  <ProtectedRoute>
+                    <HomologacaoHardware />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/simulador-drive"
+                element={
+                  <ProtectedRoute>
+                    <SimuladorDrive />
+                  </ProtectedRoute>
+                }
+              />
               {/* E5: Módulos Operacionais e Comerciais */}
               <Route
                 path="/painel-oficina"
