@@ -1,0 +1,378 @@
+{
+  "generatedAt": "2026-09-15T01:51:40.302Z",
+  "collections": [
+    {
+      "name": "users",
+      "type": "auth",
+      "apiRules": {
+        "list": "id = @request.auth.id",
+        "view": "id = @request.auth.id",
+        "create": "",
+        "update": "id = @request.auth.id",
+        "delete": "id = @request.auth.id"
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "avatar",
+          "type": "file",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX `idx_tokenKey__pb_users_auth_` ON `users` (`tokenKey`)",
+        "CREATE UNIQUE INDEX `idx_email__pb_users_auth_` ON `users` (`email`) WHERE `email` != ''"
+      ]
+    },
+    {
+      "name": "sessions",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "session_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "vehicle_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "adapter_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["SIMULADOR", "OBD REAL"]
+        },
+        {
+          "name": "transport_detail",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vin",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "protocol",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pids_found",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "started_at",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "ended_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ATIVO", "ENCERRADO", "INTERROMPIDO"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_sessions_session_id ON sessions (session_id)",
+        "CREATE INDEX idx_sessions_started_at ON sessions (started_at DESC)",
+        "CREATE INDEX idx_sessions_status ON sessions (status)"
+      ]
+    },
+    {
+      "name": "raw_samples",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "sample_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "ts_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "ts_mono_offset_ms",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pid",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "raw_value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "decoded_value",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "quality",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["OK", "TIMEOUT", "UNSUPPORTED", "INVALID", "NO_RESPONSE"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "session",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "sessions"
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_raw_samples_id ON raw_samples (sample_id)",
+        "CREATE INDEX idx_raw_samples_pid_ts ON raw_samples (pid, ts_utc DESC)"
+      ]
+    },
+    {
+      "name": "events",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "event_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "event_type",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "falha",
+            "trepidação",
+            "perda de potência",
+            "ruído",
+            "oscilação",
+            "apagamento",
+            "outro/livre"
+          ]
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "ts_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "ts_mono_offset_ms",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "window_pre_ms",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "window_post_ms",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "session",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "sessions"
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_events_event_id ON events (event_id)",
+        "CREATE INDEX idx_events_ts_utc ON events (ts_utc DESC)"
+      ]
+    },
+    {
+      "name": "dtcs",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "dtc_code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["ATIVO", "PENDENTE"]
+        },
+        {
+          "name": "mil_on",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "read_at_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "session",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "sessions"
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_dtcs_code ON dtcs (dtc_code)"]
+    }
+  ]
+}

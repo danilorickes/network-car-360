@@ -1,0 +1,83 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=JetBrains+Mono:wght@400;600;700&display=swap');
+
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 216 28% 6%; /* #0B0F14 deep automotive charcoal */
+    --foreground: 204 20% 96%; /* #F2F5F7 */
+    --card: 213 28% 11%; /* #131A22 */
+    --card-foreground: 204 20% 96%;
+    --popover: 213 28% 11%;
+    --popover-foreground: 204 20% 96%;
+    --primary: 42 100% 50%; /* #FFB300 electric amber */
+    --primary-foreground: 216 28% 6%;
+    --secondary: 214 28% 15%; /* #1A232E surface card */
+    --secondary-foreground: 204 20% 96%;
+    --muted: 214 24% 20%;
+    --muted-foreground: 211 15% 66%; /* #9AA7B4 */
+    --accent: 42 100% 50%;
+    --accent-foreground: 216 28% 6%;
+    --destructive: 3 79% 56%; /* #E53935 signal red */
+    --destructive-foreground: 210 40% 98%;
+    --border: 212 25% 20%; /* #263340 */
+    --input: 212 25% 20%;
+    --ring: 42 100% 50%;
+    --radius: 0.5rem;
+  }
+
+  body {
+    background-color: #0b0f14;
+    color: #f2f5f7;
+    font-family:
+      'Inter',
+      -apple-system,
+      BlinkMacSystemFont,
+      sans-serif;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    font-family: 'JetBrains Mono', monospace;
+  }
+
+  section[aria-label='Notifications alt+T'] {
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+}
+
+@keyframes pulse-live {
+  0% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+  50% {
+    transform: scale(1.15);
+    opacity: 1;
+  }
+  100% {
+    transform: scale(0.95);
+    opacity: 0.7;
+  }
+}
+
+@keyframes blink-rec {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.2;
+  }
+}
+
+.animate-pulse-live {
+  animation: pulse-live 1.2s infinite ease-in-out;
+}
+
+.animate-blink-rec {
+  animation: blink-rec 0.8s infinite ease-in-out;
+}
