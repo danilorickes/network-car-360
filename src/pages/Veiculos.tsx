@@ -1,6 +1,10 @@
 import React, { useState, useEffect } from 'react'
 import { vehicleService, obdCapabilityService } from '@/services/vehicles'
+import { clientService, workOrderService } from '@/services/commercial'
+import { investigationService } from '@/services/investigations'
 import { VehicleModel, ObdCapabilityModel } from '@/types/obd'
+import { ClientModel, WorkOrderModel } from '@/types/commercial'
+import { DiagnosticInvestigationModel } from '@/types/investigation'
 import { useTelemetry } from '@/contexts/TelemetryContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -12,16 +16,28 @@ import {
   DialogFooter,
 } from '@/components/ui/dialog'
 import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import {
   Car,
   Plus,
   Edit2,
   Trash2,
-  ShieldCheck,
   Cpu,
   CheckCircle2,
   AlertCircle,
+  User,
+  Clock,
+  Wrench,
   FileText,
+  Calendar,
+  Layers,
 } from 'lucide-react'
+import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Veiculos() {
@@ -31,6 +47,13 @@ export default function Veiculos() {
   const [editingVehicle, setEditingVehicle] = useState<VehicleModel | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedCapability, setSelectedCapability] = useState<ObdCapabilityModel | null>(null)
+
+  // Clientes para proprietário (Requisito 3)
+  const [clients, setClients] = useState<ClientModel[]>([])
+  const [vehicleOrders, setVehicleOrders] = useState<WorkOrderModel[]>([])
+  const [vehicleInvestigations, setVehicleInvestigations] = useState<
+    DiagnosticInvestigationModel[]
+  >([])
 
   // Formulário
   const [formData, setFormData] = useState({
@@ -45,13 +68,35 @@ export default function Veiculos() {
     odometer_km: 0,
     vin: '',
     notes: '',
+    client: '',
   })
 
+  // Carrega clientes disponíveis
+  useEffect(() => {
+    clientService.getAll().then((cls) => setClients(cls))
+  }, [])
+
+  // Carrega histórico técnico e ordens anteriores do veículo selecionado (Requisito 3 & 13)
   useEffect(() => {
     if (selectedVehicle?.id) {
       obdCapabilityService.getByVehicleId(selectedVehicle.id).then((cap) => {
         setSelectedCapability(cap)
       })
+
+      if (selectedVehicle.plate) {
+        workOrderService.getByVehiclePlate(selectedVehicle.plate).then((osList) => {
+          setVehicleOrders(osList)
+        })
+
+        investigationService.getAll().then((invList) => {
+          const filtered = invList.filter(
+            (i) =>
+              i.vehicle === selectedVehicle.id ||
+              i.vehicle_plate.toUpperCase() === selectedVehicle.plate.toUpperCase(),
+          )
+          setVehicleInvestigations(filtered)
+        })
+      }
     }
   }, [selectedVehicle])
 
@@ -69,6 +114,7 @@ export default function Veiculos() {
       odometer_km: 0,
       vin: '',
       notes: '',
+      client: '',
     })
     setModalOpen(true)
   }
@@ -87,6 +133,7 @@ export default function Veiculos() {
       odometer_km: v.odometer_km || 0,
       vin: v.vin || '',
       notes: v.notes || '',
+      client: (v as any).client || '',
     })
     setModalOpen(true)
   }
@@ -139,6 +186,9 @@ export default function Veiculos() {
     }
   }
 
+  // Proprietário do veículo selecionado
+  const currentOwner = clients.find((c) => c.id === (selectedVehicle as any)?.client)
+
   return (
     <div className="space-y-6">
       {/* Top Header */}
@@ -146,11 +196,11 @@ export default function Veiculos() {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center space-x-2">
             <Car className="w-5 h-5 text-[#FFB300]" />
-            <span>Cadastro & Perfis de Veículos (Genérico OBD-II)</span>
+            <span>Cadastro & Timeline Técnica dos Veículos</span>
           </h1>
           <p className="text-xs text-[#9AA7B4]">
-            Requisito 1 da OS-ME001-E2: Perfis reutilizáveis com assinatura OBD, sem regras
-            engessadas no código.
+            Relação 1 Cliente → N Veículos, assinatura OBD-II, histórico unificado e timeline
+            técnica sem duplicação.
           </p>
         </div>
 
@@ -175,6 +225,8 @@ export default function Veiculos() {
           <div className="space-y-2">
             {vehicles.map((v) => {
               const isSelected = selectedVehicle?.id === v.id
+              const owner = clients.find((c) => c.id === (v as any).client)
+
               return (
                 <div
                   key={v.id || v.plate}
@@ -198,9 +250,11 @@ export default function Veiculos() {
                     <div>
                       {v.version || 'Versão padrão'} • {v.year_model || 'Ano N/D'}
                     </div>
-                    <div className="font-mono text-[11px] text-gray-400">
-                      Motor: {v.engine || 'OBD-II Genérico'}
-                    </div>
+                    {owner && (
+                      <div className="text-emerald-400 font-semibold flex items-center gap-1">
+                        <User className="w-3 h-3 text-[#FFB300]" /> Prop: {owner.name}
+                      </div>
+                    )}
                   </div>
 
                   <div className="flex items-center justify-between pt-2.5 mt-2 border-t border-[#263340] text-[11px]">
@@ -208,7 +262,7 @@ export default function Veiculos() {
                       {isSelected ? (
                         <>
                           <CheckCircle2 className="w-3.5 h-3.5 inline mr-1 text-[#2ECC71]" />
-                          <span>Selecionado para Teste</span>
+                          <span>Selecionado</span>
                         </>
                       ) : (
                         <span className="text-gray-500">Clique para selecionar</span>
@@ -246,178 +300,246 @@ export default function Veiculos() {
           </div>
         </div>
 
-        {/* Detalhes & Assinatura OBD do Veículo Selecionado */}
-        <div className="lg:col-span-2">
+        {/* Detalhes, Proprietário, Assinatura OBD e Timeline Unificada (Requisitos 3 & 13) */}
+        <div className="lg:col-span-2 space-y-6">
           {selectedVehicle ? (
-            <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-5">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#263340]">
-                <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="text-lg font-bold text-white">
-                      {selectedVehicle.make} {selectedVehicle.model} {selectedVehicle.version}
-                    </span>
-                    <span className="bg-[#FFB300] text-black font-bold font-mono text-xs px-2 py-0.5 rounded">
-                      {selectedVehicle.plate}
-                    </span>
-                  </div>
-                  <span className="text-xs font-mono text-[#9AA7B4]">
-                    VIN / Chassi: {selectedVehicle.vin || 'Não disponível'}
-                  </span>
-                </div>
-
-                <Button
-                  size="sm"
-                  onClick={() => openEditModal(selectedVehicle)}
-                  className="bg-[#1A232E] hover:bg-[#263340] text-white border border-[#263340] text-xs"
-                >
-                  <Edit2 className="w-3.5 h-3.5 mr-1.5" />
-                  Editar Perfil
-                </Button>
-              </div>
-
-              {/* Ficha Técnica */}
-              <div>
-                <h3 className="text-xs font-bold text-[#9AA7B4] uppercase tracking-wider mb-2">
-                  Especificações Técnicas do Veículo
-                </h3>
-                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
-                  <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                      Motorização:
-                    </span>
-                    <span className="font-semibold text-white">
-                      {selectedVehicle.engine || 'Genérico'}
-                    </span>
-                  </div>
-                  <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                      Combustível:
-                    </span>
-                    <span className="font-semibold text-white">
-                      {selectedVehicle.fuel || 'Flex'}
-                    </span>
-                  </div>
-                  <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                      Câmbio / Transmissão:
-                    </span>
-                    <span className="font-semibold text-white">
-                      {selectedVehicle.transmission || 'Manual'}
-                    </span>
-                  </div>
-                  <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                      Ano / Modelo:
-                    </span>
-                    <span className="font-semibold text-white">
-                      {selectedVehicle.year_model || 'N/D'}
-                    </span>
-                  </div>
-                  <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                      Odômetro:
-                    </span>
-                    <span className="font-mono text-[#2ECC71]">
-                      {selectedVehicle.odometer_km
-                        ? `${selectedVehicle.odometer_km.toLocaleString('pt-BR')} km`
-                        : 'Não informado'}
-                    </span>
-                  </div>
-                  <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                      Arquitetura:
-                    </span>
-                    <span className="text-blue-400 font-semibold">Genérico OBD-II / SAE J1979</span>
-                  </div>
-                </div>
-
-                {selectedVehicle.notes && (
-                  <div className="mt-3 bg-[#0B0F14] p-3 rounded border border-[#263340] text-xs">
-                    <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold mb-1">
-                      Observações da Oficina:
-                    </span>
-                    <p className="text-gray-300 italic">{selectedVehicle.notes}</p>
-                  </div>
-                )}
-              </div>
-
-              {/* Assinatura / Capacidade OBD do Veículo (Requisito 2) */}
-              <div>
-                <h3 className="text-xs font-bold text-[#9AA7B4] uppercase tracking-wider mb-2 flex items-center space-x-1.5">
-                  <Cpu className="w-4 h-4 text-[#FFB300]" />
-                  <span>Assinatura & Capacidade OBD Registrada</span>
-                </h3>
-
-                {selectedCapability ? (
-                  <div className="bg-[#0B0F14] border border-[#263340] rounded p-4 space-y-3 text-xs">
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-[#263340] pb-2">
-                      <span className="text-gray-300">
-                        Protocolo Detectado:{' '}
-                        <strong className="text-white">
-                          {selectedCapability.protocol_detected}
-                        </strong>
+            <div className="space-y-6">
+              {/* Card 1: Ficha Técnica e Proprietário */}
+              <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#263340]">
+                  <div>
+                    <div className="flex items-center space-x-2">
+                      <span className="text-lg font-bold text-white">
+                        {selectedVehicle.make} {selectedVehicle.model} {selectedVehicle.version}
                       </span>
-                      <span className="text-gray-300">
-                        Adaptador:{' '}
-                        <strong className="text-blue-400">
-                          {selectedCapability.adapter_name || selectedCapability.adapter_type}
-                        </strong>
-                      </span>
-                      <span className="text-gray-300">
-                        MIL Inicial:{' '}
-                        <strong
-                          className={
-                            selectedCapability.mil_initial_state
-                              ? 'text-amber-400'
-                              : 'text-emerald-400'
-                          }
-                        >
-                          {selectedCapability.mil_initial_state ? 'ACESO' : 'APAGADO'}
-                        </strong>
+                      <span className="bg-[#FFB300] text-black font-bold font-mono text-xs px-2 py-0.5 rounded">
+                        {selectedVehicle.plate}
                       </span>
                     </div>
+                    <span className="text-xs font-mono text-[#9AA7B4]">
+                      VIN / Chassi: {selectedVehicle.vin || 'Não disponível'}
+                    </span>
+                  </div>
 
-                    <div>
-                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold mb-1.5">
-                        PIDs Suportados Registrados ({selectedCapability.pids_supported.length}):
-                      </span>
-                      <div className="flex flex-wrap gap-1.5">
-                        {selectedCapability.pids_supported.map((p) => (
-                          <span
-                            key={p}
-                            className="bg-[#1A232E] text-[#FFB300] px-2 py-0.5 rounded font-mono text-xs border border-[#263340]"
-                          >
-                            {p}
+                  <Button
+                    size="sm"
+                    onClick={() => openEditModal(selectedVehicle)}
+                    className="bg-[#1A232E] hover:bg-[#263340] text-white border border-[#263340] text-xs"
+                  >
+                    <Edit2 className="w-3.5 h-3.5 mr-1.5" />
+                    Editar Perfil
+                  </Button>
+                </div>
+
+                {/* Proprietário Atual (Requisito 3) */}
+                <div className="bg-[#1A232E] p-3 rounded border border-[#263340] flex items-center justify-between">
+                  <div>
+                    <span className="text-[10px] text-[#9AA7B4] uppercase font-bold block">
+                      Proprietário Cadastrado:
+                    </span>
+                    {currentOwner ? (
+                      <div className="font-semibold text-white text-xs mt-0.5 flex items-center gap-2">
+                        <span>{currentOwner.name}</span>
+                        <span className="text-[#9AA7B4] font-normal">({currentOwner.phone})</span>
+                        {currentOwner.document && (
+                          <span className="text-gray-400 font-mono text-[11px]">
+                            • CPF: {currentOwner.document}
                           </span>
-                        ))}
+                        )}
                       </div>
-                    </div>
-
-                    {selectedCapability.pids_unavailable.length > 0 && (
-                      <div>
-                        <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold mb-1.5">
-                          PIDs Indisponíveis / Não Respondidos:
-                        </span>
-                        <div className="flex flex-wrap gap-1.5">
-                          {selectedCapability.pids_unavailable.map((p) => (
-                            <span
-                              key={p}
-                              className="bg-[#131A22] text-gray-500 px-2 py-0.5 rounded font-mono text-xs border border-[#263340]"
-                            >
-                              {p}
-                            </span>
-                          ))}
-                        </div>
-                      </div>
+                    ) : (
+                      <span className="text-gray-400 text-xs italic">
+                        Nenhum proprietário vinculado. Edite o perfil para associar um cliente.
+                      </span>
                     )}
                   </div>
+                  {currentOwner && (
+                    <Badge
+                      variant="outline"
+                      className="border-[#FFB300] text-[#FFB300] text-[10px]"
+                    >
+                      Cliente Oficina
+                    </Badge>
+                  )}
+                </div>
+
+                {/* Ficha Técnica */}
+                <div>
+                  <h3 className="text-xs font-bold text-[#9AA7B4] uppercase tracking-wider mb-2">
+                    Especificações Técnicas do Veículo
+                  </h3>
+                  <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 text-xs">
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
+                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
+                        Motorização:
+                      </span>
+                      <span className="font-semibold text-white">
+                        {selectedVehicle.engine || 'Genérico'}
+                      </span>
+                    </div>
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
+                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
+                        Combustível:
+                      </span>
+                      <span className="font-semibold text-white">
+                        {selectedVehicle.fuel || 'Flex'}
+                      </span>
+                    </div>
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
+                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
+                        Câmbio / Transmissão:
+                      </span>
+                      <span className="font-semibold text-white">
+                        {selectedVehicle.transmission || 'Manual'}
+                      </span>
+                    </div>
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
+                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
+                        Ano / Modelo:
+                      </span>
+                      <span className="font-semibold text-white">
+                        {selectedVehicle.year_model || 'N/D'}
+                      </span>
+                    </div>
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
+                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
+                        Odômetro Atual:
+                      </span>
+                      <span className="font-mono text-[#2ECC71]">
+                        {selectedVehicle.odometer_km
+                          ? `${selectedVehicle.odometer_km.toLocaleString('pt-BR')} km`
+                          : 'Não informado'}
+                      </span>
+                    </div>
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340]">
+                      <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
+                        Arquitetura:
+                      </span>
+                      <span className="text-blue-400 font-semibold">
+                        Genérico OBD-II / SAE J1979
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Assinatura OBD */}
+                <div>
+                  <h3 className="text-xs font-bold text-[#9AA7B4] uppercase tracking-wider mb-2 flex items-center space-x-1.5">
+                    <Cpu className="w-4 h-4 text-[#FFB300]" />
+                    <span>Assinatura OBD Registrada</span>
+                  </h3>
+                  {selectedCapability ? (
+                    <div className="bg-[#0B0F14] border border-[#263340] rounded p-4 space-y-2 text-xs">
+                      <div className="flex flex-wrap gap-4 text-gray-300">
+                        <span>
+                          Protocolo: <strong>{selectedCapability.protocol_detected}</strong>
+                        </span>
+                        <span>
+                          Adaptador:{' '}
+                          <strong className="text-blue-400">
+                            {selectedCapability.adapter_name || selectedCapability.adapter_type}
+                          </strong>
+                        </span>
+                      </div>
+                      <div className="text-[11px] text-gray-400 font-mono">
+                        PIDs Suportados: {selectedCapability.pids_supported.join(', ')}
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] text-xs text-[#9AA7B4]">
+                      Nenhuma assinatura OBD gravada ainda.
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Card 2: TIMELINE TÉCNICA UNIFICADA DO VEÍCULO (Requisitos 3 & 13) */}
+              <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-4">
+                <div className="flex items-center justify-between pb-3 border-b border-[#263340]">
+                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
+                    <Layers className="w-4 h-4 text-[#FFB300]" />
+                    Timeline Técnica Unificada & Histórico Completo
+                  </h3>
+                  <Badge variant="outline" className="border-gray-600 text-gray-300 text-[10px]">
+                    Não duplica dados técnicos — referências cruzadas
+                  </Badge>
+                </div>
+
+                {vehicleOrders.length === 0 && vehicleInvestigations.length === 0 ? (
+                  <div className="text-center py-6 text-xs text-[#9AA7B4]">
+                    Nenhum histórico operacional ou diagnóstico registrado para esta placa.
+                  </div>
                 ) : (
-                  <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] text-xs text-[#9AA7B4] flex items-center space-x-2">
-                    <AlertCircle className="w-4 h-4 text-amber-400 shrink-0" />
-                    <span>
-                      Nenhuma assinatura OBD gravada para este veículo ainda. Conecte o adaptador no
-                      Painel Live para registrar automaticamente os protocolos e capacidades.
-                    </span>
+                  <div className="space-y-3 relative before:absolute before:inset-0 before:left-3.5 before:w-0.5 before:bg-[#263340]">
+                    {/* Eventos de Investigação Diagnóstica */}
+                    {vehicleInvestigations.map((inv) => (
+                      <div key={inv.id} className="relative flex items-start gap-3 pl-8 text-xs">
+                        <div className="absolute left-2 top-1.5 w-3.5 h-3.5 rounded-full bg-purple-500 ring-4 ring-[#131A22]" />
+                        <div className="flex-1 bg-[#1A232E] p-3 rounded-lg border border-[#263340] space-y-1">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-purple-400">
+                              {inv.investigation_number}
+                            </span>
+                            <Badge className="bg-purple-950 text-purple-300 border-purple-800 text-[10px]">
+                              DIAGNÓSTICO 360
+                            </Badge>
+                          </div>
+                          <div className="text-white font-medium">
+                            Queixa: {inv.client_complaint?.description || 'Investigação técnica'}
+                          </div>
+                          {inv.status === 'CONCLUIDA' && (
+                            <div className="text-[11px] text-emerald-400 font-semibold">
+                              Laudo confirmado tecnicamente por testes cruzados.
+                            </div>
+                          )}
+                          <div className="text-[10px] text-gray-500 font-mono">
+                            Status: {inv.status} • Odômetro: {inv.odometer_km} km
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+
+                    {/* Eventos de Ordens de Serviço Comerciais */}
+                    {vehicleOrders.map((os) => (
+                      <div key={os.id} className="relative flex items-start gap-3 pl-8 text-xs">
+                        <div className="absolute left-2 top-1.5 w-3.5 h-3.5 rounded-full bg-[#FFB300] ring-4 ring-[#131A22]" />
+                        <div className="flex-1 bg-[#1A232E] p-3 rounded-lg border border-[#263340] space-y-1.5">
+                          <div className="flex items-center justify-between">
+                            <span className="font-mono font-bold text-[#FFB300]">
+                              {os.order_number}
+                            </span>
+                            <Badge className="bg-amber-950 text-amber-300 border-amber-800 text-[10px]">
+                              {os.status}
+                            </Badge>
+                          </div>
+
+                          {os.confirmed_diagnosis && (
+                            <div className="text-[11px] text-emerald-400 font-semibold bg-[#0B0F14] p-1.5 rounded border border-[#263340]">
+                              Diagnóstico Confirmado: {os.confirmed_diagnosis}
+                            </div>
+                          )}
+
+                          <div className="text-gray-300">
+                            Itens do Serviço:{' '}
+                            {os.items.map((i) => i.description).join(', ') || 'Nenhum item'}
+                          </div>
+
+                          {os.post_repair_result && (
+                            <div className="text-[11px] text-purple-300 bg-purple-950/40 p-1.5 rounded border border-purple-800/40">
+                              Validação Pós-Reparo: {os.post_repair_result.outcome} (
+                              {os.post_repair_result.verdict})
+                            </div>
+                          )}
+
+                          <div className="text-[10px] text-gray-500 font-mono flex items-center justify-between">
+                            <span>Aprovação: {os.approval_status}</span>
+                            <span className="font-bold text-[#FFB300]">
+                              Total: R$ {os.approved_total.toFixed(2)}
+                            </span>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
                   </div>
                 )}
               </div>
@@ -442,6 +564,28 @@ export default function Veiculos() {
           </DialogHeader>
 
           <form onSubmit={handleSave} className="space-y-4 text-xs pt-2">
+            {/* Seleção de Proprietário (Requisito 3) */}
+            <div>
+              <label className="block text-[#9AA7B4] mb-1 font-medium">
+                Cliente / Proprietário (1 Cliente → N Veículos):
+              </label>
+              <Select
+                value={formData.client}
+                onValueChange={(val) => setFormData({ ...formData, client: val })}
+              >
+                <SelectTrigger className="bg-[#0B0F14] border-[#263340] text-white">
+                  <SelectValue placeholder="Selecione o proprietário do veículo..." />
+                </SelectTrigger>
+                <SelectContent className="bg-[#1A232E] border-[#263340] text-white text-xs">
+                  {clients.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>
+                      {c.name} — {c.phone} {c.document ? `(CPF: ${c.document})` : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
               <div>
                 <label className="block text-[#9AA7B4] mb-1 font-medium">Placa *:</label>
@@ -538,7 +682,7 @@ export default function Veiculos() {
                   onChange={(e) =>
                     setFormData({ ...formData, odometer_km: parseInt(e.target.value) || 0 })
                   }
-                  className="bg-[#0B0F14] border-[#263340] text-white"
+                  className="bg-[#0B0F14] border-[#263340] text-white font-mono"
                 />
               </div>
             </div>

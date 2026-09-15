@@ -13,6 +13,14 @@ import Configuracoes from './pages/Configuracoes'
 import Relatorio from './pages/Relatorio'
 import Login from './pages/Login'
 import NotFound from './pages/NotFound'
+
+// Novos módulos Etapa 5 — Operação da Oficina & OS Comercial
+import Clientes from './pages/Clientes'
+import Recepcao from './pages/Recepcao'
+import OrdensServico from './pages/OrdensServico'
+import Catalogos from './pages/Catalogos'
+import PainelOficina from './pages/PainelOficina'
+import SimuladorOperacional from './pages/SimuladorOperacional'
 import Layout from './components/Layout'
 
 // Rota protegida em conformidade com auditoria NC-E4-SEC-01:
@@ -82,19 +90,61 @@ const App = () => (
             />
 
             <Route element={<Layout />}>
+              {/* E5: Módulos Operacionais e Comerciais */}
+              <Route
+                path="/painel-oficina"
+                element={
+                  <ProtectedRoute>
+                    <PainelOficina />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/recepcao"
+                element={
+                  <ProtectedRoute>
+                    <Recepcao />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/ordens-servico"
+                element={
+                  <ProtectedRoute>
+                    <OrdensServico />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/clientes"
+                element={
+                  <ProtectedRoute>
+                    <Clientes />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/catalogos"
+                element={
+                  <ProtectedRoute>
+                    <Catalogos />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/simulador-operacional"
+                element={
+                  <ProtectedRoute>
+                    <SimuladorOperacional />
+                  </ProtectedRoute>
+                }
+              />
+              {/* Módulos E1 - E4 Preservados */}
               <Route
                 path="/"
                 element={
                   <ProtectedRoute>
                     <Index />
-                  </ProtectedRoute>
-                }
-              />
-              <Route
-                path="/veiculos"
-                element={
-                  <ProtectedRoute>
-                    <Veiculos />
                   </ProtectedRoute>
                 }
               />
@@ -115,6 +165,14 @@ const App = () => (
                 }
               />
               <Route
+                path="/veiculos"
+                element={
+                  <ProtectedRoute>
+                    <Veiculos />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
                 path="/configuracoes"
                 element={
                   <ProtectedRoute>
@@ -129,7 +187,7 @@ const App = () => (
                     <Relatorio />
                   </ProtectedRoute>
                 }
-              />
+              />{' '}
             </Route>
 
             <Route path="*" element={<NotFound />} />

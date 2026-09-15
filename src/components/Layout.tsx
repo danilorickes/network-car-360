@@ -15,6 +15,12 @@ import {
   LogOut,
   ShieldAlert,
   Car,
+  Users,
+  LogIn,
+  ClipboardList,
+  Package,
+  LayoutDashboard,
+  PlaySquare,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -47,97 +53,188 @@ export default function Layout() {
               <div className="flex items-center space-x-2">
                 <span className="font-bold text-lg tracking-wide text-white">Network Car</span>
                 <span className="text-xs bg-[#FFB300] text-black font-semibold px-2 py-0.5 rounded">
-                  360 LIVE
+                  360 PRO
+                </span>
+                <span className="text-[10px] bg-blue-950 text-blue-300 border border-blue-700 px-1.5 py-0.5 rounded font-mono font-bold">
+                  E5 OPERAÇÃO
                 </span>
               </div>
-              <p className="text-xs text-[#9AA7B4]">Diagnóstico Veicular OBD-II • Etapa 1</p>
+              <p className="text-xs text-[#9AA7B4]">
+                Diagnóstico 360 & Operação Comercial da Oficina
+              </p>
             </div>
           </div>
 
           {/* Desktop Nav Items */}
-          <nav className="hidden md:flex items-center space-x-1 lg:space-x-2">
+          <nav className="hidden xl:flex items-center space-x-1">
             <NavLink
-              to="/"
+              to="/painel-oficina"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
                   isActive
                     ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
                     : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
                 }`
               }
             >
-              <Cpu className="w-4 h-4" />
-              <span>Painel Live</span>
+              <LayoutDashboard className="w-3.5 h-3.5 text-[#FFB300]" />
+              <span>Painel Oficina</span>
+            </NavLink>
+
+            <NavLink
+              to="/recepcao"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <LogIn className="w-3.5 h-3.5" />
+              <span>Recepção</span>
+            </NavLink>
+
+            <NavLink
+              to="/ordens-servico"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <ClipboardList className="w-3.5 h-3.5" />
+              <span>OS Comercial</span>
+            </NavLink>
+
+            <NavLink
+              to="/clientes"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <Users className="w-3.5 h-3.5" />
+              <span>Clientes</span>
+            </NavLink>
+
+            <NavLink
+              to="/catalogos"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <Package className="w-3.5 h-3.5" />
+              <span>Catálogos</span>
+            </NavLink>
+
+            <NavLink
+              to="/simulador-operacional"
+              className={({ isActive }) =>
+                `px-2.5 py-1.5 rounded-md text-xs font-semibold transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <PlaySquare className="w-3.5 h-3.5 text-amber-400" />
+              <span>Simulador E5</span>
+            </NavLink>
+
+            <span className="h-4 w-[1px] bg-[#263340] mx-1" />
+
+            <NavLink
+              to="/"
+              className={({ isActive }) =>
+                `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <Cpu className="w-3.5 h-3.5" />
+              <span>Live</span>
+            </NavLink>
+
+            <NavLink
+              to="/replay"
+              className={({ isActive }) =>
+                `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <PlayCircle className="w-3.5 h-3.5" />
+              <span>Diag 360</span>
             </NavLink>
 
             <NavLink
               to="/veiculos"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${
                   isActive
                     ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
                     : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
                 }`
               }
             >
-              <Car className="w-4 h-4" />
+              <Car className="w-3.5 h-3.5" />
               <span>Veículos</span>
             </NavLink>
 
             <NavLink
               to="/sessoes"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${
                   isActive
                     ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
                     : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
                 }`
               }
             >
-              <History className="w-4 h-4" />
+              <History className="w-3.5 h-3.5" />
               <span>Sessões</span>
-            </NavLink>
-
-            <NavLink
-              to="/replay"
-              className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
-                  isActive
-                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
-                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
-                }`
-              }
-            >
-              <PlayCircle className="w-4 h-4" />
-              <span>Replay & Diagnóstico 360</span>
             </NavLink>
 
             <NavLink
               to="/configuracoes"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${
                   isActive
                     ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
                     : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
                 }`
               }
             >
-              <Settings className="w-4 h-4" />
-              <span>Configurações</span>
+              <Settings className="w-3.5 h-3.5" />
+              <span>Config</span>
             </NavLink>
 
             <NavLink
               to="/relatorio"
               className={({ isActive }) =>
-                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                `px-2 py-1.5 rounded-md text-xs font-medium transition-colors flex items-center space-x-1.5 ${
                   isActive
                     ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
                     : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
                 }`
               }
             >
-              <FileText className="w-4 h-4" />
-              <span>Relatório / Evidências</span>
+              <FileText className="w-3.5 h-3.5" />
+              <span>Relatório</span>
             </NavLink>
           </nav>
 
@@ -275,6 +372,48 @@ export default function Layout() {
         {mobileMenuOpen && (
           <div className="md:hidden bg-[#131A22] border-b border-[#263340] px-4 py-3 space-y-2">
             <NavLink
+              to="/painel-oficina"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-[#FFB300] font-bold hover:bg-[#1A232E]"
+            >
+              Painel Oficina
+            </NavLink>
+            <NavLink
+              to="/recepcao"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
+            >
+              Recepção / Entrada Rápida
+            </NavLink>
+            <NavLink
+              to="/ordens-servico"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
+            >
+              Ordens de Serviço Comercial
+            </NavLink>
+            <NavLink
+              to="/clientes"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
+            >
+              Clientes
+            </NavLink>
+            <NavLink
+              to="/catalogos"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
+            >
+              Catálogos Mestre
+            </NavLink>
+            <NavLink
+              to="/simulador-operacional"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-amber-400 hover:bg-[#1A232E]"
+            >
+              Simulador E5
+            </NavLink>
+            <NavLink
               to="/"
               onClick={() => setMobileMenuOpen(false)}
               className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
@@ -286,7 +425,7 @@ export default function Layout() {
               onClick={() => setMobileMenuOpen(false)}
               className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
             >
-              Veículos
+              Veículos & Timeline
             </NavLink>
             <NavLink
               to="/sessoes"
@@ -352,9 +491,9 @@ export default function Layout() {
           </div>
           <div className="flex items-center space-x-3">
             <span className="font-mono text-[#FFB300] bg-[#FFB300]/10 px-2 py-0.5 rounded border border-[#FFB300]/30">
-              ME001-E3 — Etapa 3
+              ME001-E5 — Etapa 5
             </span>
-            <span>Versão 3.0.0 (Motor de Inteligência Diagnóstica)</span>
+            <span>Versão 0.0.9 (Operação da Oficina & OS Comercial)</span>
           </div>
         </div>
       </footer>

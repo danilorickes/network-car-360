@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T11:23:39.030Z",
+  "generatedAt": "2026-09-15T11:37:54.881Z",
   "collections": [
     {
       "name": "users",
@@ -37,6 +37,19 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "role",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ADMINISTRADOR", "RECEPCAO", "MECANICO"]
+        },
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -471,6 +484,19 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "client",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -1040,6 +1066,719 @@
       "indexes": [
         "CREATE INDEX idx_conf_test_investigation ON confirmation_tests (investigation)",
         "CREATE INDEX idx_conf_test_status ON confirmation_tests (status)"
+      ]
+    },
+    {
+      "name": "workshops",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "cnpj",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE UNIQUE INDEX idx_workshops_code ON workshops (code)"]
+    },
+    {
+      "name": "clients",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "document",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "phone",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "whatsapp",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "email",
+          "type": "email",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "address",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_clients_workshop ON clients (workshop_id)",
+        "CREATE INDEX idx_clients_phone ON clients (phone)",
+        "CREATE INDEX idx_clients_name ON clients (name)"
+      ]
+    },
+    {
+      "name": "service_catalog",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "category",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "default_price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estimated_minutes",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_services_workshop ON service_catalog (workshop_id)"]
+    },
+    {
+      "name": "parts_catalog",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "code",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "manufacturer",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "reference_code",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cost_price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sale_price",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "unit",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_parts_workshop ON parts_catalog (workshop_id)",
+        "CREATE INDEX idx_parts_code ON parts_catalog (code)"
+      ]
+    },
+    {
+      "name": "vehicle_receptions",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "reception_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "client",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "vehicle_plate",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "odometer_km",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entry_reason",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["diagnostico", "manutencao", "revisao", "reparo", "retorno", "outros"]
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "responsible",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "entry_date",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["ABERTO", "EM_ANDAMENTO", "ENCERRADO"]
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_reception_number ON vehicle_receptions (reception_number)",
+        "CREATE INDEX idx_reception_workshop ON vehicle_receptions (workshop_id)",
+        "CREATE INDEX idx_reception_vehicle ON vehicle_receptions (vehicle)"
+      ]
+    },
+    {
+      "name": "work_orders",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "order_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "sequential_num",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "client",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "clients"
+        },
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "reception",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "vehicle_receptions"
+        },
+        {
+          "name": "diagnostic_investigation",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "diagnostic_investigations"
+        },
+        {
+          "name": "vehicle_plate",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "odometer_km",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": [
+            "RASCUNHO",
+            "AGUARDANDO_DIAGNOSTICO",
+            "AGUARDANDO_ORCAMENTO",
+            "AGUARDANDO_APROVACAO",
+            "APROVADA",
+            "EM_EXECUCAO",
+            "AGUARDANDO_PECA",
+            "AGUARDANDO_VALIDACAO",
+            "CONCLUIDA",
+            "ENTREGUE",
+            "CANCELADA"
+          ]
+        },
+        {
+          "name": "approval_status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["PENDENTE", "APROVADO", "APROVADO_PARCIALMENTE", "RECUSADO"]
+        },
+        {
+          "name": "confirmed_diagnosis",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "budget_version",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "items",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "services_subtotal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "parts_subtotal",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "discount_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approved_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "general_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "budget_notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "budget_validity_days",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "approval_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "budget_history",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "post_repair_result",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "delivery_details",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_work_order_num ON work_orders (order_number)",
+        "CREATE INDEX idx_work_order_workshop ON work_orders (workshop_id)",
+        "CREATE INDEX idx_work_order_vehicle ON work_orders (vehicle)",
+        "CREATE INDEX idx_work_order_client ON work_orders (client)",
+        "CREATE INDEX idx_work_order_status ON work_orders (status)"
+      ]
+    },
+    {
+      "name": "work_order_audits",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "work_order",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "work_orders"
+        },
+        {
+          "name": "order_number",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "event_type",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "actor_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "actor_name",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "actor_role",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "details",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "diff_data",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE INDEX idx_wo_audits_order ON work_order_audits (work_order)",
+        "CREATE INDEX idx_wo_audits_workshop ON work_order_audits (workshop_id)"
       ]
     }
   ]
