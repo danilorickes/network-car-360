@@ -2,14 +2,27 @@ import React, { useEffect, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import pb from '@/lib/pocketbase/client'
 import { useRealtime } from '@/hooks/use-realtime'
-import { SessionModel, EventModel, DtcModel } from '@/types/obd'
+import { SessionModel, EventModel, DtcModel, VehicleModel } from '@/types/obd'
+import { vehicleService } from '@/services/vehicles'
+import { ExporterService } from '@/lib/obd/exporter-service'
 import { Button } from '@/components/ui/button'
-import { PlayCircle, ShieldCheck, RefreshCw, Car, Clock, AlertTriangle, Layers } from 'lucide-react'
+import {
+  PlayCircle,
+  ShieldCheck,
+  RefreshCw,
+  Car,
+  Clock,
+  AlertTriangle,
+  Layers,
+  Printer,
+  FileDown,
+} from 'lucide-react'
 
 export default function Sessoes() {
   const navigate = useNavigate()
   const [sessions, setSessions] = useState<SessionModel[]>([])
   const [selectedSession, setSelectedSession] = useState<SessionModel | null>(null)
+  const [vehicleRecord, setVehicleRecord] = useState<VehicleModel | null>(null)
   const [sessionEvents, setSessionEvents] = useState<EventModel[]>([])
   const [sessionDtcs, setSessionDtcs] = useState<DtcModel[]>([])
   const [sampleCount, setSampleCount] = useState<number>(0)
@@ -36,6 +49,17 @@ export default function Sessoes() {
   const loadSessionDetails = async (sess: SessionModel) => {
     setSelectedSession(sess)
     if (!sess.id) return
+
+    if (sess.vehicle) {
+      try {
+        const v = await vehicleService.getById(sess.vehicle)
+        setVehicleRecord(v)
+      } catch (_) {
+        setVehicleRecord(null)
+      }
+    } else {
+      setVehicleRecord(null)
+    }
 
     try {
       // Busca eventos vinculados
@@ -182,15 +206,38 @@ export default function Sessoes() {
                   </span>
                 </div>
 
-                <Button
-                  onClick={() =>
-                    navigate(`/replay?session=${selectedSession.id || selectedSession.session_id}`)
-                  }
-                  className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs"
-                >
-                  <PlayCircle className="w-4 h-4 mr-1.5 fill-current" />
-                  Reproduzir no Replay
-                </Button>
+                <div className="flex items-center space-x-2">
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() =>
+                      ExporterService.printDiagnosticReport({
+                        session: selectedSession,
+                        vehicle: vehicleRecord,
+                        events: sessionEvents,
+                        dtcs: sessionDtcs,
+                        totalSamplesCount: sampleCount,
+                      })
+                    }
+                    className="border-[#263340] text-[#9AA7B4] hover:text-white hover:bg-[#1A232E] text-xs"
+                    title="Imprimir ou Salvar Relatório PDF"
+                  >
+                    <Printer className="w-3.5 h-3.5 mr-1" />
+                    PDF
+                  </Button>
+
+                  <Button
+                    onClick={() =>
+                      navigate(
+                        `/replay?session=${selectedSession.id || selectedSession.session_id}`,
+                      )
+                    }
+                    className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs"
+                  >
+                    <PlayCircle className="w-4 h-4 mr-1.5 fill-current" />
+                    Reproduzir no Replay
+                  </Button>
+                </div>
               </div>
 
               {/* Grid de Metadados */}

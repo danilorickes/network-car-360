@@ -1,7 +1,6 @@
 import React, { useState } from 'react'
 import { useTelemetry } from '@/contexts/TelemetryContext'
 import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
 import {
   Select,
   SelectContent,
@@ -12,6 +11,7 @@ import {
 import { RealSerialTransport } from '@/lib/obd/transports/real-serial-transport'
 import { BluetoothTransport } from '@/lib/obd/transports/bluetooth-transport'
 import { detectPlatformCapabilities } from '@/lib/obd/platform-detector'
+import { SIMULATOR_SCENARIOS, SimulatorScenario } from '@/lib/obd/transports/simulated-transport'
 import {
   Play,
   Square,
@@ -22,11 +22,18 @@ import {
   Radio,
   Bluetooth,
   Smartphone,
+  Car,
+  Plus,
 } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
 
 export const ConnectionControlPanel: React.FC = () => {
+  const navigate = useNavigate()
   const {
     telemetry,
+    vehicles,
+    selectedVehicle,
+    setSelectedVehicle,
     activeScenario,
     setActiveScenario,
     setTransportType,
@@ -39,7 +46,6 @@ export const ConnectionControlPanel: React.FC = () => {
     readDtcsManual,
   } = useTelemetry()
 
-  const [vehicleNameInput, setVehicleNameInput] = useState('Ford EcoSport 2020 1.5 Dragon 3C')
   const isWebSerialAvailable = RealSerialTransport.isWebSerialSupported()
   const isWebBluetoothAvailable = BluetoothTransport.isWebBluetoothSupported()
   const platform = detectPlatformCapabilities()
@@ -138,7 +144,7 @@ export const ConnectionControlPanel: React.FC = () => {
           {isConnected && !isTesting && (
             <Button
               size="sm"
-              onClick={() => startSession(vehicleNameInput)}
+              onClick={() => startSession(selectedVehicle?.id)}
               className="bg-[#2ECC71] hover:bg-[#27ae60] text-black font-bold tracking-wide shadow"
             >
               <Play className="w-4 h-4 mr-1.5 fill-current" />
@@ -159,27 +165,57 @@ export const ConnectionControlPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Second Row: Configuration parameters for the active test */}
+      {/* Second Row: Seleção do Veículo & Cenário do Simulador */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-4 pt-1">
-        {/* Veículo de Validação */}
+        {/* Perfil do Veículo (Requisito 1 da OS-ME001-E2) */}
         <div>
-          <label className="block text-xs font-medium text-[#9AA7B4] mb-1">
-            Veículo (Metadado de Validação):
-          </label>
-          <Input
-            value={vehicleNameInput}
-            onChange={(e) => setVehicleNameInput(e.target.value)}
+          <div className="flex items-center justify-between mb-1">
+            <label className="block text-xs font-medium text-[#9AA7B4] flex items-center space-x-1">
+              <Car className="w-3.5 h-3.5 text-[#FFB300]" />
+              <span>Veículo em Teste (Perfil Reutilizável):</span>
+            </label>
+            <button
+              type="button"
+              disabled={isTesting}
+              onClick={() => navigate('/veiculos')}
+              className="text-[11px] text-[#FFB300] hover:underline flex items-center"
+            >
+              <Plus className="w-3 h-3 mr-0.5" /> Gerenciar
+            </button>
+          </div>
+
+          <Select
+            value={selectedVehicle?.id || ''}
+            onValueChange={(val) => {
+              const v = vehicles.find((item) => item.id === val)
+              if (v) setSelectedVehicle(v)
+            }}
             disabled={isTesting}
-            placeholder="Ex: Ford EcoSport 2020 1.5 Dragon"
-            className="bg-[#0B0F14] border-[#263340] text-sm text-white"
-          />
+          >
+            <SelectTrigger className="bg-[#0B0F14] border-[#263340] text-sm text-white">
+              <SelectValue placeholder="Selecione o veículo..." />
+            </SelectTrigger>
+            <SelectContent className="bg-[#131A22] border-[#263340] text-white">
+              {vehicles.map((v) => (
+                <SelectItem key={v.id} value={v.id!}>
+                  {v.plate} — {v.make} {v.model} ({v.engine || 'OBD-II'})
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+          {selectedVehicle && (
+            <div className="text-[11px] text-[#9AA7B4] mt-1 font-mono truncate">
+              VIN: {selectedVehicle.vin || 'N/D'} • Km:{' '}
+              {selectedVehicle.odometer_km?.toLocaleString('pt-BR') || '--'}
+            </div>
+          )}
         </div>
 
-        {/* Cenário do Simulador (quando ativo) */}
+        {/* Cenário do Simulador (Requisito 8: Múltiplos Cenários Reproduzíveis) */}
         {isSimulator && (
           <div>
             <label className="block text-xs font-medium text-[#9AA7B4] mb-1">
-              Cenário de Condução Simulado:
+              Cenário Reproduzível (Simulador):
             </label>
             <Select
               value={activeScenario}
@@ -190,19 +226,23 @@ export const ConnectionControlPanel: React.FC = () => {
                 <SelectValue placeholder="Selecione o cenário" />
               </SelectTrigger>
               <SelectContent className="bg-[#131A22] border-[#263340] text-white">
-                <SelectItem value="NORMAL">Cenário Normal (Ciclo Completo)</SelectItem>
-                <SelectItem value="ANOMALIA">
-                  Cenário com Evento/Sintoma (Falha P0301 + Trepidação)
-                </SelectItem>
+                {SIMULATOR_SCENARIOS.map((sc) => (
+                  <SelectItem key={sc.id} value={sc.id}>
+                    {sc.name}
+                  </SelectItem>
+                ))}
               </SelectContent>
             </Select>
+            <div className="text-[11px] text-gray-400 mt-1 truncate">
+              {SIMULATOR_SCENARIOS.find((s) => s.id === activeScenario)?.description}
+            </div>
           </div>
         )}
 
-        {/* Ferramentas de Teste e Validação de Falhas */}
+        {/* Ferramentas de Teste e Validação */}
         <div className="flex flex-col justify-end">
           <label className="block text-xs font-medium text-[#9AA7B4] mb-1">
-            Testes de Resiliência e Varredura:
+            Testes de Resiliência & Diagnóstico:
           </label>
           <div className="flex flex-wrap items-center gap-2">
             {isSimulator && isConnected && (
@@ -212,10 +252,10 @@ export const ConnectionControlPanel: React.FC = () => {
                   variant="outline"
                   onClick={simulateCommunicationDrop}
                   className="border-amber-800 text-amber-400 hover:bg-amber-950/40 text-xs"
-                  title="Simula desconexão física/timeout súbito para validar tratamento de falhas"
+                  title="Simula perda de sinal de comunicação"
                 >
                   <AlertTriangle className="w-3.5 h-3.5 mr-1" />
-                  Simular Perda Sinal
+                  Perda Sinal
                 </Button>
                 <Button
                   size="sm"
@@ -243,7 +283,39 @@ export const ConnectionControlPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Discovered PIDs Collapsible summary */}
+      {/* Assinatura / Capacidade OBD do Veículo (Requisito 2) */}
+      {telemetry.activeObdCapability && (
+        <div className="bg-[#0B0F14] p-2.5 rounded border border-[#263340] text-xs flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center space-x-2">
+            <span className="bg-[#1A232E] text-[#FFB300] font-mono px-2 py-0.5 rounded border border-[#263340] font-bold">
+              ASSINATURA OBD REGISTRADA
+            </span>
+            <span className="text-gray-300">
+              Protocolo: <strong>{telemetry.activeObdCapability.protocol_detected}</strong> | VIN:{' '}
+              <strong className="font-mono">
+                {telemetry.activeObdCapability.vin_read || 'N/D'}
+              </strong>{' '}
+              | MIL:{' '}
+              <strong
+                className={
+                  telemetry.activeObdCapability.mil_initial_state
+                    ? 'text-amber-400'
+                    : 'text-emerald-400'
+                }
+              >
+                {telemetry.activeObdCapability.mil_initial_state ? 'ACESO' : 'APAGADO'}
+              </strong>
+            </span>
+          </div>
+          <div className="flex items-center space-x-1.5 text-[11px] text-[#9AA7B4]">
+            <span>PIDs Disponíveis: {telemetry.activeObdCapability.pids_supported.length}</span>
+            <span>•</span>
+            <span>Indisponíveis: {telemetry.activeObdCapability.pids_unavailable.length}</span>
+          </div>
+        </div>
+      )}
+
+      {/* PIDs Descobertos */}
       {telemetry.discoveredPids.length > 0 && (
         <div className="bg-[#0B0F14] p-2.5 rounded border border-[#263340] text-xs flex flex-wrap items-center gap-1.5">
           <span className="text-[#9AA7B4] font-medium mr-2">
@@ -260,7 +332,7 @@ export const ConnectionControlPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Banner de Orientação da Plataforma (Android/Desktop) */}
+      {/* Orientação da Plataforma */}
       {(isBluetooth || isSerial || platform.isAndroid) && (
         <div className="bg-[#0B0F14] border border-[#263340] rounded p-2.5 text-xs text-[#9AA7B4] flex items-start space-x-2">
           {platform.isAndroid ? (
@@ -279,7 +351,7 @@ export const ConnectionControlPanel: React.FC = () => {
         </div>
       )}
 
-      {/* Falha de comunicação evidente */}
+      {/* Falha de Comunicação */}
       {telemetry.connectionState === 'FALHA' && telemetry.lastError && (
         <div className="bg-red-950/60 border border-red-800 text-red-200 px-3 py-2 rounded text-xs flex items-center space-x-2">
           <AlertTriangle className="w-4 h-4 text-red-400 shrink-0" />

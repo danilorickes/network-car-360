@@ -1,4 +1,5 @@
-import { EventModel, EventType, RawSampleModel } from '../types/obd'
+import { EventModel, EventType, RawSampleModel, VehicleModel, DtcModel } from '../types/obd'
+import { BlackBoxBuilder } from './blackbox-builder'
 import pb from '../pocketbase/client'
 
 export class EventMarker {
@@ -22,6 +23,12 @@ export class EventMarker {
     description: string,
     windowPreMs = 30000,
     windowPostMs = 30000,
+    context?: {
+      samples?: readonly RawSampleModel[]
+      vehicle?: VehicleModel | null
+      dtcs?: DtcModel[]
+      communicationState?: 'CONECTADO' | 'RECONECTANDO' | 'FALHA'
+    },
   ): Promise<EventModel> {
     const monoNow = performance.now()
     const monoOffsetMs = Math.round(monoNow - this.sessionMonoStart)
@@ -42,7 +49,8 @@ export class EventMarker {
 
     this.events.push(event)
 
-    // Persiste oportunisticamente no PocketBase
+    // Persiste oportunisticamente no PocketBase (events)
+    let eventRecordId: string | undefined = undefined
     if (this.dbSessionRecordId) {
       try {
         const rec = await pb.collection('events').create({
@@ -56,8 +64,48 @@ export class EventMarker {
           window_post_ms: event.window_post_ms,
         })
         event.id = rec.id
+        eventRecordId = rec.id
       } catch (e) {
         console.warn('Persistência de evento em fallback local:', e)
+      }
+    }
+
+    // Se houver telemetria e contexto, constrói e persiste automaticamente a Caixa-Preta (DiagnosticEvidence)
+    if (context && context.samples && context.samples.length > 0) {
+      try {
+        const pkg = BlackBoxBuilder.buildPackage({
+          event,
+          samples: context.samples,
+          vehicle: context.vehicle || {
+            plate: 'S/PLACA',
+            make: 'Veículo',
+            model: 'Genérico OBD-II',
+          },
+          dtcs: context.dtcs || [],
+          communicationState: context.communicationState || 'CONECTADO',
+        })
+
+        if (eventRecordId && this.dbSessionRecordId) {
+          await pb.collection('diagnostic_evidences').create({
+            event: eventRecordId,
+            session: this.dbSessionRecordId,
+            event_id: event.event_id,
+            session_id: this.sessionUniqueId,
+            vehicle_info: pkg.vehicle,
+            symptom_type: event.event_type,
+            description: event.description || '',
+            timestamp_utc: event.ts_utc,
+            mono_offset_ms: event.ts_mono_offset_ms,
+            window_stats: pkg.window_stats,
+            dtcs_context: pkg.dtcs_context,
+            communication_state: pkg.communication_state,
+            sample_quality_summary: pkg.sample_quality_summary,
+            pids_available: pkg.pids_available,
+            facts: pkg.facts,
+          })
+        }
+      } catch (err) {
+        console.warn('Persistência de evidência diagnóstica da caixa-preta em fallback local:', err)
       }
     }
 
@@ -76,49 +124,7 @@ export class EventMarker {
  * REGRA INVIOLÁVEL: A extração NUNCA altera nem remove a telemetria bruta original.
  */
 export class WindowExtractor {
-  static extractEventWindow(
-    samples: readonly RawSampleModel[],
-    event: EventModel,
-  ): {
-    event: EventModel
-    samplesBefore: RawSampleModel[]
-    samplesAtEvent: RawSampleModel[]
-    samplesAfter: RawSampleModel[]
-    totalSamplesInWindow: number
-    startMonoOffsetMs: number
-    endMonoOffsetMs: number
-  } {
-    const eventOffset = event.ts_mono_offset_ms
-    const windowStart = Math.max(0, eventOffset - (event.window_pre_ms || 30000))
-    const windowEnd = eventOffset + (event.window_post_ms || 30000)
-
-    const samplesBefore: RawSampleModel[] = []
-    const samplesAtEvent: RawSampleModel[] = []
-    const samplesAfter: RawSampleModel[] = []
-
-    // Opera sobre cópias para garantir imutabilidade estrita
-    for (const s of samples) {
-      const sOffset = s.ts_mono_offset_ms
-      if (sOffset >= windowStart && sOffset <= windowEnd) {
-        const copy = { ...s }
-        if (Math.abs(sOffset - eventOffset) < 150) {
-          samplesAtEvent.push(copy)
-        } else if (sOffset < eventOffset) {
-          samplesBefore.push(copy)
-        } else {
-          samplesAfter.push(copy)
-        }
-      }
-    }
-
-    return {
-      event,
-      samplesBefore,
-      samplesAtEvent,
-      samplesAfter,
-      totalSamplesInWindow: samplesBefore.length + samplesAtEvent.length + samplesAfter.length,
-      startMonoOffsetMs: windowStart,
-      endMonoOffsetMs: windowEnd,
-    }
+  static extractEventWindow(samples: readonly RawSampleModel[], event: EventModel) {
+    return BlackBoxBuilder.partitionWindow(samples, event)
   }
 }

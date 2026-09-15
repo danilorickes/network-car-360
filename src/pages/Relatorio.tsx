@@ -7,84 +7,85 @@ import {
   Cpu,
   HardDrive,
   Terminal,
+  Car,
+  Layers,
+  Sparkles,
+  FileDown,
+  Printer,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
 export default function Relatorio() {
   const [activeTab, setActiveTab] = useState<
-    'checklist' | 'relatorio' | 'instrucoes' | 'evidencias'
-  >('checklist')
+    'checklist' | 'relatorio_e2' | 'arquitetura' | 'instrucoes' | 'evidencias'
+  >('relatorio_e2')
 
-  const rfChecklist = [
+  const rfChecklistEtapa2 = [
     {
-      id: 'RF01',
-      title: 'Conexão e Inicialização OBD-II',
-      status: 'IMPLEMENTADO — AGUARDANDO VALIDAÇÃO EM HARDWARE REAL (Real) / VALIDADO (Simulado)',
-      desc: 'Transporte abstrato OBDTransport com RealSerialTransport (Web Serial API para ELM327 com sequência ATZ, ATE0, ATL0, ATH0, ATS0, ATSP0) e SimulatedTransport. Reconexão automática resiliente.',
-      verified: true,
+      id: 'REQ 01',
+      title: 'Perfil do Veículo (Cadastro Reutilizável Genérico)',
+      status: 'VALIDADO',
+      desc: 'Cadastro reutilizável: placa, fabricante, modelo, versão, ano/modelo, motorização, combustível, câmbio, odômetro, VIN e observações. Sem nenhuma lógica hardcoded. Seed inicial com Ford EcoSport 2020 1.5 Dragon 3C e VW T-Cross 1.0 TSI.',
     },
     {
-      id: 'RF02',
-      title: 'Descoberta de PIDs Suportados',
+      id: 'REQ 02',
+      title: 'Descoberta OBD & Assinatura do Veículo',
       status: 'VALIDADO',
-      desc: 'Consulta PIDs 00, 20, 40 via Modo 01, decodifica bitmaps de 32 bits e persiste a lista de PIDs suportados na sessão.',
-      verified: true,
+      desc: 'Ao conectar, registra: protocolo OBD, PIDs suportados e indisponíveis, transporte utilizado, DTCs presentes, MIL e VIN. Assinatura salva na coleção obd_capabilities e associada ao veículo.',
     },
     {
-      id: 'RF03',
-      title: 'Telemetria Contínua (13 PIDs) e Frequência Efetiva',
+      id: 'REQ 03',
+      title: 'Caixa-Preta do Sintoma Autocontida',
       status: 'VALIDADO',
-      desc: 'Coleta de RPM (0x0C), velocidade (0x0D), temp. arrefecimento (0x05), carga (0x04), TPS (0x11), MAF (0x10), MAP (0x0B), tensão (0x42), STFT (0x06), LTFT (0x07), avanço (0x0E), temp. ar (0x0F) e tempo motor (0x1F). Frequência efetiva calculada e exibida em tempo real.',
-      verified: true,
+      desc: 'Pacote diagnóstico automático contendo veículo, sessão, timestamp exato, tipo do sintoma, telemetria ±30s, DTCs de contexto, estado do barramento, qualidade das amostras, PIDs disponíveis e estatísticas (min/max/avg). RAW original preservado estritamente append-only.',
     },
     {
-      id: 'RF04',
-      title: 'Gerenciamento de Sessão de Teste',
+      id: 'REQ 04',
+      title: 'Comparação Temporal Simultânea (Antes → Sintoma → Depois)',
       status: 'VALIDADO',
-      desc: 'Ciclo completo: INICIAR TESTE → TESTE EM ANDAMENTO → ENCERRAR TESTE. session_id único, metadados de veículo (Ford EcoSport 2020 1.5 Dragon como metadado injetado, sem hardcode), horários UTC e relógio monotônico.',
-      verified: true,
+      desc: 'Visualização comparativa simultânea no Replay e Caixa-Preta (RPM, Velocidade, Carga, TPS, MAP, MAF, STFT, LTFT, Avanço, Temp., Tensão). Permite correlacionar causa-efeito sem atribuir diagnóstico antecipado.',
     },
     {
-      id: 'RF05',
-      title: 'Marcar Sintoma em Pista',
+      id: 'REQ 05',
+      title: 'Múltiplos Sintomas por Sessão',
       status: 'VALIDADO',
-      desc: 'Botão destacado flutuante "MARCAR SINTOMA". 7 tipos normalizados: falha, trepidação, perda de potência, ruído, oscilação, apagamento, outro/livre. Registro duplo de timestamp (monotônico e UTC ISO-8601).',
-      verified: true,
+      desc: 'Suporte a múltiplas ocorrências na mesma sessão. Cada sintoma gera sua própria caixa-preta isolada e pode ser aberto e inspecionado individualmente no Replay.',
     },
     {
-      id: 'RF06',
-      title: 'Caixa-Preta (Janela ±30s Imutável)',
+      id: 'REQ 06',
+      title: 'Exportação Multiformato (JSON, CSV, PDF Imprimível)',
       status: 'VALIDADO',
-      desc: 'WindowExtractor isola janela de 30s anteriores + instante do sintoma + 30s posteriores sobre projeção de leitura. A telemetria bruta original NUNCA é removida ou modificada.',
-      verified: true,
+      desc: 'Exportação da sessão completa e de eventos individuais em JSON técnico completo, CSV de telemetria bruta e Relatório PDF para oficina/cliente via CSS print de alta definição (Salvar como PDF). RAW original não alterado.',
     },
     {
-      id: 'RF07',
-      title: 'Diagnóstico de Códigos de Falha (DTC / MIL)',
+      id: 'REQ 07',
+      title: 'Preparação para IA (DiagnosticEvidence)',
       status: 'VALIDADO',
-      desc: 'Leitura de DTCs Modo 03 (ativos), Modo 07 (pendentes) e indicador MIL (01 01). Proibição estrita de Modo 04 (sem limpeza de falhas).',
-      verified: true,
+      desc: 'Estrutura DiagnosticEvidence com fatos puramente objetivos (ex: queda percentual de RPM, posição de TPS, faixa de STFT). Separação estrita: RAW → DERIVED/EVIDENCE → FUTURA INTERPRETAÇÃO IA. Nenhuma hipótese de defeito gravada como fato.',
     },
     {
-      id: 'RF08',
-      title: 'Painel Live Operacional Automotivo',
+      id: 'REQ 08',
+      title: 'Simulador Expandido com 7 Cenários Reproduzíveis',
       status: 'VALIDADO',
-      desc: 'Identidade dark automotiva (#0B0F14 / #131A22), numerais grandes tabular-nums, sparklines em tempo real, estados de qualidade (OK, TIMEOUT, UNSUPPORTED = N/D, INVALID, NO_RESPONSE). Falhas de comunicação não geram valor zero.',
-      verified: true,
+      desc: 'Cenários selecionáveis nas Configurações e no Painel: Funcionamento Normal, Perda de Potência, Oscilação de Marcha Lenta, Trepidação/Misfire (DTC P0301), Apagamento Súbito, DTC Ativo (P0171) e Perda Temporária de Comunicação.',
     },
     {
-      id: 'RF09',
-      title: 'Simulador Veicular Temporal Plausível',
+      id: 'REQ 09',
+      title: 'Testes Unitários e Integrados Abrangentes',
       status: 'VALIDADO',
-      desc: 'Simulador não estático com dinâmica física (marcha lenta, aceleração, cruzeiro, desaceleração, anomalia com misfire e oscilação de STFT). Permite testar todo o MVP sem carro físico.',
-      verified: true,
+      desc: 'Cobertura de testes para perfil de veículo, associação sessão/veículo, capacidade OBD, múltiplos sintomas, janela ±30s, imutabilidade do RAW, cálculo de evidências, replay e exportação. Nenhuma regressão nos RF01–RF10 da Etapa 1.',
     },
     {
-      id: 'RF10',
-      title: 'Replay de Sessão no Mesmo Modelo do Live',
+      id: 'REQ 10',
+      title: 'Interface Operacional para Mecânico em Rodagem',
       status: 'VALIDADO',
-      desc: 'Motor de replay que consome os dados persistidos alimentando os mesmos componentes de medidores e mini gráfico do Live, com velocidades 1x, 2x, 5x, 10x, scrubber e detecção de sintomas marcados.',
-      verified: true,
+      desc: 'Fluxo direto: Veículo → Conectar OBD → Iniciar teste → Live → Marcar Sintoma → Encerrar → Analisar Caixa-Preta. Alta legibilidade em ambiente de teste de rodagem.',
+    },
+    {
+      id: 'REQ 11',
+      title: 'Transparência de Hardware Real ELM327',
+      status: 'IMPLEMENTADA — AGUARDANDO VALIDAÇÃO EM HARDWARE REAL',
+      desc: 'Suporte completo Web Serial e Web Bluetooth (BLE/Android). Mantido status explícito sem fabricação de dados de hardware físico.',
     },
   ]
 
@@ -95,416 +96,379 @@ export default function Relatorio() {
         <div>
           <h1 className="text-xl font-bold text-white flex items-center space-x-2">
             <FileText className="w-5 h-5 text-[#FFB300]" />
-            <span>Relatório Técnico de Entrega & Evidências</span>
+            <span>Relatório Oficial de Entrega — OS-ME001-E2</span>
           </h1>
           <p className="text-xs text-[#9AA7B4]">
-            MISSÃO ME001-E1 — Network Car — Diagnóstico 360 Live — Etapa 1
+            Network Car — Diagnóstico 360 Live — Dan e Theo (Network Soluções)
           </p>
         </div>
 
         {/* Tab Selector */}
-        <div className="inline-flex rounded-md p-1 bg-[#131A22] border border-[#263340]">
+        <div className="inline-flex rounded-md p-1 bg-[#131A22] border border-[#263340] overflow-x-auto max-w-full">
+          <button
+            type="button"
+            onClick={() => setActiveTab('relatorio_e2')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
+              activeTab === 'relatorio_e2'
+                ? 'bg-[#FFB300] text-black shadow'
+                : 'text-[#9AA7B4] hover:text-white'
+            }`}
+          >
+            RELATÓRIO — ME001-E2
+          </button>
           <button
             type="button"
             onClick={() => setActiveTab('checklist')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
               activeTab === 'checklist'
                 ? 'bg-[#FFB300] text-black shadow'
                 : 'text-[#9AA7B4] hover:text-white'
             }`}
           >
-            Checklist RF01–RF10
+            Checklist Requisitos
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('relatorio')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
-              activeTab === 'relatorio'
+            onClick={() => setActiveTab('arquitetura')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
+              activeTab === 'arquitetura'
                 ? 'bg-[#FFB300] text-black shadow'
                 : 'text-[#9AA7B4] hover:text-white'
             }`}
           >
-            Relatório Técnico Completo
+            Arquitetura & Evidências IA
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('instrucoes')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
               activeTab === 'instrucoes'
                 ? 'bg-[#FFB300] text-black shadow'
                 : 'text-[#9AA7B4] hover:text-white'
             }`}
           >
-            Instruções Web Serial & Execução
+            Instruções Operacionais
           </button>
           <button
             type="button"
             onClick={() => setActiveTab('evidencias')}
-            className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
               activeTab === 'evidencias'
                 ? 'bg-[#FFB300] text-black shadow'
                 : 'text-[#9AA7B4] hover:text-white'
             }`}
           >
-            Evidências & Dados Semeados
+            Dados Semeados (EcoSport)
           </button>
         </div>
       </div>
 
-      {/* Conteúdo Aba Checklist */}
-      {activeTab === 'checklist' && (
-        <div className="space-y-4">
-          <div className="bg-[#131A22] border border-[#263340] rounded-lg p-4">
-            <h2 className="text-sm font-bold text-white mb-1">
-              Matriz de Rastreabilidade dos Requisitos Funcionais (RF01 a RF10)
-            </h2>
-            <p className="text-xs text-[#9AA7B4]">
-              Conformidade total com a Ordem de Serviço ME001-E1 da Network Car.
-            </p>
-          </div>
-
-          <div className="grid grid-cols-1 gap-3">
-            {rfChecklist.map((item) => (
-              <div
-                key={item.id}
-                className="bg-[#131A22] border border-[#263340] rounded-lg p-4 space-y-2 hover:border-[#FFB300]/40 transition-colors"
-              >
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
-                  <div className="flex items-center space-x-2">
-                    <span className="bg-[#0B0F14] text-[#FFB300] font-mono font-bold text-xs px-2 py-0.5 rounded border border-[#263340]">
-                      {item.id}
-                    </span>
-                    <span className="font-bold text-white text-sm">{item.title}</span>
-                  </div>
-
-                  <span
-                    className={`text-xs font-semibold px-2 py-0.5 rounded ${
-                      item.status.includes('AGUARDANDO')
-                        ? 'bg-amber-950/80 text-amber-300 border border-amber-700'
-                        : 'bg-emerald-950/80 text-[#2ECC71] border border-emerald-700'
-                    }`}
-                  >
-                    {item.status}
-                  </span>
-                </div>
-
-                <p className="text-xs text-gray-300 leading-relaxed">{item.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      )}
-
-      {/* Conteúdo Aba Relatório Técnico */}
-      {activeTab === 'relatorio' && (
+      {/* Aba 1: RELATÓRIO OFICIAL ME001-E2 */}
+      {activeTab === 'relatorio_e2' && (
         <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-6 text-xs text-gray-300 leading-relaxed max-w-4xl">
           <div className="border-b border-[#263340] pb-4">
             <span className="text-[10px] uppercase tracking-wider text-[#FFB300] font-mono font-bold">
-              DOCUMENTO TÉCNICO OFICIAL DE ENTREGA
+              DOCUMENTO TÉCNICO OFICIAL DE ENTREGA — ETAPA 2
             </span>
-            <h2 className="text-lg font-bold text-white mt-1">RELATÓRIO — ME001-E1 — THEO</h2>
-            <p className="text-[#9AA7B4]">
-              Sistema de Telemetria e Diagnóstico 360 Live para Oficinas Mecânicas de Alta Precisão
+            <h2 className="text-xl font-bold text-white mt-1">RELATÓRIO — ME001-E2 — THEO</h2>
+            <p className="text-[#9AA7B4] mt-0.5">
+              Network Car Diagnóstico 360 Live • Versão 2.0.0 • Autor: Theo (Desenvolvedor) • Para:
+              Danilo (Network Soluções)
             </p>
           </div>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
-              1. Resumo Executivo
+              1. Resumo Executivo da Entrega (Etapa 2)
             </h3>
             <p>
-              O presente projeto entrega a Etapa 1 do produto{' '}
-              <strong>Network Car — Diagnóstico 360 Live</strong>, implementando um MVP plenamente
-              executável de coleta, monitoramento em tempo real, gravação contínua e análise
-              retrospectiva ("caixa-preta") de telemetria automotiva padrão OBD-II (SAE J1979 / ISO
-              15031-5).
+              Em cumprimento integral à Ordem de Serviço <strong>OS-ME001-E2</strong>, entregamos a
+              Etapa 2 do sistema
+              <strong> Network Car — Diagnóstico 360 Live</strong>. A arquitetura validada e
+              aprovada na Etapa 1 (v0.0.4) foi integralmente preservada sem regressões nos
+              requisitos funcionais RF01 a RF10.
             </p>
             <p>
-              O sistema foi construído com arquitetura offline-first no navegador: todo o pipeline
-              de aquisição, decodificação de PIDs, controle de amostragem por relógio monotônico e
-              extração de janelas opera diretamente no cliente, utilizando o banco PocketBase (Skip
-              Cloud) como repositório persistente estritamente <strong>append-only</strong>.
+              Foi implementada a camada completa de{' '}
+              <strong>Perfil do Veículo Genérico OBD-II</strong>, a descoberta e assinatura de
+              capacidades da ECU (<code>obd_capabilities</code>), a{' '}
+              <strong>Caixa-Preta do Sintoma</strong> com congelamento de fatos objetivos (
+              <code>DiagnosticEvidence</code>), o módulo de{' '}
+              <strong>Comparação Temporal Simultânea</strong> (Antes → Sintoma → Depois), suporte a{' '}
+              <strong>Múltiplos Sintomas por Sessão</strong>,{' '}
+              <strong>Exportação Multiformato</strong> (JSON técnico, CSV da telemetria e Relatório
+              PDF para oficina) e a expansão do <strong>Simulador Multicenário</strong> para 7 modos
+              de falha reproduzíveis.
             </p>
           </section>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
-              2. Stack Tecnológica e Justificativas
+              2. Arquitetura e Preservação da Imutabilidade RAW
             </h3>
+            <p>
+              A regra fundamental de segurança de dados automotivos foi rigorosamente respeitada:
+            </p>
+            <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] font-mono text-[11px] text-[#2ECC71]">
+              RAW TELEMETRY (Imutável / Append-Only) → DERIVED WINDOW / BLACKBOX → DIAGNOSTIC
+              EVIDENCE (Fatos Objetivos) → [FUTURA IA]
+            </div>
+            <p>
+              O motor de geração de caixa-preta (<code>BlackBoxBuilder</code>) opera sobre cópias
+              defensivas da telemetria bruta. Nenhum dado é modificado, sobrescrito ou deletado para
+              calcular resumos, gerar gráficos comparativos ou renderizar relatórios.
+            </p>
+          </section>
+
+          <section className="space-y-2">
+            <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
+              3. Preparação para IA (DiagnosticEvidence) & Princípio Epistemológico
+            </h3>
+            <p>
+              Conforme exigência expressa do usuário Danilo, a Etapa 2 não atribui diagnósticos de
+              causa raiz ou suposições mecânicas automaticamente. Em seu lugar, foi construído o
+              gerador de evidências diagnósticas <code>DiagnosticFact</code>, que extrai apenas
+              declarações puramente objetivas e verificáveis a partir da janela de -30s a +30s:
+            </p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                <strong>React 18 + Vite + TypeScript:</strong> Tipagem estrita para segurança de
-                conversões binárias e manipulação de barramento.
+                Exemplo de Fato:{' '}
+                <em>"RPM decresceu 28.5% no momento do evento (de média 2.150 para 1.537 RPM)."</em>
               </li>
               <li>
-                <strong>Tailwind CSS (Automotive Dark System):</strong> Identidade operacional de
-                oficina com alto contraste, fontes com dígitos tabulares e feedback visual
-                instantâneo.
+                Exemplo de Fato:{' '}
+                <em>"Posição da borboleta/pedal (TPS) no evento: 78% (acelerador exigido)."</em>
               </li>
               <li>
-                <strong>Web Serial API:</strong> Comunicação nativa e direta com adaptadores ELM327
-                USB e Bluetooth Serial sem necessidade de drivers ou servidores intermediários
-                pesados.
+                Exemplo de Fato:{' '}
+                <em>
+                  "Ajuste de combustível a curto prazo (STFT) oscilou entre +12% e +24% (média:
+                  +18.2%)."
+                </em>
               </li>
               <li>
-                <strong>PocketBase / Skip Cloud:</strong> SQLite embutido com regras de segurança no
-                nível de registro (RLS), garantindo a imutabilidade da telemetria bruta.
+                Exemplo de Fato:{' '}
+                <em>"Código de anomalia P0301 (ATIVO) estava presente na ECU (MIL: Aceso)."</em>
               </li>
             </ul>
           </section>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
-              3. Arquitetura e Desacoplamento do Núcleo
+              4. Decisão Técnica de Exportação & PDF
             </h3>
-            <p>
-              O núcleo da aplicação consome apenas interfaces e contratos abstratos. Nenhuma regra
-              de veículo é fixada em código (hardcoded):
-            </p>
+            <p>A exportação foi desenvolvida em três formatos obrigatórios:</p>
             <ul className="list-disc pl-5 space-y-1">
               <li>
-                <code>OBDTransport</code>: Interface padronizada que permite alternância instantânea
-                entre <code>SimulatedTransport</code> e <code>RealSerialTransport</code> sem alterar
-                uma única linha do scheduler ou do recorder.
+                <strong>JSON Técnico Completo:</strong> Estrutura autocontida incluindo metadados do
+                veículo, sessão, DTCs e telemetria RAW integral.
               </li>
               <li>
-                <code>PidDecoder</code>: Tabela declarativa mapeando PID → bytes → fórmula
-                matemática → unidade física → limites técnicos.
+                <strong>CSV da Telemetria:</strong> Arquivo tabular delimitado por ponto e vírgula
+                com UTF-8 BOM, compatível diretamente com Excel e LibreOffice.
               </li>
               <li>
-                <code>WindowExtractor</code>: Módulo isolado que extrai janelas de 30s pré-evento e
-                30s pós-evento operando sobre projeções de leitura, garantindo que a telemetria
-                original nunca seja alterada.
+                <strong>Relatório PDF Legível:</strong> Implementado via composição visual
+                especializada em CSS Print (@media print) de alta resolução, dispensando
+                dependências binárias infladas e permitindo ao mecânico imprimir em impressora
+                física ou acionar o diálogo nativo "Salvar como PDF" com diagramação profissional
+                pronta para o cliente final.
               </li>
             </ul>
           </section>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
-              4. Status de Validação de Hardware Real
+              5. Transparência de Hardware Real
             </h3>
             <div className="bg-amber-950/40 border border-amber-800 p-3 rounded">
-              <p className="font-semibold text-amber-300">
-                Aviso de Transparência e Rigor Técnico:
-              </p>
+              <span className="font-bold text-amber-300">Classificação Obrigatória:</span>
               <p className="text-gray-300 mt-1">
-                A camada de comunicação serial com adaptador físico foi integralmente implementada
-                conforme a especificação oficial do chip ELM327 (comandos <code>ATZ</code>,{' '}
-                <code>ATE0</code>, <code>ATL0</code>,<code>ATH0</code>, <code>ATS0</code>,{' '}
-                <code>ATSP0</code>). Conforme exigência inegociável da OS, esta funcionalidade é
-                catalogada explicitamente como:
+                Todas as rotinas que interagem com o barramento físico ELM327 USB (Web Serial) e
+                Bluetooth BLE (Web Bluetooth) permanecem categorizadas estritamente como:
                 <br />
                 <strong className="text-white">
                   "IMPLEMENTADA — AGUARDANDO VALIDAÇÃO EM HARDWARE REAL"
                 </strong>
-                . Nenhuma evidência simulada foi forjada como sendo de hardware real.
+                . Não foram geradas evidências fictícias de testes físicos.
               </p>
             </div>
           </section>
 
           <section className="space-y-2">
             <h3 className="text-sm font-bold text-white uppercase tracking-wider text-[#FFB300]">
-              5. Recomendações Técnicas para a Etapa 2
+              6. Conclusão da Etapa 2 & Aguardo de Auditoria
             </h3>
-            <ul className="list-disc pl-5 space-y-1">
-              <li>
-                Validação em bancada e pista com adaptadores ELM327 genuínos (PIC18F25K80) e
-                STN1110/STN2120.
-              </li>
-              <li>
-                Implementação de buffers de transmissão CAN de alta velocidade (250/500 kbps) via
-                WebAssembly.
-              </li>
-              <li>
-                Adição de gráficos de dispersão comparativa entre STFT e LTFT para análise rápida de
-                sonda lambda.
-              </li>
-            </ul>
+            <p className="text-emerald-400 font-semibold">
+              ✓ Todos os critérios da Definition of Done foram atendidos com êxito. Conforme
+              instrução expressa da OS-ME001-E2, a Etapa 3 não foi iniciada automaticamente. O
+              sistema aguarda auditoria e aprovação da Network Soluções.
+            </p>
           </section>
         </div>
       )}
 
-      {/* Conteúdo Aba Evidências & Dados Semeados */}
-      {activeTab === 'evidencias' && (
+      {/* Aba 2: CHECKLIST DOS REQUISITOS */}
+      {activeTab === 'checklist' && (
+        <div className="space-y-3">
+          {rfChecklistEtapa2.map((item) => (
+            <div
+              key={item.id}
+              className="bg-[#131A22] border border-[#263340] rounded-lg p-4 space-y-2 hover:border-[#FFB300]/40 transition-colors"
+            >
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                <div className="flex items-center space-x-2">
+                  <span className="bg-[#0B0F14] text-[#FFB300] font-mono font-bold text-xs px-2 py-0.5 rounded border border-[#263340]">
+                    {item.id}
+                  </span>
+                  <span className="font-bold text-white text-sm">{item.title}</span>
+                </div>
+
+                <span
+                  className={`text-xs font-semibold px-2 py-0.5 rounded ${
+                    item.status.includes('AGUARDANDO')
+                      ? 'bg-amber-950/80 text-amber-300 border border-amber-700'
+                      : 'bg-emerald-950/80 text-[#2ECC71] border border-emerald-700'
+                  }`}
+                >
+                  {item.status}
+                </span>
+              </div>
+              <p className="text-xs text-gray-300 leading-relaxed">{item.desc}</p>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Aba 3: ARQUITETURA & EVIDÊNCIAS IA */}
+      {activeTab === 'arquitetura' && (
         <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-6 text-xs text-gray-300 leading-relaxed max-w-4xl">
           <div className="border-b border-[#263340] pb-3">
             <h2 className="text-base font-bold text-white flex items-center space-x-2">
-              <HardDrive className="w-5 h-5 text-[#FFB300]" />
-              <span>Evidências de Persistência & Amostra Semeada (PocketBase)</span>
+              <Layers className="w-5 h-5 text-[#FFB300]" />
+              <span>Arquitetura de Isolamento & Modelos de Dados (PocketBase)</span>
             </h2>
-            <p className="text-[#9AA7B4] text-xs">
-              Sessão de exemplo, evento de sintoma, código DTC e amostras brutas persistidas de
-              forma idempotente.
-            </p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-            <div className="bg-[#0B0F14] border border-[#263340] p-4 rounded-lg space-y-2">
-              <h3 className="font-bold text-[#FFB300] uppercase text-xs">
-                Sessão Semeada no Banco
-              </h3>
-              <ul className="space-y-1 font-mono text-[11px] text-gray-300">
-                <li>
-                  <strong className="text-white">ID:</strong> sess_ecosport_seed_001
-                </li>
-                <li>
-                  <strong className="text-white">Veículo:</strong> Ford EcoSport 2020 1.5 Dragon 3C
-                </li>
-                <li>
-                  <strong className="text-white">VIN:</strong> 9BFBJ55E6L8104921
-                </li>
-                <li>
-                  <strong className="text-white">Protocolo:</strong> ISO 15765-4 (CAN 11/500)
-                </li>
-                <li>
-                  <strong className="text-white">Status:</strong> ENCERRADO
-                </li>
-                <li>
-                  <strong className="text-white">Transporte:</strong> SIMULADOR
-                </li>
-              </ul>
+            <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] space-y-2">
+              <span className="font-bold text-[#FFB300] uppercase text-xs block">
+                Coleção: vehicles
+              </span>
+              <p className="text-gray-400">
+                Cadastro genérico e reutilizável de veículos. Campos: plate, make, model, version,
+                year_model, engine, fuel, transmission, odometer_km, vin, notes.
+              </p>
             </div>
 
-            <div className="bg-[#0B0F14] border border-[#263340] p-4 rounded-lg space-y-2">
-              <h3 className="font-bold text-[#E53935] uppercase text-xs">
-                Sintoma Registrado (Caixa-Preta)
-              </h3>
-              <ul className="space-y-1 font-mono text-[11px] text-gray-300">
-                <li>
-                  <strong className="text-white">Evento ID:</strong> ev_seed_001
-                </li>
-                <li>
-                  <strong className="text-white">Tipo:</strong> trepidação
-                </li>
-                <li>
-                  <strong className="text-white">Descrição:</strong> Trepidação perceptível na
-                  transição para 2ª marcha com oscilação na marcha lenta
-                </li>
-                <li>
-                  <strong className="text-white">Janela:</strong> -30.000 ms a +30.000 ms
-                </li>
-                <li>
-                  <strong className="text-white">DTC Vinculado:</strong> P0301 (Cilindro 1 com Falha
-                  de Combustão)
-                </li>
-              </ul>
+            <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] space-y-2">
+              <span className="font-bold text-[#FFB300] uppercase text-xs block">
+                Coleção: obd_capabilities
+              </span>
+              <p className="text-gray-400">
+                Assinatura de capacidades OBD detectadas no veículo: protocol_detected,
+                adapter_type, pids_supported, pids_unavailable, vin_read, mil_initial_state,
+                dtcs_present.
+              </p>
             </div>
-          </div>
 
-          <div className="bg-[#0B0F14] border border-[#263340] p-4 rounded-lg space-y-3">
-            <h3 className="font-bold text-[#2ECC71] uppercase text-xs">
-              Estrutura de Arquivos da Solução
-            </h3>
-            <div className="font-mono text-[11px] text-gray-400 bg-[#131A22] p-3 rounded border border-[#263340] overflow-x-auto space-y-1">
-              <div>src/lib/obd/transports/obd-transport.ts (Interface abstrata de transporte)</div>
-              <div>
-                src/lib/obd/transports/simulated-transport.ts (Simulador temporal dinâmico com ciclo
-                físico)
-              </div>
-              <div>
-                src/lib/obd/transports/real-serial-transport.ts (Web Serial API para ELM327 real)
-              </div>
-              <div>
-                src/lib/obd/elm-parser.ts (Parser robusto de respostas ELM327 e códigos DTC)
-              </div>
-              <div>
-                src/lib/obd/pid-decoder.ts (Tabela declarativa e extensível dos 13 PIDs OBD-II)
-              </div>
-              <div>
-                src/lib/obd/sampler-scheduler.ts (Agendador de amostragem por relógio monotônico
-                ≥5Hz / ≥1Hz)
-              </div>
-              <div>
-                src/lib/obd/raw-recorder.ts (Gravação imutável append-only com buffer local)
-              </div>
-              <div>
-                src/lib/obd/event-marker.ts (Marcação de sintomas com relógio monotônico e ISO-8601)
-              </div>
-              <div>
-                src/lib/obd/dtc-service.ts (Diagnóstico passivo de DTCs Modo 03/07 e MIL sem Modo
-                04)
-              </div>
-              <div>
-                src/lib/obd/replay-engine.ts (Motor de replay determinístico pelo mesmo modelo do
-                Live)
-              </div>
-              <div>
-                pocketbase/migrations/ (Migrations 0001, 0002 e 0003 com coleções imutáveis e seeds)
-              </div>
-              <div>RELATORIO-ME001-E1-THEO.md (Documento formal oficial de entrega técnica)</div>
+            <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] space-y-2">
+              <span className="font-bold text-[#FFB300] uppercase text-xs block">
+                Coleção: diagnostic_evidences
+              </span>
+              <p className="text-gray-400">
+                Pacotes congelados de caixa-preta e fatos observados objetivos. Relação com event e
+                session. Imutável (sem updateRule nem deleteRule).
+              </p>
+            </div>
+
+            <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] space-y-2">
+              <span className="font-bold text-[#2ECC71] uppercase text-xs block">
+                Coleções Preservadas da Etapa 1
+              </span>
+              <p className="text-gray-400">
+                sessions (ampliada com relação a vehicle), raw_samples (telemetria bruta imutável
+                append-only), events e dtcs.
+              </p>
             </div>
           </div>
         </div>
       )}
 
-      {/* Conteúdo Aba Instruções de Execução */}
+      {/* Aba 4: INSTRUÇÕES OPERACIONAIS */}
       {activeTab === 'instrucoes' && (
         <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-5 text-xs text-gray-300 leading-relaxed max-w-4xl">
-          <div className="border-b border-[#263340] pb-3">
-            <h2 className="text-base font-bold text-white flex items-center space-x-2">
-              <Terminal className="w-5 h-5 text-[#FFB300]" />
-              <span>Instruções de Operação e Conexão em Hardware Real</span>
-            </h2>
-          </div>
+          <h2 className="text-base font-bold text-white flex items-center space-x-2">
+            <Terminal className="w-5 h-5 text-[#FFB300]" />
+            <span>Fluxo Principal do Mecânico em Teste de Rodagem</span>
+          </h2>
 
-          <div className="space-y-3">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider text-[#FFB300]">
-              1. Executando o Sistema em Modo Simulador (Sem Carro)
-            </h3>
-            <p>
-              O simulador temporal dinâmico vem ativado por padrão. Ele reproduz acelerações,
-              marchas lentas, cruzeiro e anomalias de injeção em tempo real:
-            </p>
-            <ol className="list-decimal pl-5 space-y-1">
+          <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] space-y-3">
+            <div className="flex items-center space-x-2 font-mono text-sm text-[#FFB300] font-bold">
+              <span>
+                VEÍCULO → CONECTAR OBD → INICIAR TESTE → LIVE → MARCAR SINTOMA → ENCERRAR →
+                CAIXA-PRETA
+              </span>
+            </div>
+
+            <ol className="list-decimal pl-5 space-y-2 text-gray-300">
               <li>
-                Acesse o <strong>Painel Live</strong> (<code>/</code>).
+                <strong>Veículo:</strong> Selecione o veículo na lista suspensa do Painel Live ou
+                acesse a aba <em>Veículos</em> para cadastrar ou editar o perfil.
               </li>
               <li>
-                Clique no botão <strong>INICIAR SIMULADOR</strong> no topo.
+                <strong>Cenário do Simulador:</strong> Escolha um dos 7 cenários reproduzíveis
+                (Normal, Perda de Potência, Oscilação, Trepidação/Falha P0301, Apagamento, DTC Ativo
+                P0171, Perda de Comunicação).
               </li>
               <li>
-                Clique em <strong>INICIAR TESTE</strong>. O painel começará a receber telemetria
-                contínua a ≥5 Hz.
+                <strong>Conectar & Iniciar Teste:</strong> Clique em <em>INICIAR SIMULADOR</em> (ou
+                Conectar Adaptador) e em seguida <em>INICIAR TESTE</em>.
               </li>
               <li>
-                Durante o teste, clique no botão vermelho <strong>MARCAR SINTOMA</strong> no canto
-                inferior para simular a marcação de anomalia na pista.
+                <strong>Monitoramento Live & Marcação:</strong> Acompanhe a telemetria ao vivo. Ao
+                perceber a anomalia simulada ou real, clique no botão flutuante vermelho{' '}
+                <em>MARCAR SINTOMA</em>.
               </li>
               <li>
-                Ao encerrar o teste, acesse a aba <strong>Sessões</strong> para verificar o
-                armazenamento ou <strong>Replay</strong> para reproduzir a gravação.
+                <strong>Múltiplos Sintomas:</strong> Marque quantos sintomas desejar durante a
+                rodagem contínua.
+              </li>
+              <li>
+                <strong>Encerramento & Análise:</strong> Clique em <em>ENCERRAR TESTE</em> e navegue
+                até a aba <em>Replay</em> para abrir individualmente as caixas-pretas e exportar
+                JSON/CSV/PDF.
               </li>
             </ol>
           </div>
+        </div>
+      )}
 
-          <div className="space-y-3 pt-3 border-t border-[#263340]">
-            <h3 className="text-xs font-bold text-white uppercase tracking-wider text-purple-400">
-              2. Conectando Adaptador ELM327 Físico (Web Serial)
-            </h3>
-            <p>Para validar o funcionamento em veículo real:</p>
-            <ol className="list-decimal pl-5 space-y-1">
-              <li>
-                Utilize o navegador <strong>Google Chrome</strong> ou{' '}
-                <strong>Microsoft Edge</strong> (com suporte à Web Serial API).
-              </li>
-              <li>
-                Conecte o adaptador ELM327 na porta OBD-II do veículo e ligue a ignição do carro.
-              </li>
-              <li>
-                No computador, conecte o cabo USB do adaptador ou emparelhe o dispositivo Bluetooth
-                Serial.
-              </li>
-              <li>
-                No Painel Live do sistema, selecione a opção <strong>OBD REAL (ELM327)</strong>.
-              </li>
-              <li>
-                Clique em <strong>CONECTAR ADAPTADOR</strong>. O navegador abrirá o diálogo nativo
-                para seleção da porta COM/USB correspondente.
-              </li>
-              <li>
-                Após a conexão, o sistema executará a inicialização dos comandos AT automaticamente.
-              </li>
-            </ol>
+      {/* Aba 5: DADOS SEMEADOS */}
+      {activeTab === 'evidencias' && (
+        <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-4 text-xs text-gray-300 max-w-4xl">
+          <h2 className="text-base font-bold text-white flex items-center space-x-2">
+            <Car className="w-5 h-5 text-[#FFB300]" />
+            <span>Perfil Padrão de Validação Semeado no Banco</span>
+          </h2>
+
+          <div className="bg-[#0B0F14] p-4 rounded border border-[#263340] space-y-2 font-mono text-[11px]">
+            <div className="text-[#FFB300] font-bold text-sm">
+              Ford EcoSport 2020 — 1.5 Dragon — 3 cilindros
+            </div>
+            <div>Placa: BRA2E20</div>
+            <div>Versão: Freestyle 1.5 AT</div>
+            <div>Motor: 1.5 Ti-VCT Dragon 3C (137 cv) Flex</div>
+            <div>VIN: 9BFBJ55E6L8104921</div>
+            <div>Odômetro: 48.500 km</div>
+            <div>
+              Assinatura OBD: Protocolo ISO 15765-4 (CAN 11/500), 13 PIDs suportados, MIL inicial
+              Apagado
+            </div>
+            <div className="text-gray-400 italic mt-2">
+              Observação: Cadastrado como DADOS genéricos reutilizáveis, provando a ausência de
+              hardcode veicular no código.
+            </div>
           </div>
         </div>
       )}

@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T02:45:11.816Z",
+  "generatedAt": "2026-09-15T02:50:56.315Z",
   "collections": [
     {
       "name": "users",
@@ -130,6 +130,13 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "vehicles"
         }
       ],
       "indexes": [
@@ -373,6 +380,321 @@
         }
       ],
       "indexes": ["CREATE INDEX idx_dtcs_code ON dtcs (dtc_code)"]
+    },
+    {
+      "name": "vehicles",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "plate",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "make",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "version",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "year_model",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "engine",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "transmission",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "odometer_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vin",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_vehicles_plate ON vehicles (plate)",
+        "CREATE INDEX idx_vehicles_make_model ON vehicles (make, model)"
+      ]
+    },
+    {
+      "name": "obd_capabilities",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": "@request.auth.id != ''",
+        "delete": "@request.auth.id != ''"
+      },
+      "fields": [
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": false,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "protocol_detected",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "adapter_type",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "adapter_name",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pids_supported",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pids_unavailable",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vin_supported",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vin_read",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "mil_initial_state",
+          "type": "bool",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dtcs_present",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "raw_discovery_log",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": ["CREATE INDEX idx_obd_cap_vehicle ON obd_capabilities (vehicle)"]
+    },
+    {
+      "name": "diagnostic_evidences",
+      "type": "base",
+      "apiRules": {
+        "list": "@request.auth.id != ''",
+        "view": "@request.auth.id != ''",
+        "create": "@request.auth.id != ''",
+        "update": null,
+        "delete": null
+      },
+      "fields": [
+        {
+          "name": "event",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "events"
+        },
+        {
+          "name": "session",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "sessions"
+        },
+        {
+          "name": "event_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "session_id",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "vehicle_info",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "symptom_type",
+          "type": "text",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "description",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "timestamp_utc",
+          "type": "date",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "mono_offset_ms",
+          "type": "number",
+          "required": true,
+          "system": false
+        },
+        {
+          "name": "window_stats",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "dtcs_context",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "communication_state",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "sample_quality_summary",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "pids_available",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "facts",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_evidence_event_id ON diagnostic_evidences (event_id)",
+        "CREATE INDEX idx_evidence_session ON diagnostic_evidences (session)"
+      ]
     }
   ]
 }

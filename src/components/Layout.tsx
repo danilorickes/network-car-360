@@ -14,6 +14,7 @@ import {
   X,
   LogOut,
   ShieldAlert,
+  Car,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 
@@ -67,6 +68,20 @@ export default function Layout() {
             >
               <Cpu className="w-4 h-4" />
               <span>Painel Live</span>
+            </NavLink>
+
+            <NavLink
+              to="/veiculos"
+              className={({ isActive }) =>
+                `px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center space-x-2 ${
+                  isActive
+                    ? 'bg-[#1A232E] text-[#FFB300] border-b-2 border-[#FFB300]'
+                    : 'text-[#9AA7B4] hover:text-white hover:bg-[#1A232E]/60'
+                }`
+              }
+            >
+              <Car className="w-4 h-4" />
+              <span>Veículos</span>
             </NavLink>
 
             <NavLink
@@ -262,6 +277,13 @@ export default function Layout() {
               Painel Live
             </NavLink>
             <NavLink
+              to="/veiculos"
+              onClick={() => setMobileMenuOpen(false)}
+              className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
+            >
+              Veículos
+            </NavLink>
+            <NavLink
               to="/sessoes"
               onClick={() => setMobileMenuOpen(false)}
               className="block px-3 py-2 rounded text-sm text-[#F2F5F7] hover:bg-[#1A232E]"
@@ -306,9 +328,9 @@ export default function Layout() {
           </div>
           <div className="flex items-center space-x-3">
             <span className="font-mono text-[#FFB300] bg-[#FFB300]/10 px-2 py-0.5 rounded border border-[#FFB300]/30">
-              ME001-E1 — MVP
+              ME001-E2 — Etapa 2
             </span>
-            <span>Versão 1.0.0 (Etapa 1 Executável)</span>
+            <span>Versão 2.0.0 (Diagnóstico 360 Live)</span>
           </div>
         </div>
       </footer>

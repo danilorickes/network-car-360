@@ -4,6 +4,15 @@ import { AppConfig } from '@/types/obd'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { useToast } from '@/hooks/use-toast'
+import { useTelemetry } from '@/contexts/TelemetryContext'
+import { SIMULATOR_SCENARIOS, SimulatorScenario } from '@/lib/obd/transports/simulated-transport'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
 import {
   Settings,
   Save,
@@ -15,10 +24,12 @@ import {
   Bluetooth,
   Database,
   HelpCircle,
+  Layers,
 } from 'lucide-react'
 import { detectPlatformCapabilities } from '@/lib/obd/platform-detector'
 
 export default function Configuracoes() {
+  const { activeScenario, setActiveScenario } = useTelemetry()
   const { toast } = useToast()
   const [config, setConfig] = useState<AppConfig>(loadAppConfig())
   const platform = detectPlatformCapabilities()
@@ -81,6 +92,47 @@ export default function Configuracoes() {
             <Save className="w-3.5 h-3.5 mr-1" />
             Salvar Alterações
           </Button>
+        </div>
+      </div>
+
+      {/* Seletor de Cenário do Simulador (Requisito 8 da OS-ME001-E2) */}
+      <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-4">
+        <div className="flex items-center space-x-2 border-b border-[#263340] pb-2">
+          <Layers className="w-4 h-4 text-[#FFB300]" />
+          <h2 className="text-sm font-bold text-white uppercase tracking-wider">
+            Simulador de Testes — Cenários Reproduzíveis (OS-ME001-E2 Requisito 8)
+          </h2>
+        </div>
+        <p className="text-xs text-[#9AA7B4]">
+          Escolha o comportamento veicular simulado para validar a Caixa-Preta e a telemetria sem
+          veículo físico.
+        </p>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-xs font-semibold text-[#9AA7B4] mb-1">
+              Cenário Ativo do Simulador:
+            </label>
+            <Select value={activeScenario} onValueChange={(val: any) => setActiveScenario(val)}>
+              <SelectTrigger className="bg-[#0B0F14] border-[#263340] text-sm text-white">
+                <SelectValue placeholder="Selecione o cenário" />
+              </SelectTrigger>
+              <SelectContent className="bg-[#131A22] border-[#263340] text-white">
+                {SIMULATOR_SCENARIOS.map((sc) => (
+                  <SelectItem key={sc.id} value={sc.id}>
+                    {sc.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] text-xs space-y-1">
+            <span className="text-[#FFB300] font-bold block">
+              Descrição & Comportamento Esperado:
+            </span>
+            <p className="text-gray-300">
+              {SIMULATOR_SCENARIOS.find((s) => s.id === activeScenario)?.description}
+            </p>
+          </div>
         </div>
       </div>
 

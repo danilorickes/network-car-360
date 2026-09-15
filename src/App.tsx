@@ -7,6 +7,7 @@ import { TelemetryProvider } from '@/contexts/TelemetryContext'
 import Index from './pages/Index'
 import Sessoes from './pages/Sessoes'
 import Replay from './pages/Replay'
+import Veiculos from './pages/Veiculos'
 import Configuracoes from './pages/Configuracoes'
 import Relatorio from './pages/Relatorio'
 import NotFound from './pages/NotFound'
@@ -47,6 +48,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <Index />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/veiculos"
+                element={
+                  <ProtectedRoute>
+                    <Veiculos />
                   </ProtectedRoute>
                 }
               />

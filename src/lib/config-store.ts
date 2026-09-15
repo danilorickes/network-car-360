@@ -13,7 +13,7 @@ export const DEFAULT_CONFIG: AppConfig = {
   dtcIntervalMs: 60000,
   simulatorIdleRpm: 850,
   simulatorCruiseRpm: 2100,
-  defaultVehicleName: 'Ford EcoSport 2020 1.5 Dragon 3C',
+  defaultVehicleName: 'Ford EcoSport 2020 — 1.5 Dragon — 3 cilindros',
 }
 
 export function loadAppConfig(): AppConfig {
