@@ -179,8 +179,10 @@ export class NinaCopilotService {
 
     if (
       lower.includes('como está o carro') ||
+      lower.includes('como esta o carro') ||
       lower.includes('status do carro') ||
-      lower.includes('saúde do carro')
+      lower.includes('saúde do carro') ||
+      lower.includes('saude do carro')
     ) {
       let reply = ''
       if (context.connectionStatus !== 'CONECTADO') {

@@ -181,6 +181,39 @@ export interface TripSessionModel {
   updated?: string
 }
 
+// NC-E6.1-VOICE: Configuração e Estado dos Boletins Periódicos da Nina
+export type BulletinIntervalOption = 'DESATIVADO' | 5 | 10 | 20 | 30 | 60 | 'PERSONALIZADO'
+export type BulletinDetailLevel = 'RESUMIDO' | 'NORMAL' | 'DETALHADO'
+
+export interface NinaBulletinConfig {
+  enabled: boolean
+  intervalOption: BulletinIntervalOption
+  customMinutes?: number
+  effectiveMinutes: number // Minutos reais calculados (ou 0 se desativado)
+  detailLevel: BulletinDetailLevel
+  lastBulletinUtc?: string
+  totalBulletinsEmitted: number
+}
+
+export interface NinaBulletinPayload {
+  id: string
+  timestampUtc: string
+  detailLevel: BulletinDetailLevel
+  text: string
+  isShortUpdate: boolean // Anti-repetição ativado (resumo rápido pois nada relevante mudou)
+  significantChanges: string[]
+  telemetrySnapshot: {
+    speedKmh?: number
+    rpm?: number
+    coolantTemp?: number
+    batteryVoltage?: number
+    stft?: number
+    ltft?: number
+    drivingContext: DrivingContextType
+    safetyLevel: SafetyLevel
+  }
+}
+
 export type TripDiaryEntryType =
   | 'PARADA'
   | 'PONTO_TURISTICO'
@@ -232,9 +265,9 @@ export interface CopilotContext {
     musicStyle?: string
     voiceVolume?: number
     allowLocation?: boolean
+    bulletinConfig?: NinaBulletinConfig
   }
 }
-
 // Perfil de Homologação Guiada: Ford EcoSport 2020 1.5 Dragon 3Cil
 export interface EcoSportValidationStep {
   id: string

@@ -62,7 +62,19 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     let isCancelled = false
 
-    // Sondagem de integridade com timeout de proteção
+    // Se não há token no authStore desde o início, não há sessão prévia para validar
+    if (!pb.authStore.isValid) {
+      setUser(null)
+      setLoading(false)
+      // Ainda checa saúde em background sem travar tela do visitante
+      checkBackendHealth().catch(() => {})
+      return () => {
+        isCancelled = true
+        unsub()
+      }
+    }
+
+    // Sondagem de integridade com timeout de proteção quando há token prévio
     checkBackendHealth()
       .then((isHealthy) => {
         if (isCancelled) return
@@ -88,11 +100,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             })
         } else {
-          // Backend indisponível ou sem token prévio: finaliza loading sem conceder login
+          // Backend indisponível com token prévio: encerra loading
           if (!isCancelled) {
-            if (!pb.authStore.isValid) {
-              setUser(null)
-            }
             setLoading(false)
           }
         }

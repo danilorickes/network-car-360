@@ -32,6 +32,10 @@ import { VehicleSafetyMonitor } from '@/lib/diagnostic/vehicle-safety-monitor'
 import { TripSessionManager } from '@/lib/trip/trip-session-manager'
 import { NinaCopilotService, NinaMessage } from '@/lib/nina/nina-copilot-service'
 import {
+  NinaPeriodicBulletinService,
+  BulletinContextInput,
+} from '@/lib/nina/nina-periodic-bulletin-service'
+import {
   TRAVEL_QUIZ_QUESTIONS,
   EXTERNAL_MEDIA_SHORTCUTS,
   TravelQuizQuestion,
@@ -43,6 +47,10 @@ import {
   CopilotContext,
   TripSessionModel,
   TripDiaryEntryModel,
+  NinaBulletinConfig,
+  NinaBulletinPayload,
+  BulletinIntervalOption,
+  BulletinDetailLevel,
 } from '@/types/etapa6'
 
 export const NetworkCarDrive: React.FC = () => {
@@ -67,6 +75,7 @@ export const NetworkCarDrive: React.FC = () => {
   const safetyMonitorRef = useRef(new VehicleSafetyMonitor())
   const tripManagerRef = useRef(new TripSessionManager())
   const ninaRef = useRef<NinaCopilotService | null>(null)
+  const bulletinServiceRef = useRef<NinaPeriodicBulletinService | null>(null)
 
   // Estados dinâmicos de monitoramento contínuo
   const [drivingContext, setDrivingContext] = useState<DrivingContextInfo>({
@@ -81,6 +90,18 @@ export const NetworkCarDrive: React.FC = () => {
   const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlert[]>([])
   const [activeTrip, setActiveTrip] = useState<TripSessionModel | null>(null)
   const [diaryEntries, setDiaryEntries] = useState<TripDiaryEntryModel[]>([])
+
+  // NC-E6.1-VOICE: Estados de Boletins Periódicos da Nina
+  const [bulletinConfig, setBulletinConfig] = useState<NinaBulletinConfig>({
+    enabled: true,
+    intervalOption: 20,
+    effectiveMinutes: 20,
+    detailLevel: 'NORMAL',
+    totalBulletinsEmitted: 0,
+  })
+  const [recentBulletins, setRecentBulletins] = useState<NinaBulletinPayload[]>([])
+  const [customMinutesInput, setCustomMinutesInput] = useState<string>('15')
+  const [isAudioDucked, setIsAudioDucked] = useState<boolean>(false)
 
   // Estados da Nina
   const [ninaInput, setNinaInput] = useState('')
@@ -98,19 +119,69 @@ export const NetworkCarDrive: React.FC = () => {
   const [newDiaryNotes, setNewDiaryNotes] = useState('')
   const [hasLocationConsent, setHasLocationConsent] = useState(false)
 
-  // Inicializa Baseline Learner para o veículo selecionado
+  // Inicializa Baseline Learner e BulletinService para o veículo selecionado
   useEffect(() => {
     const plate = selectedVehicle?.plate || 'PADRAO'
     baselineLearnerRef.current = new IndividualBaselineLearner(plate)
+
+    if (bulletinServiceRef.current) {
+      bulletinServiceRef.current.setVehiclePlate(plate)
+      setBulletinConfig(bulletinServiceRef.current.getConfig())
+    }
   }, [selectedVehicle?.plate])
 
-  // Inicializa Nina Service
+  // Ducking helper: reduz / interrompe entretenimento enquanto a Nina fala e devolve controle depois
+  const executeDuckingSpeech = (text: string, onDone?: () => void) => {
+    setIsAudioDucked(true)
+    ninaRef.current?.speak(text, () => {
+      setIsAudioDucked(false)
+      onDone?.()
+    })
+  }
+
+  // Inicializa Nina Service e Bulletin Service
   useEffect(() => {
+    const plate = selectedVehicle?.plate || 'PADRAO'
+    const bulletinService = new NinaPeriodicBulletinService(plate, {
+      onBulletinGenerated: (bulletin) => {
+        setRecentBulletins((prev) => [bulletin, ...prev.slice(0, 9)])
+        // Executa fala do boletim com Ducking de áudio
+        executeDuckingSpeech(bulletin.text)
+        // Adiciona à lista de mensagens da Nina
+        const msg: NinaMessage = {
+          id: `msg_bulletin_${Date.now()}`,
+          role: 'assistant',
+          content: `📢 [Boletim ${bulletin.detailLevel}] ${bulletin.text}`,
+          timestamp: bulletin.timestampUtc,
+        }
+        setNinaMessages((prev) => [...prev, msg])
+      },
+      onConfigChanged: (cfg) => {
+        setBulletinConfig(cfg)
+      },
+    })
+    bulletinServiceRef.current = bulletinService
+    setBulletinConfig(bulletinService.getConfig())
+
     const nina = new NinaCopilotService({
       onListeningStateChange: (listening) => setIsListeningVoice(listening),
       onSpeakingStateChange: (speaking) => setIsSpeakingVoice(speaking),
       onSpeechRecognized: (text) => {
-        handleSendNinaMessage(text)
+        // Tenta primeiro interpretar como comando de boletim
+        const cmdRes = bulletinServiceRef.current?.parseVoiceCommand(text)
+        if (cmdRes && cmdRes.handled) {
+          executeDuckingSpeech(cmdRes.replyText)
+          const cmdMsg: NinaMessage = {
+            id: `msg_cmd_${Date.now()}`,
+            role: 'assistant',
+            content: cmdRes.replyText,
+            timestamp: new Date().toISOString(),
+          }
+          setNinaMessages((prev) => [...prev, cmdMsg])
+        } else {
+          // Encaminha comando geral à Nina
+          handleSendNinaMessage(text)
+        }
       },
     })
     ninaRef.current = nina
@@ -119,6 +190,7 @@ export const NetworkCarDrive: React.FC = () => {
     return () => {
       nina.stopListening()
       nina.stopSpeaking()
+      bulletinService.destroy()
     }
   }, [])
 
@@ -202,10 +274,53 @@ export const NetworkCarDrive: React.FC = () => {
     setSafetyAlerts(safetyRes.alerts)
 
     // Prioridade de segurança máxima: se houver alerta crítico, interrompe voz ou quiz
+    // E alerta crítico independe do temporizador de boletins (sempre emitido)
     if (safetyRes.overallLevel === 'CRITICO') {
       ninaRef.current?.stopSpeaking()
       if (quizActive) setQuizActive(false)
     }
+
+    // 3.1 Alimenta o Snapshot do BulletinService
+    const supportedList = Object.keys(telemetry.currentValues).filter(
+      (k) => telemetry.currentValues[k]?.quality === 'OK',
+    )
+    const copilotSnapshot: CopilotContext = {
+      vehicleName: selectedVehicle
+        ? `${selectedVehicle.make} ${selectedVehicle.model}`
+        : 'Veículo OBD',
+      vehiclePlate: selectedVehicle?.plate || 'S/P',
+      connectionStatus: telemetry.connectionState,
+      transportType: telemetry.transportType,
+      drivingContext: currentCtx.type,
+      speedKmh: speed,
+      rpm,
+      coolantTemp: coolant,
+      batteryVoltage: volt,
+      stft,
+      ltft,
+      activeDtcs: telemetry.dtcList.map((d) => d.dtc_code),
+      milOn: telemetry.milOn,
+      safetyLevel: safetyRes.overallLevel,
+      activeAlerts: safetyRes.alerts.map((a) => a.title),
+      isTripActive: Boolean(tripManagerRef.current.getActiveTrip()),
+      tripTitle: tripManagerRef.current.getActiveTrip()?.title,
+      tripDuration: tripManagerRef.current.getActiveTrip()
+        ? `${Math.floor(tripManagerRef.current.getActiveTrip()!.duration_seconds / 60)} min`
+        : undefined,
+      tripDistance: tripManagerRef.current.getActiveTrip()
+        ? `${tripManagerRef.current.getActiveTrip()!.distance_km} km`
+        : undefined,
+    }
+
+    const baselineInfo = baselineLearnerRef.current?.getBaseline(currentCtx.type)
+    const hasSufficient = (baselineInfo?.samples_count || 0) >= 30
+
+    bulletinServiceRef.current?.updateTelemetrySnapshot({
+      copilotContext: copilotSnapshot,
+      supportedPids: supportedList.length > 0 ? supportedList : ['0x0C', '0x0D', '0x05', '0x42'],
+      hasSufficientBaseline: hasSufficient,
+      baselineSampleCount: baselineInfo?.samples_count || 0,
+    })
 
     // 4. Alimenta Viagem Ativa se houver
     if (tripManagerRef.current.getActiveTrip()) {
@@ -778,6 +893,22 @@ export const NetworkCarDrive: React.FC = () => {
               </div>
             )}
 
+            {/* Status do Ducking de Áudio */}
+            {isAudioDucked && (
+              <div className="bg-amber-950/60 border border-amber-600/70 rounded-xl p-3 text-xs text-amber-200 flex items-center justify-between animate-pulse">
+                <div className="flex items-center space-x-2">
+                  <Volume2 className="w-4 h-4 text-amber-400" />
+                  <span>
+                    <strong>Áudio Ducking Ativo:</strong> Entretenimento atenuado temporariamente
+                    para boletim prioritário de voz da Nina.
+                  </span>
+                </div>
+                <span className="text-[10px] font-mono bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
+                  DUCKING ON
+                </span>
+              </div>
+            )}
+
             {/* Atalhos para Players de Música Externos */}
             <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-5 space-y-3">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
@@ -785,7 +916,8 @@ export const NetworkCarDrive: React.FC = () => {
                 <span>Central de Áudio & Streaming</span>
               </h3>
               <p className="text-xs text-gray-400">
-                Integração com reprodutores instalados no dispositivo ou navegadores:
+                Integração com reprodutores instalados no dispositivo ou navegadores (com atenuação
+                automática / ducking ao falar boletim):
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
@@ -826,6 +958,9 @@ export const NetworkCarDrive: React.FC = () => {
                     <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold">
                       NATIVE AGENT
                     </span>
+                    <span className="text-[10px] bg-[#FFB300]/20 text-[#FFB300] border border-[#FFB300]/40 px-1.5 py-0.5 rounded font-mono font-bold">
+                      E6.1 VOICE
+                    </span>
                   </div>
                   <p className="text-xs text-gray-400">
                     Contexto real do veículo • Wake word &quot;Nina...&quot; • Alertas locais
@@ -860,6 +995,184 @@ export const NetworkCarDrive: React.FC = () => {
                     </>
                   )}
                 </Button>
+              </div>
+            </div>
+
+            {/* NC-E6.1-VOICE: PAINEL DE CONTROLE DOS BOLETINS PERIÓDICOS (PT-BR / BOTÕES GRANDES) */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 space-y-3">
+              <div className="flex items-center justify-between border-b border-[#202B37] pb-2">
+                <div className="flex items-center space-x-2">
+                  <Volume2 className="w-4 h-4 text-[#FFB300]" />
+                  <span className="text-xs font-bold text-white uppercase tracking-wider">
+                    Boletins Periódicos por Voz da Nina
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  <span className="text-[11px] font-mono text-gray-400">
+                    Status:{' '}
+                    <strong
+                      className={bulletinConfig.enabled ? 'text-emerald-400' : 'text-gray-500'}
+                    >
+                      {bulletinConfig.enabled
+                        ? `A cada ${bulletinConfig.effectiveMinutes} min`
+                        : 'Desativado'}
+                    </strong>
+                  </span>
+                  <Button
+                    size="sm"
+                    variant="outline"
+                    onClick={() => {
+                      if (bulletinServiceRef.current) {
+                        const supportedList = Object.keys(telemetry.currentValues).filter(
+                          (k) => telemetry.currentValues[k]?.quality === 'OK',
+                        )
+                        const b = bulletinServiceRef.current.generateBulletin({
+                          copilotContext: {
+                            vehicleName: selectedVehicle
+                              ? `${selectedVehicle.make} ${selectedVehicle.model}`
+                              : 'Veículo OBD',
+                            vehiclePlate: selectedVehicle?.plate || 'S/P',
+                            connectionStatus: telemetry.connectionState,
+                            transportType: telemetry.transportType,
+                            drivingContext: drivingContext.type,
+                            speedKmh: telemetry.currentValues['0x0D']?.decoded,
+                            rpm: telemetry.currentValues['0x0C']?.decoded,
+                            coolantTemp: telemetry.currentValues['0x05']?.decoded,
+                            batteryVoltage: telemetry.currentValues['0x42']?.decoded,
+                            stft: telemetry.currentValues['0x06']?.decoded,
+                            ltft: telemetry.currentValues['0x07']?.decoded,
+                            activeDtcs: telemetry.dtcList.map((d) => d.dtc_code),
+                            milOn: telemetry.milOn,
+                            safetyLevel,
+                            activeAlerts: safetyAlerts.map((a) => a.title),
+                            isTripActive: Boolean(activeTrip),
+                            tripTitle: activeTrip?.title,
+                          },
+                          supportedPids:
+                            supportedList.length > 0
+                              ? supportedList
+                              : ['0x0C', '0x0D', '0x05', '0x42'],
+                          hasSufficientBaseline: true,
+                        })
+                        executeDuckingSpeech(b.text)
+                        toast({
+                          title: 'Boletim Emitido Manualmente',
+                          description: b.text,
+                        })
+                      }
+                    }}
+                    className="border-[#2B394A] text-xs h-7 px-2.5 text-gray-300 hover:text-white"
+                  >
+                    Ouvir Agora
+                  </Button>
+                </div>
+              </div>
+
+              {/* Seletor de Intervalos (Grandes Botões) */}
+              <div>
+                <span className="text-[11px] text-gray-400 uppercase font-semibold block mb-1.5">
+                  Frequência dos Boletins por Voz:
+                </span>
+                <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
+                  {(
+                    ['DESATIVADO', 5, 10, 20, 30, 60, 'PERSONALIZADO'] as BulletinIntervalOption[]
+                  ).map((opt) => (
+                    <button
+                      key={String(opt)}
+                      type="button"
+                      onClick={() => {
+                        if (opt === 'PERSONALIZADO') {
+                          const val = parseInt(customMinutesInput, 10) || 15
+                          bulletinServiceRef.current?.updateConfig({
+                            intervalOption: 'PERSONALIZADO',
+                            customMinutes: val,
+                          })
+                        } else {
+                          bulletinServiceRef.current?.updateConfig({
+                            intervalOption: opt,
+                          })
+                        }
+                      }}
+                      className={`py-2 px-1 text-center rounded-lg text-xs font-bold transition-all border ${
+                        bulletinConfig.intervalOption === opt
+                          ? 'bg-[#FFB300] text-black border-[#FFB300] shadow'
+                          : 'bg-[#0B0F14] text-gray-300 border-[#202B37] hover:bg-[#1C2633]'
+                      }`}
+                    >
+                      {opt === 'DESATIVADO'
+                        ? 'Desativado'
+                        : opt === 'PERSONALIZADO'
+                          ? 'Livre'
+                          : `${opt} min`}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Campo para Intervalo Personalizado */}
+                {bulletinConfig.intervalOption === 'PERSONALIZADO' && (
+                  <div className="mt-2 flex items-center space-x-2 bg-[#0B0F14] p-2 rounded-lg border border-[#202B37]">
+                    <span className="text-xs text-gray-400">Minutos personalizados:</span>
+                    <input
+                      type="number"
+                      min={1}
+                      max={180}
+                      value={customMinutesInput}
+                      onChange={(e) => {
+                        setCustomMinutesInput(e.target.value)
+                        const val = parseInt(e.target.value, 10)
+                        if (val > 0) {
+                          bulletinServiceRef.current?.updateConfig({
+                            intervalOption: 'PERSONALIZADO',
+                            customMinutes: val,
+                          })
+                        }
+                      }}
+                      className="bg-[#121A24] border border-[#202B37] rounded px-2 py-1 text-xs text-white w-20 text-center font-mono focus:outline-none focus:border-[#FFB300]"
+                    />
+                    <span className="text-xs text-gray-400">minutos (1 a 180 min)</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Seletor de Nível de Detalhe (RESUMIDO / NORMAL / DETALHADO) */}
+              <div>
+                <span className="text-[11px] text-gray-400 uppercase font-semibold block mb-1.5">
+                  Nível de Detalhe:
+                </span>
+                <div className="grid grid-cols-3 gap-2">
+                  {(['RESUMIDO', 'NORMAL', 'DETALHADO'] as BulletinDetailLevel[]).map((lvl) => (
+                    <button
+                      key={lvl}
+                      type="button"
+                      onClick={() => {
+                        bulletinServiceRef.current?.updateConfig({
+                          detailLevel: lvl,
+                        })
+                      }}
+                      className={`py-2 px-2 text-center rounded-lg text-xs font-bold transition-all border ${
+                        bulletinConfig.detailLevel === lvl
+                          ? 'bg-cyan-500 text-black border-cyan-400 shadow'
+                          : 'bg-[#0B0F14] text-gray-300 border-[#202B37] hover:bg-[#1C2633]'
+                      }`}
+                    >
+                      {lvl === 'RESUMIDO' ? 'Resumido' : lvl === 'NORMAL' ? 'Normal' : 'Detalhado'}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
+              {/* Dica de Comandos de Voz da Nina */}
+              <div className="bg-[#0B0F14] p-2.5 rounded-lg border border-[#202B37] text-[11px] text-gray-400 flex flex-wrap items-center justify-between gap-1">
+                <span>Comandos de voz aceitos:</span>
+                <span className="text-[#FFB300] font-mono">
+                  &quot;Nina, me avisa a cada 20 minutos&quot;
+                </span>
+                <span className="text-cyan-400 font-mono">
+                  &quot;Nina, deixa os boletins mais detalhados&quot;
+                </span>
+                <span className="text-red-400 font-mono">
+                  &quot;Nina, desativa os boletins&quot;
+                </span>
               </div>
             </div>
 

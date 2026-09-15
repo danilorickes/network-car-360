@@ -39,11 +39,16 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return (
       <div
         data-testid="protected-route-loading"
-        className="flex flex-col items-center justify-center min-h-screen bg-[#0B0F14] text-[#9AA7B4] text-xs font-mono space-y-3"
+        className="flex flex-col items-center justify-center min-h-screen bg-[#0B0F14] text-[#9AA7B4] text-xs font-mono space-y-3 p-4 text-center"
       >
         <div className="w-8 h-8 border-2 border-[#FFB300] border-t-transparent rounded-full animate-spin" />
         <span className="text-white font-semibold">Validando integridade e sessão técnica...</span>
         <span className="text-[11px] text-gray-500">Network Car Diagnóstico 360</span>
+        {backendStatus === 'unavailable' && (
+          <span className="text-[11px] text-amber-400 bg-amber-950/60 px-3 py-1 rounded border border-amber-800">
+            Aguardando resposta do servidor ou redirecionando...
+          </span>
+        )}
       </div>
     )
   }
@@ -54,6 +59,7 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
     return <Navigate to="/login" replace />
   }
 
+  // Quando autenticado, garante renderização imediata e segura dos filhos protegidos
   return <>{children}</>
 }
 
@@ -61,17 +67,22 @@ export const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ childr
 const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user, loading } = useAuth()
 
-  if (loading) {
-    return (
-      <div className="flex flex-col items-center justify-center min-h-screen bg-[#0B0F14] text-[#9AA7B4] text-xs font-mono space-y-3">
-        <div className="w-8 h-8 border-2 border-[#FFB300] border-t-transparent rounded-full animate-spin" />
-        <span>Carregando subsistema...</span>
-      </div>
-    )
-  }
-
+  // Se já há usuário autenticado no authStore, redireciona de imediato sem prender em loading
   if (user) {
     return <Navigate to="/" replace />
+  }
+
+  if (loading) {
+    return (
+      <div
+        data-testid="public-route-loading"
+        className="flex flex-col items-center justify-center min-h-screen bg-[#0B0F14] text-[#9AA7B4] text-xs font-mono space-y-3 p-4 text-center"
+      >
+        <div className="w-8 h-8 border-2 border-[#FFB300] border-t-transparent rounded-full animate-spin" />
+        <span className="text-white font-semibold">Carregando subsistema de autenticação...</span>
+        <span className="text-[11px] text-gray-500">Network Car Diagnóstico 360</span>
+      </div>
+    )
   }
 
   return <>{children}</>
