@@ -11,7 +11,9 @@ import {
 import { Button } from '@/components/ui/button'
 
 export default function Relatorio() {
-  const [activeTab, setActiveTab] = useState<'checklist' | 'relatorio' | 'instrucoes'>('checklist')
+  const [activeTab, setActiveTab] = useState<
+    'checklist' | 'relatorio' | 'instrucoes' | 'evidencias'
+  >('checklist')
 
   const rfChecklist = [
     {
@@ -134,6 +136,17 @@ export default function Relatorio() {
             }`}
           >
             Instruções Web Serial & Execução
+          </button>
+          <button
+            type="button"
+            onClick={() => setActiveTab('evidencias')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded transition-colors ${
+              activeTab === 'evidencias'
+                ? 'bg-[#FFB300] text-black shadow'
+                : 'text-[#9AA7B4] hover:text-white'
+            }`}
+          >
+            Evidências & Dados Semeados
           </button>
         </div>
       </div>
@@ -308,6 +321,119 @@ export default function Relatorio() {
               </li>
             </ul>
           </section>
+        </div>
+      )}
+
+      {/* Conteúdo Aba Evidências & Dados Semeados */}
+      {activeTab === 'evidencias' && (
+        <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-6 text-xs text-gray-300 leading-relaxed max-w-4xl">
+          <div className="border-b border-[#263340] pb-3">
+            <h2 className="text-base font-bold text-white flex items-center space-x-2">
+              <HardDrive className="w-5 h-5 text-[#FFB300]" />
+              <span>Evidências de Persistência & Amostra Semeada (PocketBase)</span>
+            </h2>
+            <p className="text-[#9AA7B4] text-xs">
+              Sessão de exemplo, evento de sintoma, código DTC e amostras brutas persistidas de
+              forma idempotente.
+            </p>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="bg-[#0B0F14] border border-[#263340] p-4 rounded-lg space-y-2">
+              <h3 className="font-bold text-[#FFB300] uppercase text-xs">
+                Sessão Semeada no Banco
+              </h3>
+              <ul className="space-y-1 font-mono text-[11px] text-gray-300">
+                <li>
+                  <strong className="text-white">ID:</strong> sess_ecosport_seed_001
+                </li>
+                <li>
+                  <strong className="text-white">Veículo:</strong> Ford EcoSport 2020 1.5 Dragon 3C
+                </li>
+                <li>
+                  <strong className="text-white">VIN:</strong> 9BFBJ55E6L8104921
+                </li>
+                <li>
+                  <strong className="text-white">Protocolo:</strong> ISO 15765-4 (CAN 11/500)
+                </li>
+                <li>
+                  <strong className="text-white">Status:</strong> ENCERRADO
+                </li>
+                <li>
+                  <strong className="text-white">Transporte:</strong> SIMULADOR
+                </li>
+              </ul>
+            </div>
+
+            <div className="bg-[#0B0F14] border border-[#263340] p-4 rounded-lg space-y-2">
+              <h3 className="font-bold text-[#E53935] uppercase text-xs">
+                Sintoma Registrado (Caixa-Preta)
+              </h3>
+              <ul className="space-y-1 font-mono text-[11px] text-gray-300">
+                <li>
+                  <strong className="text-white">Evento ID:</strong> ev_seed_001
+                </li>
+                <li>
+                  <strong className="text-white">Tipo:</strong> trepidação
+                </li>
+                <li>
+                  <strong className="text-white">Descrição:</strong> Trepidação perceptível na
+                  transição para 2ª marcha com oscilação na marcha lenta
+                </li>
+                <li>
+                  <strong className="text-white">Janela:</strong> -30.000 ms a +30.000 ms
+                </li>
+                <li>
+                  <strong className="text-white">DTC Vinculado:</strong> P0301 (Cilindro 1 com Falha
+                  de Combustão)
+                </li>
+              </ul>
+            </div>
+          </div>
+
+          <div className="bg-[#0B0F14] border border-[#263340] p-4 rounded-lg space-y-3">
+            <h3 className="font-bold text-[#2ECC71] uppercase text-xs">
+              Estrutura de Arquivos da Solução
+            </h3>
+            <div className="font-mono text-[11px] text-gray-400 bg-[#131A22] p-3 rounded border border-[#263340] overflow-x-auto space-y-1">
+              <div>src/lib/obd/transports/obd-transport.ts (Interface abstrata de transporte)</div>
+              <div>
+                src/lib/obd/transports/simulated-transport.ts (Simulador temporal dinâmico com ciclo
+                físico)
+              </div>
+              <div>
+                src/lib/obd/transports/real-serial-transport.ts (Web Serial API para ELM327 real)
+              </div>
+              <div>
+                src/lib/obd/elm-parser.ts (Parser robusto de respostas ELM327 e códigos DTC)
+              </div>
+              <div>
+                src/lib/obd/pid-decoder.ts (Tabela declarativa e extensível dos 13 PIDs OBD-II)
+              </div>
+              <div>
+                src/lib/obd/sampler-scheduler.ts (Agendador de amostragem por relógio monotônico
+                ≥5Hz / ≥1Hz)
+              </div>
+              <div>
+                src/lib/obd/raw-recorder.ts (Gravação imutável append-only com buffer local)
+              </div>
+              <div>
+                src/lib/obd/event-marker.ts (Marcação de sintomas com relógio monotônico e ISO-8601)
+              </div>
+              <div>
+                src/lib/obd/dtc-service.ts (Diagnóstico passivo de DTCs Modo 03/07 e MIL sem Modo
+                04)
+              </div>
+              <div>
+                src/lib/obd/replay-engine.ts (Motor de replay determinístico pelo mesmo modelo do
+                Live)
+              </div>
+              <div>
+                pocketbase/migrations/ (Migrations 0001, 0002 e 0003 com coleções imutáveis e seeds)
+              </div>
+              <div>RELATORIO-ME001-E1-THEO.md (Documento formal oficial de entrega técnica)</div>
+            </div>
+          </div>
         </div>
       )}
 
