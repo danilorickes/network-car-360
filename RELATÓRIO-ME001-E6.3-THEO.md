@@ -5,7 +5,7 @@
 **Etapa:** E6.3 — Redesign UX/UI da Experiência Embarcada ("Network Car Drive")  
 **Base:** v0.0.13 — E6.2 aprovada  
 **Data:** 15 de Setembro de 2026  
-**Status da OS:** INTERFACE AUTOMOTIVA IMPLEMENTADA — AGUARDANDO VALIDAÇÃO NA MULTIMÍDIA REAL  
+**Status da OS:** INTERFACE AUTOMOTIVA IMPLEMENTADA — AGUARDANDO VALIDAÇÃO NA MULTIMÍDIA REAL
 
 ---
 
@@ -14,6 +14,7 @@
 A ordem de serviço **OS-ME001-E6.3** teve como missão exclusiva a reformulação completa de UX/UI da experiência embarcada (**Network Car Drive**), transformando a aplicação em um verdadeiro **computador de bordo automotivo**, prioritariamente desenhado para centrais multimídia Android em orientação **HORIZONTAL** (widescreen), com alta legibilidade instantânea, segurança determinística, ausência de elementos administrativos e respeito rigoroso às diretrizes de ergonomia veicular.
 
 Em cumprimento estrito às regras da OS:
+
 1. **Motores de telemetria, diagnóstico e segurança permaneceram intactos funcionalmente** (`VehicleSafetyMonitor`, motor diagnóstico 360, baseline individual, `BlackBoxBuilder` e simuladores).
 2. **Nenhuma funcionalidade da E7 foi iniciada**.
 3. **Não foi declarada homologação antecipada de multimídia física real**, concluindo com o status mandatório: `"INTERFACE AUTOMOTIVA IMPLEMENTADA — AGUARDANDO VALIDAÇÃO NA MULTIMÍDIA REAL"`.
@@ -23,6 +24,7 @@ Em cumprimento estrito às regras da OS:
 ## 2. ATENDIMENTO DETALHADO DOS REQUISITOS (1 A 16)
 
 ### Requisito 1 — Home automotiva limpa, escura e de leitura instantânea
+
 - Implementado cabeçalho e cockpit escuros com paleta automotiva de alto contraste (`#080B0F`, `#121A24`, `#202B37`, `#FFB300`, `#26C6DA`, `#2ECC71`).
 - Informações essenciais visíveis de relance:
   - Estado da conexão com o veículo (badge explícito: OBD CONECTADO, OBD CONECTANDO, VEÍCULO DESCONECTADO);
@@ -32,6 +34,7 @@ Em cumprimento estrito às regras da OS:
   - Condição monitorada em tempo real e nível de segurança determinístico.
 
 ### Requisito 2 — Navegação Principal: CARRO | VIAGEM | DIVERSÃO | ASSISTENTE
+
 - Barra inferior e controles estruturados estritamente nas 4 áreas:
   - **CARRO**: cockpit, telemetria essencial, status e botão de marcar sintoma;
   - **VIAGEM**: controle da viagem, métricas acumuladas e diário de paradas;
@@ -40,6 +43,7 @@ Em cumprimento estrito às regras da OS:
 - **Dinamismo da Assistente**: quando o usuário configura a assistente personalizada (ex.: "LUNA" via E6.2 / `AssistantIdentityConfig`), a quarta aba assume dinamicamente o nome configurado em caixa alta (`LUNA`); caso ainda não tenha sido configurada pelo condutor, a denominação neutra `ASSISTENTE` é exibida.
 
 ### Requisito 3 — Aba CARRO
+
 - Foco em grandezas críticas: Velocidade, Giro (RPM), Arrefecimento (ECT) e Tensão Elétrica (Alternador).
 - NUNCA polui a tela com tabelas ou números secundários desnecessários durante a condução.
 - Acesso rápido por toque grande a:
@@ -48,32 +52,38 @@ Em cumprimento estrito às regras da OS:
   - Link direto para Diagnóstico 360 / Replay da Caixa-Preta (em modo passageiro).
 
 ### Requisito 4 — Aba VIAGEM
+
 - Controle centralizado de Iniciar / Finalizar Viagem com botões grandes de toque (mínimo 48px).
 - Métricas: Distância percorrida (km), Duração em minutos, Velocidade média (km/h) e Consumo estimado (L).
-- **Redução de interações durante o movimento**: Quando a velocidade do veículo supera 5 km/h e o Modo Motorista está ativo, o formulário de texto do diário de bordo é desativado e substituído por uma orientação segura de comando por voz (*"Use o comando de voz: [nome], marca esse momento"*). Em modo passageiro ou com veículo parado, o diário manual fica liberado.
+- **Redução de interações durante o movimento**: Quando a velocidade do veículo supera 5 km/h e o Modo Motorista está ativo, o formulário de texto do diário de bordo é desativado e substituído por uma orientação segura de comando por voz (_"Use o comando de voz: [nome], marca esse momento"_). Em modo passageiro ou com veículo parado, o diário manual fica liberado.
 
 ### Requisito 5 — Aba DIVERSÃO
+
 - Controles grandes de entretenimento, central de áudio externa e Quiz Interativo de Estrada.
 - **Prioridade absoluta de segurança**: em caso de alerta crítico detectado pelo `VehicleSafetyMonitor`, qualquer quiz ou áudio é interrompido imediatamente.
 - **Áudio Ducking**: quando a assistente emite um boletim de voz periódico ou manual, o status de ducking é sinalizado visualmente e o entretenimento é atenuado.
 
 ### Requisito 6 — Aba ASSISTENTE
+
 - Botão grande de microfone de toque rápido (48px+ de alvo tátil).
-- Sinalização visual clara dos estados: *Ouvindo microfone...*, *Falando boletim...* ou *Em espera*.
+- Sinalização visual clara dos estados: _Ouvindo microfone..._, _Falando boletim..._ ou _Em espera_.
 - Painel do último boletim de voz emitido, com botão para repetir a fala.
 - Botão direto para o modal **Minha Assistente** (E6.2), permitindo trocar nome, wake word, voz TTS real do dispositivo e estilo (Objetivo, Amigável ou Técnico).
 
 ### Requisito 7 — Modo Motorista vs Modo Passageiro e Modo Noturno
+
 - **Modo Motorista (Default)**: exibe o mínimo essencial, fontes ampliadas, alvos de toque grandes, desativando inputs textuais durante o deslocamento.
 - **Modo Passageiro**: adiciona painel com DTCs ativos, estado da MIL, frequência efetiva do OBD, link de acesso ao diagnóstico detalhado e formulário manual de paradas.
 - **Modo Noturno**: modo padrão com fundo escuro profundo (`#080B0F`), contraste otimizado contra fadiga visual e ofuscamento noturno no para-brisa, alternável por botão no cabeçalho.
 
 ### Requisito 8 — Sem dependência de Hover e Alvos de Toque
+
 - Removida qualquer dependência de eventos de mouse/hover para ações fundamentais.
 - Definidas classes utilitárias automotivas (`btn-touch-automotive`) com alvos de toque de no mínimo 48×48px.
 - Espaçamento ergonômico entre botões para evitar toques acidentais em curvas ou pisos irregulares.
 
 ### Requisito 9 — Responsividade Específica (800×480, 1024×600, 1280×720 e 1920×1080)
+
 - O layout reorganiza seus componentes conforme o espaço útil e orientação:
   - Em telas compactas widescreen (ex.: 800×480 WVGA automotivo), os cards de telemetria utilizam alturas otimizadas (`min-h-[92px]`), os textos longos diminuem e as listas possuem rolagem fluida sem estouro da barra de navegação;
   - Em telas médias (1024×600 WSVGA Android), os badges de status e telemetria resumida expandem confortavelmente;
@@ -81,6 +91,7 @@ Em cumprimento estrito às regras da OS:
   - Utilizado `h-screen h-[100dvh] w-screen overflow-hidden` no container mestre, impedindo o layout de vazar a viewport da central multimídia.
 
 ### Requisito 10 — Safe Areas, Viewport-Fit, dvh e Teclado Virtual
+
 - `index.html` atualizado com:
   `<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover" />`
 - Classes utilitárias criadas no `src/main.css`:
@@ -91,6 +102,7 @@ Em cumprimento estrito às regras da OS:
   - `-webkit-tap-highlight-color: transparent` e `overscroll-behavior-y: none`.
 
 ### Requisito 11 — Operação Offline e Sem Falsificação de Dados ("—")
+
 - A interface opera 100% sem internet.
 - Diferenciação inequívoca dos estados:
   - **Veículo Desconectado** (badge vermelho, valores como `—`);
@@ -101,6 +113,7 @@ Em cumprimento estrito às regras da OS:
   - **Dados Indisponíveis**: exibe rigorosamente `—` quando o PID não foi retornado ou está ausente na ECU, sem criar números falsos para preencher a tela.
 
 ### Requisito 12 — Prioridade de Interrupção de Segurança
+
 - Ordem rigorosa implementada no componente e nos serviços:
   `ALERTA CRÍTICO DO VEÍCULO > NAVEGAÇÃO/VIAGEM > ASSISTENTE > ENTRETENIMENTO`
 - Se o `VehicleSafetyMonitor` detectar nível `CRITICO` (ex.: ECT ≥ 110°C ou subtensão severa):
@@ -109,11 +122,13 @@ Em cumprimento estrito às regras da OS:
   - O motor determinístico não depende de rede, nuvem ou inteligência artificial.
 
 ### Requisito 13 — Modo Demonstração / Simulador Visual
+
 - Permite avaliar toda a interface e suas 4 abas sem hardware físico conectado.
 - Identificação visual mandatória no cabeçalho:
   `DADOS SIMULADOS (CENÁRIO)` com badge âmbar pulsante e atributo `data-testid="banner-dados-simulados"`.
 
 ### Requisito 14 — Suíte de Testes e Regressão E1 a E6.2
+
 - Criada nova suíte de testes de experiência embarcada: `src/lib/diagnostic/__tests__/etapa6-3-embedded-ux.test.ts`.
 - Validados:
   - Dinamismo de denominação da aba (neutra `ASSISTENTE` vs personalizada `LUNA`);
@@ -122,6 +137,7 @@ Em cumprimento estrito às regras da OS:
 - Execução do `run_qa`: **100% limpo** (Setup, Migrations, Linter Oxlint, Typecheck `tsc`, Build Vite e 12 suítes de testes Vitest aprovadas com 0 erros).
 
 ### Requisito 15 — Conclusão da OS
+
 - Declaração formal e status final:
   **"INTERFACE AUTOMOTIVA IMPLEMENTADA — AGUARDANDO VALIDAÇÃO NA MULTIMÍDIA REAL"**.
 
@@ -133,6 +149,7 @@ Em cumprimento estrito às regras da OS:
 O usuário relatou que o ambiente informava `currentRoute "/"` com componente `ProtectedRoute`, gerando dúvida sobre possível tela em branco ou preview parado.
 
 **Resultado da Investigação Técnica e Testes:**
+
 1. A rota `"/"` renderiza o componente `Index.tsx` protegido pelo `ProtectedRoute`.
 2. Quando não autenticado (ou com authStore limpo/expirado):
    - O `ProtectedRoute` verifica a ausência de token e redireciona **imediatamente** para `/login` via `<Navigate to="/login" replace />`.
@@ -146,13 +163,13 @@ O usuário relatou que o ambiente informava `currentRoute "/"` com componente `P
 
 ## 4. ARQUIVOS CRIADOS OU MODIFICADOS
 
-| Arquivo | Ação | Descrição |
-|---|---|---|
-| `index.html` | Modificado | Adicionado `viewport-fit=cover`, `maximum-scale=1.0` e `user-scalable=no` para multimídias automotivas Android |
-| `src/main.css` | Modificado | Adicionadas classes para safe areas (`env(safe-area-inset-*)`), `btn-touch-automotive` (48px+ touch target) e otimização de toque |
-| `src/pages/NetworkCarDrive.tsx` | Reescrito / Evoluído | Implementada arquitetura de UX/UI automotiva para multimídias horizontais: cabeçalho limpo, telemetria essencial, 4 abas (CARRO, VIAGEM, DIVERSÃO, ASSISTENTE), Modo Motorista/Passageiro, Ducking de áudio e prioridade de segurança |
-| `src/lib/diagnostic/__tests__/etapa6-3-embedded-ux.test.ts` | Criado | Suíte de testes unitários validando requisitos da E6.3 (dinamismo de abas, prioridade determinística de segurança e resoluções) |
-| `RELATÓRIO-ME001-E6.3-THEO.md` | Criado | Relatório formal de entrega e encerramento da OS-ME001-E6.3 |
+| Arquivo                                                     | Ação                 | Descrição                                                                                                                                                                                                                             |
+| ----------------------------------------------------------- | -------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `index.html`                                                | Modificado           | Adicionado `viewport-fit=cover`, `maximum-scale=1.0` e `user-scalable=no` para multimídias automotivas Android                                                                                                                        |
+| `src/main.css`                                              | Modificado           | Adicionadas classes para safe areas (`env(safe-area-inset-*)`), `btn-touch-automotive` (48px+ touch target) e otimização de toque                                                                                                     |
+| `src/pages/NetworkCarDrive.tsx`                             | Reescrito / Evoluído | Implementada arquitetura de UX/UI automotiva para multimídias horizontais: cabeçalho limpo, telemetria essencial, 4 abas (CARRO, VIAGEM, DIVERSÃO, ASSISTENTE), Modo Motorista/Passageiro, Ducking de áudio e prioridade de segurança |
+| `src/lib/diagnostic/__tests__/etapa6-3-embedded-ux.test.ts` | Criado               | Suíte de testes unitários validando requisitos da E6.3 (dinamismo de abas, prioridade determinística de segurança e resoluções)                                                                                                       |
+| `RELATÓRIO-ME001-E6.3-THEO.md`                              | Criado               | Relatório formal de entrega e encerramento da OS-ME001-E6.3                                                                                                                                                                           |
 
 ---
 
@@ -163,4 +180,4 @@ A interface do **Network Car Drive** está pronta, estilizada e validada para us
 **STATUS FINAL DA OS:**  
 **INTERFACE AUTOMOTIVA IMPLEMENTADA — AGUARDANDO VALIDAÇÃO NA MULTIMÍDIA REAL**
 
-*(Conforme ordem expressa, a Etapa 7 não foi iniciada).*
+_(Conforme ordem expressa, a Etapa 7 não foi iniciada)._
