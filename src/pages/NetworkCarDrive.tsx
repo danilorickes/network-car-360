@@ -12,16 +12,28 @@ import {
   Play,
   Square,
   Plus,
-  Camera,
   MapPin,
   Sparkles,
-  Radio,
   ExternalLink,
   ShieldCheck,
   Moon,
   Sun,
-  Flame,
   Award,
+  Radio,
+  Wifi,
+  WifiOff,
+  Info,
+  Maximize2,
+  Minimize2,
+  Flag,
+  Flame,
+  Gauge,
+  Thermometer,
+  Zap,
+  Activity,
+  UserCheck,
+  SlidersHorizontal,
+  LayoutDashboard,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { useTelemetry } from '@/contexts/TelemetryContext'
@@ -46,7 +58,6 @@ import { AssistantSettingsModal } from '@/components/assistant/AssistantSettings
 import {
   TRAVEL_QUIZ_QUESTIONS,
   EXTERNAL_MEDIA_SHORTCUTS,
-  TravelQuizQuestion,
 } from '@/lib/entertainment/travel-entertainment'
 import {
   DrivingContextInfo,
@@ -57,34 +68,32 @@ import {
   TripDiaryEntryModel,
   NinaBulletinConfig,
   NinaBulletinPayload,
-  BulletinIntervalOption,
-  BulletinDetailLevel,
   AssistantIdentityConfig,
 } from '@/types/etapa6'
 
 export const NetworkCarDrive: React.FC = () => {
   const { toast } = useToast()
-  const { telemetry, selectedVehicle, connectTransport, disconnectTransport } = useTelemetry()
+  const { telemetry, selectedVehicle, markSymptom, activeScenario } = useTelemetry()
 
-  // Abas principais do Network Car Drive: CARRO | VIAGEM | ENTRETENIMENTO | ASSISTENTE
-  const [activeTab, setActiveTab] = useState<'CARRO' | 'VIAGEM' | 'ENTRETENIMENTO' | 'NINA'>(
+  // Navegação principal: CARRO | VIAGEM | DIVERSÃO | ASSISTENTE
+  const [activeTab, setActiveTab] = useState<'CARRO' | 'VIAGEM' | 'DIVERSAO' | 'ASSISTENTE'>(
     'CARRO',
   )
 
-  // OS-ME001-E6.2: Identidade Dinâmica da Assistente ("Minha Assistente")
+  // Identidade Dinâmica da Assistente (E6.2)
   const [assistantIdentity, setAssistantIdentity] = useState<AssistantIdentityConfig>(() =>
     loadAssistantIdentity(selectedVehicle?.plate),
   )
   const [assistantModalOpen, setAssistantModalOpen] = useState(false)
 
-  // Modos de Condução e Interface Automotiva
+  // Modos Automotivos
   const [isNightMode, setIsNightMode] = useState(true)
   const [isPassengerMode, setIsPassengerMode] = useState(false)
-  const [voiceVolume, setVoiceVolume] = useState(1.0)
   const [isListeningVoice, setIsListeningVoice] = useState(false)
   const [isSpeakingVoice, setIsSpeakingVoice] = useState(false)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
-  // Gerenciadores locais
+  // Gerenciadores locais mantidos intocados funcionalmente
   const contextEstimatorRef = useRef(new DrivingContextEstimator())
   const baselineLearnerRef = useRef<IndividualBaselineLearner | null>(null)
   const safetyMonitorRef = useRef(new VehicleSafetyMonitor())
@@ -92,13 +101,13 @@ export const NetworkCarDrive: React.FC = () => {
   const assistantRef = useRef<AssistantCopilotService | null>(null)
   const bulletinServiceRef = useRef<AssistantPeriodicBulletinService | null>(null)
 
-  // Estados dinâmicos de monitoramento contínuo
+  // Estados dinâmicos de telemetria e contexto
   const [drivingContext, setDrivingContext] = useState<DrivingContextInfo>({
     type: 'DESCONHECIDO',
-    label: 'Identificando...',
-    confidence: 50,
+    label: 'Aguardando veículo...',
+    confidence: 0,
     estimatedAtMonoMs: 0,
-    description: 'Aguardando telemetria',
+    description: 'Aguardando telemetria OBD',
     activeSinceUtc: new Date().toISOString(),
   })
   const [safetyLevel, setSafetyLevel] = useState<SafetyLevel>('NORMAL')
@@ -106,7 +115,7 @@ export const NetworkCarDrive: React.FC = () => {
   const [activeTrip, setActiveTrip] = useState<TripSessionModel | null>(null)
   const [diaryEntries, setDiaryEntries] = useState<TripDiaryEntryModel[]>([])
 
-  // NC-E6.1-VOICE: Estados de Boletins Periódicos da Nina
+  // Estados de Boletins e Ducking de Áudio
   const [bulletinConfig, setBulletinConfig] = useState<NinaBulletinConfig>({
     enabled: true,
     intervalOption: 20,
@@ -115,7 +124,6 @@ export const NetworkCarDrive: React.FC = () => {
     totalBulletinsEmitted: 0,
   })
   const [recentBulletins, setRecentBulletins] = useState<NinaBulletinPayload[]>([])
-  const [customMinutesInput, setCustomMinutesInput] = useState<string>('15')
   const [isAudioDucked, setIsAudioDucked] = useState<boolean>(false)
 
   // Estados da Assistente
@@ -123,23 +131,20 @@ export const NetworkCarDrive: React.FC = () => {
   const [assistantMessages, setAssistantMessages] = useState<AssistantMessage[]>([])
   const [isAssistantLoading, setIsAssistantLoading] = useState(false)
 
-  // Estados dos Jogos de Viagem
+  // Quiz e Diário
   const [quizActive, setQuizActive] = useState(false)
   const [quizQuestionIndex, setQuizQuestionIndex] = useState(0)
   const [quizScore, setQuizScore] = useState(0)
   const [quizSelectedOption, setQuizSelectedOption] = useState<number | null>(null)
-
-  // Diário: Adição Rápida
   const [newDiaryTitle, setNewDiaryTitle] = useState('')
   const [newDiaryNotes, setNewDiaryNotes] = useState('')
   const [hasLocationConsent, setHasLocationConsent] = useState(false)
+  const [symptomMarking, setSymptomMarking] = useState(false)
 
-  // Inicializa Baseline Learner e BulletinService para o veículo selecionado
+  // Identidade reativa à placa
   useEffect(() => {
     const plate = selectedVehicle?.plate || 'PADRAO'
     baselineLearnerRef.current = new IndividualBaselineLearner(plate)
-
-    // Recarrega identidade para a placa ativa
     const activeIdentity = loadAssistantIdentity(plate)
     setAssistantIdentity(activeIdentity)
 
@@ -147,7 +152,6 @@ export const NetworkCarDrive: React.FC = () => {
       assistantRef.current.setVehiclePlate(plate)
       assistantRef.current.setIdentity(activeIdentity)
     }
-
     if (bulletinServiceRef.current) {
       bulletinServiceRef.current.setVehiclePlate(plate)
       bulletinServiceRef.current.setIdentity(activeIdentity)
@@ -155,7 +159,7 @@ export const NetworkCarDrive: React.FC = () => {
     }
   }, [selectedVehicle?.plate])
 
-  // Ducking helper: reduz / interrompe entretenimento enquanto a assistente fala e devolve controle depois
+  // Helper de fala com ducking de entretenimento
   const executeDuckingSpeech = (text: string, onDone?: () => void) => {
     setIsAudioDucked(true)
     assistantRef.current?.speak(text, () => {
@@ -164,7 +168,7 @@ export const NetworkCarDrive: React.FC = () => {
     })
   }
 
-  // Inicializa Assistant Service e Bulletin Service
+  // Inicializa serviços de Assistente e Boletins
   useEffect(() => {
     const plate = selectedVehicle?.plate || 'PADRAO'
     const loadedIdentity = loadAssistantIdentity(plate)
@@ -175,9 +179,7 @@ export const NetworkCarDrive: React.FC = () => {
       {
         onBulletinGenerated: (bulletin) => {
           setRecentBulletins((prev) => [bulletin, ...prev.slice(0, 9)])
-          // Executa fala do boletim com Ducking de áudio
           executeDuckingSpeech(bulletin.text)
-          // Adiciona à lista de mensagens da Assistente
           const msg: AssistantMessage = {
             id: `msg_bulletin_${Date.now()}`,
             role: 'assistant',
@@ -199,7 +201,6 @@ export const NetworkCarDrive: React.FC = () => {
       onListeningStateChange: (listening) => setIsListeningVoice(listening),
       onSpeakingStateChange: (speaking) => setIsSpeakingVoice(speaking),
       onSpeechRecognized: (text) => {
-        // Tenta primeiro interpretar como comando de boletim com wake word configurado
         const cmdRes = bulletinServiceRef.current?.parseVoiceCommand(text)
         if (cmdRes && cmdRes.handled) {
           executeDuckingSpeech(cmdRes.replyText)
@@ -211,7 +212,6 @@ export const NetworkCarDrive: React.FC = () => {
           }
           setAssistantMessages((prev) => [...prev, cmdMsg])
         } else {
-          // Encaminha comando geral à assistente
           handleSendAssistantMessage(text)
         }
       },
@@ -226,14 +226,12 @@ export const NetworkCarDrive: React.FC = () => {
     }
   }, [])
 
-  // Loop de Telemetria e Monitoramento Contínuo
+  // Loop de Telemetria e Monitoramento de Segurança
   useEffect(() => {
     const rpm = telemetry.currentValues['0x0C']?.decoded
     const speed = telemetry.currentValues['0x0D']?.decoded
     const coolant = telemetry.currentValues['0x05']?.decoded
     const volt = telemetry.currentValues['0x42']?.decoded
-    const tps = telemetry.currentValues['0x11']?.decoded
-    const load = telemetry.currentValues['0x04']?.decoded
     const stft = telemetry.currentValues['0x06']?.decoded
     const ltft = telemetry.currentValues['0x07']?.decoded
     const maf = telemetry.currentValues['0x10']?.decoded
@@ -276,7 +274,7 @@ export const NetworkCarDrive: React.FC = () => {
     const currentCtx = contextEstimatorRef.current.getCurrentContext()
     setDrivingContext(currentCtx)
 
-    // 2. Aprende Baseline Individual por Contexto
+    // 2. Baseline Learner
     if (baselineLearnerRef.current && currentCtx.type !== 'DESCONHECIDO') {
       if (stft !== undefined) {
         baselineLearnerRef.current.learnObservation(currentCtx.type, '0x06', stft, '%', 'STFT')
@@ -286,7 +284,14 @@ export const NetworkCarDrive: React.FC = () => {
       }
     }
 
-    // 3. Avalia Segurança Local Determinística (VehicleSafetyMonitor)
+    // 3. Avalia Segurança Determinística (Local)
+    const commState =
+      telemetry.connectionState === 'CONECTADO'
+        ? 'CONECTADO'
+        : telemetry.connectionState === 'RECONECTANDO' || telemetry.connectionState === 'CONECTANDO'
+          ? 'RECONECTANDO'
+          : 'FALHA'
+
     const safetyRes = safetyMonitorRef.current.evaluateSafety({
       coolantTemp: coolant,
       batteryVoltage: volt,
@@ -294,25 +299,19 @@ export const NetworkCarDrive: React.FC = () => {
       speed,
       milOn: telemetry.milOn,
       dtcCodes: telemetry.dtcList.map((d) => d.dtc_code),
-      communicationState:
-        telemetry.connectionState === 'CONECTADO'
-          ? 'CONECTADO'
-          : telemetry.connectionState === 'RECONECTANDO'
-            ? 'RECONECTANDO'
-            : 'FALHA',
+      communicationState: commState,
     })
 
     setSafetyLevel(safetyRes.overallLevel)
     setSafetyAlerts(safetyRes.alerts)
 
-    // Prioridade de segurança máxima: se houver alerta crítico, interrompe voz ou quiz
-    // E alerta crítico independe do temporizador de boletins (sempre emitido)
+    // Prioridade absoluta de interrupção: ALERTA CRÍTICO > NAVEGAÇÃO > ASSISTENTE > ENTRETENIMENTO
     if (safetyRes.overallLevel === 'CRITICO') {
       assistantRef.current?.stopSpeaking()
       if (quizActive) setQuizActive(false)
     }
 
-    // 3.1 Alimenta o Snapshot do BulletinService
+    // 3.1 Snapshot para Boletins
     const supportedList = Object.keys(telemetry.currentValues).filter(
       (k) => telemetry.currentValues[k]?.quality === 'OK',
     )
@@ -354,7 +353,7 @@ export const NetworkCarDrive: React.FC = () => {
       baselineSampleCount: baselineInfo?.samples_count || 0,
     })
 
-    // 4. Alimenta Viagem Ativa se houver
+    // 4. Modo Viagem
     if (tripManagerRef.current.getActiveTrip()) {
       tripManagerRef.current.processTelemetry({
         speedKmh: speed,
@@ -367,14 +366,36 @@ export const NetworkCarDrive: React.FC = () => {
     }
   }, [telemetry.currentValues, telemetry.connectionState, telemetry.milOn, telemetry.dtcList])
 
-  // Iniciar / Encerrar Viagem
+  // Valores de telemetria sem falsificação ("—" quando indisponível)
+  const isConnected = telemetry.connectionState === 'CONECTADO'
+  const isSimulated = telemetry.transportType === 'SIMULADOR'
+
+  const rawSpeed = telemetry.currentValues['0x0D']?.decoded
+  const hasSpeedPid = isConnected && rawSpeed !== undefined
+  const displaySpeed = hasSpeedPid ? String(Math.round(rawSpeed)) : '—'
+
+  const rawRpm = telemetry.currentValues['0x0C']?.decoded
+  const hasRpmPid = isConnected && rawRpm !== undefined
+  const displayRpm = hasRpmPid ? String(Math.round(rawRpm)) : '—'
+
+  const rawCoolant = telemetry.currentValues['0x05']?.decoded
+  const hasCoolantPid = isConnected && rawCoolant !== undefined
+  const displayCoolant = hasCoolantPid ? String(Math.round(rawCoolant)) : '—'
+
+  const rawVolt = telemetry.currentValues['0x42']?.decoded
+  const hasVoltPid = isConnected && rawVolt !== undefined
+  const displayVolt = hasVoltPid ? Number(rawVolt).toFixed(1) : '—'
+
+  const isVehicleMoving = (rawSpeed || 0) > 5
+
+  // Ações de viagem
   const handleToggleTrip = () => {
     if (activeTrip && activeTrip.status === 'EM_ANDAMENTO') {
       const finished = tripManagerRef.current.endTrip()
       setActiveTrip(null)
       toast({
-        title: 'Viagem Finalizada!',
-        description: `Distância: ${finished?.distance_km} km | Duração: ${Math.floor((finished?.duration_seconds || 0) / 60)} min.`,
+        title: 'Viagem Concluída',
+        description: `Distância: ${finished?.distance_km} km | Duração: ${Math.floor((finished?.duration_seconds || 0) / 60)} min`,
       })
     } else {
       const newTrip = tripManagerRef.current.startTrip({
@@ -385,13 +406,12 @@ export const NetworkCarDrive: React.FC = () => {
       })
       setActiveTrip(newTrip)
       toast({
-        title: 'Modo Viagem Ativado',
-        description: 'Métricas, telemetria resumida e paradas sendo registradas.',
+        title: 'Viagem Iniciada',
+        description: 'Gravando duração, distância, paradas e consumo estimado.',
       })
     }
   }
 
-  // Adicionar Parada / Diário
   const handleAddDiaryEntry = () => {
     if (!newDiaryTitle.trim()) return
     const entry = tripManagerRef.current.addDiaryEntry({
@@ -406,13 +426,30 @@ export const NetworkCarDrive: React.FC = () => {
       setNewDiaryTitle('')
       setNewDiaryNotes('')
       toast({
-        title: 'Momento Salvo no Diário',
+        title: 'Parada Registrada',
         description: entry.title,
       })
     }
   }
 
-  // Interação com a Copiloto / Assistente
+  // Marcar Sintoma pelo Motorista / Passageiro
+  const handleMarkSymptomQuick = async (symptomType = 'SINTOMA_MOTORISTA') => {
+    setSymptomMarking(true)
+    try {
+      const desc = `Sintoma marcado pelo botão rápido Network Car Drive (${drivingContext.type})`
+      const res = await markSymptom(symptomType, desc)
+      if (res) {
+        toast({
+          title: 'Sintoma Registrado no Black Box',
+          description: 'Janela pré e pós capturada com sucesso para diagnóstico 360.',
+        })
+      }
+    } finally {
+      setSymptomMarking(false)
+    }
+  }
+
+  // Enviar Mensagem à Assistente
   const handleSendAssistantMessage = async (textToSend?: string) => {
     const text = textToSend || assistantInput
     if (!text.trim() || !assistantRef.current) return
@@ -453,15 +490,15 @@ export const NetworkCarDrive: React.FC = () => {
     }
   }
 
-  // Ação de voz "Anima a viagem"
+  // Quiz
   const handleStartEntertainmentMode = () => {
     setQuizActive(true)
     setQuizQuestionIndex(0)
     setQuizScore(0)
     setQuizSelectedOption(null)
-    setActiveTab('ENTRETENIMENTO')
+    setActiveTab('DIVERSAO')
     assistantRef.current?.speak(
-      'Modo diversão ativado! Vamos jogar um quiz de viagem com perguntas automotivas e de estrada.',
+      'Modo diversão ativado! Vamos jogar um quiz de viagem com perguntas automotivas.',
     )
   }
 
@@ -484,196 +521,375 @@ export const NetworkCarDrive: React.FC = () => {
       } else {
         setQuizActive(false)
         assistantRef.current?.speak(
-          `Fim do quiz! Sua pontuação final foi de ${quizScore + (isCorrect ? 10 : 0)} pontos! Parabéns.`,
+          `Fim do quiz! Sua pontuação final foi de ${quizScore + (isCorrect ? 10 : 0)} pontos!`,
         )
       }
-    }, 3500)
+    }, 3200)
   }
+
+  // Fullscreen toggle nativo automotivo
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+      setIsFullscreen(true)
+    } else {
+      document.exitFullscreen().catch(() => {})
+      setIsFullscreen(false)
+    }
+  }
+
+  // Denominação dinâmica da aba ASSISTENTE (Requisito 2)
+  const assistantTabLabel = getAssistantDisplayName(assistantIdentity, true)
 
   return (
     <div
-      className={`min-h-screen ${
+      className={`h-screen h-[100dvh] w-screen overflow-hidden ${
         isNightMode ? 'bg-[#080B0F] text-[#F2F5F7]' : 'bg-[#101720] text-white'
-      } flex flex-col font-sans select-none transition-colors duration-300`}
+      } flex flex-col font-sans select-none antialiased`}
     >
-      {/* Barra de Topo Automotiva com Indicador de Segurança Determinístico */}
-      <header className="bg-[#0E141C] border-b border-[#202B37] px-4 py-2.5 flex items-center justify-between">
-        <div className="flex items-center space-x-3">
-          <div className="flex items-center space-x-1.5">
-            <span className="w-3 h-3 rounded-full bg-[#FFB300] animate-pulse" />
-            <span className="font-black text-sm tracking-widest text-white uppercase">
-              Network Car Drive
+      {/* ============================================================== */}
+      {/* 1. TOPO AUTOMOTIVO: CONEXÃO, VELOCIDADE, ECT, SEGURANÇA E CONTROLES */}
+      {/* ============================================================== */}
+      <header className="safe-area-pt safe-area-pl safe-area-pr bg-[#0E141C] border-b border-[#202B37] px-3 py-2 flex items-center justify-between gap-2 shrink-0">
+        {/* Esquerda: Identidade & Conexão do Veículo */}
+        <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
+          <div className="flex items-center space-x-2">
+            <span
+              className={`w-3 h-3 rounded-full ${
+                isConnected
+                  ? 'bg-emerald-400 animate-pulse'
+                  : telemetry.connectionState === 'CONECTANDO' ||
+                      telemetry.connectionState === 'RECONECTANDO'
+                    ? 'bg-amber-400 animate-ping'
+                    : 'bg-red-500'
+              }`}
+            />
+            <span className="font-black text-xs sm:text-sm tracking-wider uppercase text-white font-mono">
+              NETWORK CAR DRIVE
             </span>
           </div>
 
-          <span className="text-xs bg-[#1C2633] text-gray-300 font-mono px-2 py-0.5 rounded border border-[#2B394A]">
-            {drivingContext.label}
-          </span>
+          {/* Badge de Estado da Conexão com o Veículo */}
+          <div
+            className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono uppercase flex items-center space-x-1 border ${
+              isConnected
+                ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700'
+                : telemetry.connectionState === 'CONECTANDO' ||
+                    telemetry.connectionState === 'RECONECTANDO'
+                  ? 'bg-amber-950/70 text-amber-300 border-amber-700'
+                  : 'bg-red-950/70 text-red-300 border-red-800'
+            }`}
+          >
+            {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
+            <span>
+              {isConnected
+                ? 'OBD CONECTADO'
+                : telemetry.connectionState === 'CONECTANDO'
+                  ? 'OBD CONECTANDO'
+                  : telemetry.connectionState === 'RECONECTANDO'
+                    ? 'RECONECTANDO'
+                    : 'VEÍCULO DESCONECTADO'}
+            </span>
+          </div>
+
+          {/* Tag Simulador claramente identificado (Requisito 13) */}
+          {isSimulated && (
+            <span
+              data-testid="banner-dados-simulados"
+              className="hidden md:inline-flex text-[10px] font-mono font-bold bg-amber-500/20 text-[#FFB300] border border-amber-500/50 px-2 py-0.5 rounded tracking-wide animate-pulse"
+            >
+              DADOS SIMULADOS ({activeScenario})
+            </span>
+          )}
         </div>
 
-        {/* Nível de Segurança (Local / Determinístico) */}
-        <div className="flex items-center space-x-3">
+        {/* Centro: Telemetria Essencial de Leitura Rápida */}
+        <div className="hidden lg:flex items-center space-x-4 font-mono text-xs">
+          <div className="flex items-center space-x-1 text-gray-300">
+            <Gauge className="w-3.5 h-3.5 text-cyan-400" />
+            <span className="text-gray-400">VEL:</span>
+            <strong className="text-cyan-300 text-sm">{displaySpeed}</strong>
+            <span className="text-[10px] text-gray-400">km/h</span>
+          </div>
+
+          <div className="flex items-center space-x-1 text-gray-300">
+            <Thermometer className="w-3.5 h-3.5 text-[#FFB300]" />
+            <span className="text-gray-400">ECT:</span>
+            <strong className="text-[#FFB300] text-sm">{displayCoolant}</strong>
+            <span className="text-[10px] text-gray-400">°C</span>
+          </div>
+
+          <div className="flex items-center space-x-1 text-gray-300">
+            <Zap className="w-3.5 h-3.5 text-emerald-400" />
+            <span className="text-gray-400">BAT:</span>
+            <strong className="text-emerald-300 text-sm">{displayVolt}</strong>
+            <span className="text-[10px] text-gray-400">V</span>
+          </div>
+        </div>
+
+        {/* Direita: Condição Monitorada / Alerta e Modos */}
+        <div className="flex items-center space-x-1.5 sm:space-x-2 shrink-0">
+          {/* Badge de Segurança Determinística */}
           <div
-            className={`px-3 py-1 rounded-full text-xs font-black uppercase tracking-wider flex items-center space-x-1.5 border ${
+            className={`px-2.5 py-1 rounded-lg text-xs font-black uppercase tracking-wider flex items-center space-x-1 border ${
               safetyLevel === 'CRITICO'
-                ? 'bg-red-950 text-red-400 border-red-700 animate-pulse'
+                ? 'bg-red-950 text-red-300 border-red-600 animate-pulse'
                 : safetyLevel === 'ATENCAO'
                   ? 'bg-amber-950 text-[#FFB300] border-amber-700'
-                  : 'bg-emerald-950 text-emerald-400 border-emerald-800'
+                  : 'bg-emerald-950/80 text-emerald-300 border-emerald-800'
             }`}
           >
             {safetyLevel === 'CRITICO' ? (
-              <AlertTriangle className="w-3.5 h-3.5" />
+              <AlertTriangle className="w-3.5 h-3.5 text-red-400" />
             ) : (
-              <ShieldCheck className="w-3.5 h-3.5" />
+              <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" />
             )}
-            <span>SEGURANÇA: {safetyLevel}</span>
+            <span className="text-[11px]">{safetyLevel}</span>
           </div>
 
-          {/* Botão Modo Noturno / Estrada */}
-          <Button
-            size="sm"
-            variant="ghost"
+          {/* Alternador Modo Noturno */}
+          <button
+            type="button"
             onClick={() => setIsNightMode(!isNightMode)}
-            className="text-gray-400 hover:text-white p-1.5 h-8 w-8"
+            className="btn-touch-automotive flex items-center justify-center p-2 rounded-lg bg-[#141C26] hover:bg-[#1E2836] border border-[#202B37] text-cyan-300"
             title="Alternar Modo Noturno / Estrada"
+            aria-label="Alternar Modo Noturno"
           >
-            {isNightMode ? <Moon className="w-4 h-4 text-cyan-400" /> : <Sun className="w-4 h-4" />}
-          </Button>
+            {isNightMode ? (
+              <Moon className="w-4 h-4 text-cyan-400" />
+            ) : (
+              <Sun className="w-4 h-4 text-amber-400" />
+            )}
+          </button>
 
-          {/* Botão Perfil Passageiro vs Motorista */}
-          <Button
-            size="sm"
-            variant="ghost"
+          {/* Alternador Modo Motorista / Passageiro */}
+          <button
+            type="button"
             onClick={() => setIsPassengerMode(!isPassengerMode)}
-            className={`text-xs px-2.5 h-8 border ${
+            className={`btn-touch-automotive px-2.5 py-1 rounded-lg border text-xs font-bold transition-all flex items-center space-x-1 ${
               isPassengerMode
-                ? 'bg-purple-950/80 text-purple-300 border-purple-700'
-                : 'bg-[#1C2633] text-gray-400 border-[#2B394A]'
+                ? 'bg-purple-950/80 text-purple-200 border-purple-700'
+                : 'bg-[#141C26] text-gray-300 border-[#202B37]'
             }`}
+            title="Alternar perfil Motorista (minimalista) ou Passageiro (detalhado)"
           >
-            {isPassengerMode ? 'Modo Passageiro' : 'Modo Motorista'}
-          </Button>
+            <UserCheck className="w-3.5 h-3.5" />
+            <span className="hidden sm:inline">{isPassengerMode ? 'Passageiro' : 'Motorista'}</span>
+          </button>
+
+          {/* Fullscreen Button */}
+          <button
+            type="button"
+            onClick={toggleFullscreen}
+            className="hidden sm:flex btn-touch-automotive items-center justify-center p-2 rounded-lg bg-[#141C26] hover:bg-[#1E2836] border border-[#202B37] text-gray-400 hover:text-white"
+            title="Tela Cheia Automotiva"
+            aria-label="Alternar Tela Cheia"
+          >
+            {isFullscreen ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
+          </button>
         </div>
       </header>
 
-      {/* Alertas Críticos de Alta Prioridade (Interrompe tudo) */}
+      {/* Banner de Dados Simulados em telas pequenas */}
+      {isSimulated && (
+        <div className="md:hidden bg-amber-950/60 border-b border-amber-600/60 px-3 py-1 text-center text-[10px] font-mono text-[#FFB300] font-bold shrink-0">
+          DADOS SIMULADOS ({activeScenario}) — AVALIAÇÃO VISUAL SEM HARDWARE REAL
+        </div>
+      )}
+
+      {/* ============================================================== */}
+      {/* 2. ALERTA CRÍTICO DETERMINÍSTICO (PRIORIDADE ABSOLUTA DE INTERRUPÇÃO) */}
+      {/* CRÍTICO VEÍCULO > VIAGEM > ASSISTENTE > ENTRETENIMENTO           */}
+      {/* ============================================================== */}
       {safetyLevel === 'CRITICO' && safetyAlerts.length > 0 && (
-        <div className="bg-red-950 border-b-2 border-red-600 p-4 text-white flex items-center justify-between shadow-lg animate-pulse">
-          <div className="flex items-center space-x-3">
-            <AlertTriangle className="w-8 h-8 text-red-400 shrink-0" />
+        <div
+          data-testid="banner-alerta-critico-interrupcao"
+          className="bg-red-950 border-b-2 border-red-600 px-4 py-2.5 text-white flex flex-col sm:flex-row items-center justify-between gap-2 shadow-2xl animate-pulse shrink-0 z-50"
+        >
+          <div className="flex items-center space-x-3 w-full sm:w-auto">
+            <div className="w-8 h-8 rounded-full bg-red-800/80 border border-red-400 flex items-center justify-center shrink-0">
+              <AlertTriangle className="w-5 h-5 text-white" />
+            </div>
             <div>
-              <span className="font-black text-sm uppercase tracking-wide block">
-                ALERTA DE SEGURANÇA PRIORITÁRIO DO VEÍCULO
+              <span className="font-black text-xs uppercase tracking-wider text-red-200 block">
+                ALERTA DE SEGURANÇA PRIORITÁRIO DO VEÍCULO (NÃO DEPENDE DE NUVEM)
               </span>
-              <p className="text-xs text-red-200 mt-0.5">{safetyAlerts[0].message}</p>
-              <p className="text-xs text-amber-300 font-semibold mt-1">
+              <p className="text-xs sm:text-sm font-bold text-white">{safetyAlerts[0].message}</p>
+              <p className="text-[11px] text-amber-300 font-semibold mt-0.5">
                 Ação Recomendada: {safetyAlerts[0].recommendedAction}
               </p>
             </div>
           </div>
-          <Button
-            size="sm"
-            onClick={() => assistantRef.current?.speak(safetyAlerts[0].message)}
-            className="bg-red-600 hover:bg-red-700 text-white font-bold text-xs"
-          >
-            Ouvir Alerta
-          </Button>
+
+          <div className="flex items-center space-x-2 shrink-0 w-full sm:w-auto justify-end">
+            <Button
+              size="sm"
+              onClick={() => assistantRef.current?.speak(safetyAlerts[0].message)}
+              className="btn-touch-automotive bg-red-600 hover:bg-red-700 text-white font-bold text-xs px-3 rounded-xl"
+            >
+              <Volume2 className="w-4 h-4 mr-1.5" /> Ouvir Alerta
+            </Button>
+          </div>
         </div>
       )}
 
-      {/* Corpo Principal com as 4 Grandes Áreas: CARRO | VIAGEM | ENTRETENIMENTO | NINA */}
-      <main className="flex-1 p-3 md:p-6 overflow-y-auto">
-        {/* ======================= ABA: CARRO ======================= */}
+      {/* ============================================================== */}
+      {/* 3. ÁREA PRINCIPAL HORIZONTAL COM REORGANIZAÇÃO RESPONSIVA     */}
+      {/* Em telas widescreen (800x480, 1024x600, etc.) distribui em    */}
+      {/* colunas ou linhas adaptativas sem estourar altura útil         */}
+      {/* ============================================================== */}
+      <main className="flex-1 safe-area-pl safe-area-pr p-2 sm:p-3 overflow-y-auto no-scrollbar flex flex-col min-h-0">
+        {/* ========================= ABA: CARRO ========================= */}
         {activeTab === 'CARRO' && (
-          <div className="space-y-6 max-w-5xl mx-auto">
-            {/* Grandes Indicadores do Motorista */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
-              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 flex flex-col justify-between h-32">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Velocidade
-                </span>
-                <div className="flex items-baseline space-x-1">
-                  <span className="text-4xl md:text-5xl font-black font-mono text-cyan-400">
-                    {telemetry.currentValues['0x0D']?.decoded || 0}
+          <div className="flex-1 flex flex-col justify-between max-w-6xl mx-auto w-full gap-2 sm:gap-3 min-h-0">
+            {/* Grid Principal de Telemetria — Leitura Instantânea (Sem Números Inúteis) */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-3 shrink-0">
+              {/* Card 1: Velocidade */}
+              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between min-h-[92px] sm:min-h-[110px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Velocidade
                   </span>
-                  <span className="text-xs text-gray-400 font-bold">km/h</span>
+                  <Gauge className="w-3.5 h-3.5 text-cyan-400" />
                 </div>
-                <div className="text-[11px] text-gray-400 font-mono">
-                  {drivingContext.type === 'ESTRADA' ? 'Rodovia' : 'Urbano'}
+                <div className="flex items-baseline space-x-1 my-0.5">
+                  <span className="text-3xl sm:text-4xl md:text-5xl font-black font-mono text-cyan-400 tracking-tight">
+                    {displaySpeed}
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-gray-400 font-bold font-mono">
+                    km/h
+                  </span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate">
+                  {hasSpeedPid
+                    ? rawSpeed! > 80
+                      ? 'Em Rodovia'
+                      : rawSpeed! > 0
+                        ? 'Tráfego Urbano'
+                        : 'Veículo Parado'
+                    : 'Aguardando telemetria'}
                 </div>
               </div>
 
-              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 flex flex-col justify-between h-32">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Giro do Motor
-                </span>
-                <div className="flex items-baseline space-x-1">
-                  <span className="text-4xl md:text-5xl font-black font-mono text-white">
-                    {telemetry.currentValues['0x0C']?.decoded || 0}
+              {/* Card 2: Rotação do Motor */}
+              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between min-h-[92px] sm:min-h-[110px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Giro do Motor
                   </span>
-                  <span className="text-xs text-gray-400 font-bold">RPM</span>
+                  <Activity className="w-3.5 h-3.5 text-white" />
                 </div>
-                <div className="text-[11px] text-gray-400 font-mono">
-                  Lenta: ~{drivingContext.type.includes('LENTA') ? 'Estável' : 'Operando'}
+                <div className="flex items-baseline space-x-1 my-0.5">
+                  <span className="text-3xl sm:text-4xl md:text-5xl font-black font-mono text-white tracking-tight">
+                    {displayRpm}
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-gray-400 font-bold font-mono">
+                    RPM
+                  </span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate">
+                  {hasRpmPid
+                    ? rawRpm! > 1000
+                      ? 'Motor em Operação'
+                      : rawRpm! > 0
+                        ? 'Marcha Lenta'
+                        : 'Motor Desligado'
+                    : 'Aguardando PID 0x0C'}
                 </div>
               </div>
 
-              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 flex flex-col justify-between h-32">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Arrefecimento (ECT)
-                </span>
-                <div className="flex items-baseline space-x-1">
+              {/* Card 3: Temperatura de Arrefecimento (ECT) */}
+              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between min-h-[92px] sm:min-h-[110px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Arrefecimento
+                  </span>
+                  <Thermometer
+                    className={`w-3.5 h-3.5 ${
+                      hasCoolantPid && rawCoolant! >= 105 ? 'text-red-400' : 'text-[#FFB300]'
+                    }`}
+                  />
+                </div>
+                <div className="flex items-baseline space-x-1 my-0.5">
                   <span
-                    className={`text-4xl md:text-5xl font-black font-mono ${
-                      (telemetry.currentValues['0x05']?.decoded || 85) >= 105
-                        ? 'text-red-400'
-                        : 'text-[#FFB300]'
+                    className={`text-3xl sm:text-4xl md:text-5xl font-black font-mono tracking-tight ${
+                      hasCoolantPid && rawCoolant! >= 105 ? 'text-red-400' : 'text-[#FFB300]'
                     }`}
                   >
-                    {telemetry.currentValues['0x05']?.decoded || '--'}
+                    {displayCoolant}
                   </span>
-                  <span className="text-xs text-gray-400 font-bold">°C</span>
+                  <span className="text-[11px] sm:text-xs text-gray-400 font-bold font-mono">
+                    °C
+                  </span>
                 </div>
-                <div className="text-[11px] text-gray-400 font-mono">Faixa Nominal: 85 - 95 °C</div>
+                <div className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate">
+                  {hasCoolantPid
+                    ? rawCoolant! < 70
+                      ? 'Aquecendo'
+                      : rawCoolant! <= 98
+                        ? 'Faixa Nominal'
+                        : 'Temp Elevada'
+                    : 'Aguardando PID 0x05'}
+                </div>
               </div>
 
-              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 flex flex-col justify-between h-32">
-                <span className="text-xs font-semibold text-gray-400 uppercase tracking-wider">
-                  Tensão Elétrica
-                </span>
-                <div className="flex items-baseline space-x-1">
-                  <span className="text-4xl md:text-5xl font-black font-mono text-emerald-400">
-                    {telemetry.currentValues['0x42']?.decoded || '14.1'}
+              {/* Card 4: Tensão Elétrica */}
+              <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-2.5 sm:p-3.5 flex flex-col justify-between min-h-[92px] sm:min-h-[110px]">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] sm:text-xs font-bold text-gray-400 uppercase tracking-wider">
+                    Tensão Elétrica
                   </span>
-                  <span className="text-xs text-gray-400 font-bold">V</span>
+                  <Zap className="w-3.5 h-3.5 text-emerald-400" />
                 </div>
-                <div className="text-[11px] text-gray-400 font-mono">Alternador em carga</div>
+                <div className="flex items-baseline space-x-1 my-0.5">
+                  <span className="text-3xl sm:text-4xl md:text-5xl font-black font-mono text-emerald-400 tracking-tight">
+                    {displayVolt}
+                  </span>
+                  <span className="text-[11px] sm:text-xs text-gray-400 font-bold font-mono">
+                    V
+                  </span>
+                </div>
+                <div className="text-[10px] sm:text-[11px] text-gray-400 font-mono truncate">
+                  {hasVoltPid
+                    ? rawVolt! >= 13.5
+                      ? 'Alternador em Carga'
+                      : rawVolt! >= 12.2
+                        ? 'Tensão Nominal'
+                        : 'Subtensão'
+                    : 'Aguardando PID 0x42'}
+                </div>
               </div>
             </div>
 
-            {/* Painel do Modo Motorista Simples (Alto Contraste) */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="space-y-1 text-center md:text-left">
-                <span className="text-xs text-[#FFB300] font-bold uppercase tracking-widest block">
-                  Status de Condução Ativa
-                </span>
-                <div className="text-lg md:text-xl font-bold text-white">
-                  Motor:{' '}
-                  <span className="text-emerald-400">
-                    {safetyLevel === 'NORMAL' ? 'Normal' : safetyLevel}
-                  </span>{' '}
-                  • OBD:{' '}
-                  <span className="text-cyan-400">
-                    {telemetry.connectionState === 'CONECTADO' ? 'Conectado' : 'Aguardando'}
-                  </span>{' '}
-                  • Monitoramento:{' '}
-                  <span className="text-emerald-400">Ativo 100% Local (Sem Nuvem)</span>
+            {/* Banner de Condição Monitorada e Ações Rápidas do Motorista */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 flex flex-col md:flex-row items-center justify-between gap-2.5">
+              <div className="space-y-0.5 text-center md:text-left w-full md:w-auto">
+                <div className="flex items-center justify-center md:justify-start space-x-2">
+                  <span className="text-xs text-[#FFB300] font-bold uppercase tracking-wider">
+                    Monitoramento Embarcado:
+                  </span>
+                  <span className="text-xs font-mono bg-[#1C2633] text-gray-300 px-2 py-0.5 rounded border border-[#2B394A]">
+                    {drivingContext.label}
+                  </span>
                 </div>
-                <p className="text-xs text-gray-400">{drivingContext.description}</p>
+                <p className="text-xs text-gray-300 font-medium">
+                  {drivingContext.description} • Monitoramento determinístico local ativo sem
+                  dependência de internet.
+                </p>
               </div>
 
-              <div className="flex items-center space-x-3">
+              {/* Botões de Ação por Toque Grande (Marcar Sintoma e Assistente) */}
+              <div className="flex items-center space-x-2 sm:space-x-3 w-full md:w-auto justify-center shrink-0">
+                <Button
+                  size="lg"
+                  onClick={() => handleMarkSymptomQuick('SINTOMA_MOTORISTA')}
+                  disabled={symptomMarking}
+                  className="btn-touch-automotive bg-[#1C2633] hover:bg-[#283647] border border-amber-500/50 text-[#FFB300] font-bold text-xs sm:text-sm px-4 rounded-xl shadow"
+                >
+                  <Flag className="w-4 h-4 mr-1.5 text-[#FFB300]" />
+                  {symptomMarking ? 'Gravando...' : 'Marcar Sintoma'}
+                </Button>
+
                 <Button
                   size="lg"
                   onClick={() =>
@@ -681,39 +897,89 @@ export const NetworkCarDrive: React.FC = () => {
                       `${assistantIdentity.name || 'Assistente'}, como está o carro?`,
                     )
                   }
-                  className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-extrabold text-sm shadow-lg px-6 h-12 rounded-xl"
+                  className="btn-touch-automotive bg-[#FFB300] hover:bg-[#e5a000] text-black font-extrabold text-xs sm:text-sm px-4 rounded-xl shadow"
                 >
-                  <Bot className="w-5 h-5 mr-2" />
-                  {assistantIdentity.name || 'Assistente'}, como está o carro?
+                  <Bot className="w-4 h-4 mr-1.5" />
+                  Como está o carro?
                 </Button>
               </div>
             </div>
+
+            {/* Modo Passageiro: Informações Adicionais de Telemetria e Enlace */}
+            {isPassengerMode && (
+              <div className="bg-[#0E151E] border border-purple-800/40 rounded-xl p-2.5 sm:p-3 space-y-2">
+                <div className="flex items-center justify-between text-xs font-bold text-purple-300">
+                  <span className="flex items-center space-x-1.5">
+                    <SlidersHorizontal className="w-3.5 h-3.5" />
+                    <span>Painel Técnico do Passageiro / Co-Piloto</span>
+                  </span>
+                  <span className="text-[11px] font-mono text-gray-400">
+                    Enlace: {telemetry.transportType} | Veículo:{' '}
+                    {selectedVehicle?.plate || 'PADRÃO'}
+                  </span>
+                </div>
+
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-xs font-mono">
+                  <div className="bg-[#121A24] p-2 rounded border border-[#202B37]">
+                    <span className="text-[10px] text-gray-400 block">DTCs Ativos</span>
+                    <strong className="text-[#FFB300]">
+                      {telemetry.dtcList.length > 0
+                        ? telemetry.dtcList.map((d) => d.dtc_code).join(', ')
+                        : 'Nenhuma Falha'}
+                    </strong>
+                  </div>
+                  <div className="bg-[#121A24] p-2 rounded border border-[#202B37]">
+                    <span className="text-[10px] text-gray-400 block">Luz de Injeção</span>
+                    <strong className={telemetry.milOn ? 'text-red-400' : 'text-emerald-400'}>
+                      {telemetry.milOn ? 'MIL ACESA' : 'MIL Apagada'}
+                    </strong>
+                  </div>
+                  <div className="bg-[#121A24] p-2 rounded border border-[#202B37]">
+                    <span className="text-[10px] text-gray-400 block">Frequência OBD</span>
+                    <strong className="text-white">
+                      {telemetry.effectiveFreqHz > 0 ? `${telemetry.effectiveFreqHz} Hz` : '0 Hz'}
+                    </strong>
+                  </div>
+                  <div className="bg-[#121A24] p-2 rounded border border-[#202B37]">
+                    <span className="text-[10px] text-gray-400 block">Acesso Diagnóstico</span>
+                    <a
+                      href="/replay"
+                      className="text-cyan-400 underline flex items-center space-x-1"
+                    >
+                      <span>Abrir Caixa-Preta</span>
+                      <ExternalLink className="w-3 h-3" />
+                    </a>
+                  </div>
+                </div>
+              </div>
+            )}
           </div>
         )}
 
-        {/* ======================= ABA: VIAGEM ======================= */}
+        {/* ========================= ABA: VIAGEM ========================= */}
         {activeTab === 'VIAGEM' && (
-          <div className="space-y-6 max-w-5xl mx-auto">
-            {/* Controle da Viagem */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
+          <div className="flex-1 flex flex-col justify-between max-w-6xl mx-auto w-full gap-2 sm:gap-3 min-h-0">
+            {/* Header / Controle de Iniciar/Finalizar Viagem */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
               <div>
-                <span className="text-xs font-bold text-[#FFB300] uppercase tracking-wider block mb-1">
-                  Sessão do Modo Viagem
+                <span className="text-xs font-bold text-[#FFB300] uppercase tracking-wider block mb-0.5">
+                  Modo Viagem Automotivo
                 </span>
-                <div className="text-xl font-black text-white">
-                  {activeTrip ? activeTrip.title : 'Nenhuma viagem iniciada'}
+                <div className="text-base sm:text-lg font-black text-white">
+                  {activeTrip ? activeTrip.title : 'Nenhuma viagem em andamento'}
                 </div>
-                <div className="text-xs text-gray-400 mt-1">
+                <div className="text-[11px] sm:text-xs text-gray-400">
                   {activeTrip
-                    ? `Iniciada às ${new Date(activeTrip.started_at).toLocaleTimeString('pt-BR')} • Paradas: ${activeTrip.stop_count}`
+                    ? `Em andamento desde ${new Date(activeTrip.started_at).toLocaleTimeString('pt-BR')} • Paradas: ${activeTrip.stop_count}`
                     : 'Inicie a viagem para registrar duração, distância, paradas e consumo estimado.'}
                 </div>
               </div>
 
+              {/* Botão de Toque Grande para Iniciar / Parar Viagem */}
               <Button
                 size="lg"
                 onClick={handleToggleTrip}
-                className={`font-black tracking-wider text-sm h-12 px-6 rounded-xl shadow-lg ${
+                className={`btn-touch-automotive font-black tracking-wider text-xs sm:text-sm px-6 rounded-xl shadow-lg shrink-0 ${
                   activeTrip
                     ? 'bg-red-600 hover:bg-red-700 text-white'
                     : 'bg-[#2ECC71] hover:bg-[#27ae60] text-black'
@@ -733,114 +999,139 @@ export const NetworkCarDrive: React.FC = () => {
               </Button>
             </div>
 
-            {/* Estatísticas da Viagem */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-lg p-3">
-                <span className="text-[11px] text-gray-400 block">Distância Percorrida</span>
-                <div className="flex items-baseline space-x-1">
-                  <span className="text-2xl font-bold font-mono text-white">
-                    {activeTrip ? activeTrip.distance_km : 0}
+            {/* Métricas Principais da Viagem */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 shrink-0">
+              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
+                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
+                  Distância
+                </span>
+                <div className="flex items-baseline space-x-1 my-0.5">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-white">
+                    {activeTrip ? activeTrip.distance_km : '0.0'}
                   </span>
-                  <span className="text-xs text-gray-400">km (medido)</span>
+                  <span className="text-xs text-gray-400 font-bold font-mono">km</span>
                 </div>
+                <span className="text-[10px] text-gray-500 font-mono">Baseado em OBD</span>
               </div>
 
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-lg p-3">
-                <span className="text-[11px] text-gray-400 block">Tempo em Movimento</span>
-                <div className="text-2xl font-bold font-mono text-cyan-400">
-                  {activeTrip ? `${Math.floor(activeTrip.duration_seconds / 60)} min` : '0 min'}
+              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
+                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
+                  Duração
+                </span>
+                <div className="my-0.5">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-cyan-400">
+                    {activeTrip ? `${Math.floor(activeTrip.duration_seconds / 60)}` : '0'}
+                  </span>
+                  <span className="text-xs text-gray-400 font-bold font-mono ml-1">min</span>
                 </div>
+                <span className="text-[10px] text-gray-500 font-mono">Tempo decorrido</span>
               </div>
 
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-lg p-3">
-                <span className="text-[11px] text-gray-400 block">Velocidade Média</span>
-                <div className="flex items-baseline space-x-1">
-                  <span className="text-2xl font-bold font-mono text-white">
-                    {activeTrip ? activeTrip.avg_speed_kmh : 0}
+              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
+                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
+                  Velocidade Média
+                </span>
+                <div className="flex items-baseline space-x-1 my-0.5">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-white">
+                    {activeTrip ? activeTrip.avg_speed_kmh : '0'}
                   </span>
-                  <span className="text-xs text-gray-400">km/h</span>
+                  <span className="text-xs text-gray-400 font-bold font-mono">km/h</span>
                 </div>
+                <span className="text-[10px] text-gray-500 font-mono">Média em movimento</span>
               </div>
 
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-lg p-3">
-                <span className="text-[11px] text-gray-400 block">Consumo Estimado</span>
-                <div className="flex items-baseline space-x-1">
-                  <span className="text-2xl font-bold font-mono text-[#FFB300]">
-                    {activeTrip ? activeTrip.estimated_fuel_liters : 0}
+              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
+                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
+                  Consumo Estimado
+                </span>
+                <div className="flex items-baseline space-x-1 my-0.5">
+                  <span className="text-2xl sm:text-3xl font-black font-mono text-[#FFB300]">
+                    {activeTrip ? activeTrip.estimated_fuel_liters : '0.0'}
                   </span>
-                  <span className="text-xs text-gray-400">L (estimado)</span>
+                  <span className="text-xs text-gray-400 font-bold font-mono">L</span>
                 </div>
+                <span className="text-[10px] text-gray-500 font-mono">Estimativa MAF/Vel.</span>
               </div>
             </div>
 
-            {/* Diário de Bordo da Viagem */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-5 space-y-4">
-              <div className="flex items-center justify-between">
-                <h3 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+            {/* Diário e Paradas: Durante movimento reduz elementos interativos */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 space-y-2 flex-1 min-h-0 flex flex-col justify-between">
+              <div className="flex items-center justify-between shrink-0">
+                <h3 className="text-xs sm:text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
                   <MapPin className="w-4 h-4 text-[#FFB300]" />
-                  <span>Diário de Bordo & Momentos da Viagem</span>
+                  <span>Diário e Paradas da Viagem</span>
                 </h3>
+                {isVehicleMoving && !isPassengerMode && (
+                  <span className="text-[10px] sm:text-[11px] text-amber-400 bg-amber-950/60 px-2 py-0.5 rounded border border-amber-800">
+                    Modo Condução Ativo: Interações reduzidas
+                  </span>
+                )}
               </div>
 
-              {/* Formulário de Adição Rápida */}
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-[#0B0F14] p-3 rounded-lg border border-[#202B37]">
-                <input
-                  type="text"
-                  placeholder="Nome do local / momento (ex: Parada Café Graal)"
-                  value={newDiaryTitle}
-                  onChange={(e) => setNewDiaryTitle(e.target.value)}
-                  className="bg-[#121A24] border border-[#202B37] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#FFB300]"
-                />
-                <input
-                  type="text"
-                  placeholder="Comentário ou observação curta..."
-                  value={newDiaryNotes}
-                  onChange={(e) => setNewDiaryNotes(e.target.value)}
-                  className="bg-[#121A24] border border-[#202B37] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#FFB300]"
-                />
-                <div className="flex items-center space-x-2 justify-end">
-                  <label className="text-[11px] text-gray-400 flex items-center space-x-1 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={hasLocationConsent}
-                      onChange={(e) => setHasLocationConsent(e.target.checked)}
-                      className="rounded"
-                    />
-                    <span>Consentir Local</span>
-                  </label>
-                  <Button
-                    size="sm"
-                    onClick={handleAddDiaryEntry}
-                    className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs h-8"
-                  >
-                    <Plus className="w-3.5 h-3.5 mr-1" />
-                    Salvar
-                  </Button>
+              {/* Se o carro estiver em movimento e NÃO for modo passageiro, esconde formulário de texto */}
+              {isVehicleMoving && !isPassengerMode ? (
+                <div className="bg-[#0B0F14] p-3 rounded-lg border border-[#202B37] text-center space-y-1">
+                  <p className="text-xs text-gray-300">
+                    Veículo em movimento ({displaySpeed} km/h). Para segurança do motorista, utilize
+                    comando de voz:
+                  </p>
+                  <p className="text-xs text-[#FFB300] font-mono font-bold">
+                    &quot;{assistantIdentity.wakeWord || 'assistente'}, marca esse momento&quot;
+                  </p>
                 </div>
-              </div>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 bg-[#0B0F14] p-2 rounded-lg border border-[#202B37] shrink-0">
+                  <input
+                    type="text"
+                    placeholder="Nome da parada (ex: Posto / Café)..."
+                    value={newDiaryTitle}
+                    onChange={(e) => setNewDiaryTitle(e.target.value)}
+                    className="bg-[#121A24] border border-[#202B37] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#FFB300]"
+                  />
+                  <input
+                    type="text"
+                    placeholder="Observação rápida..."
+                    value={newDiaryNotes}
+                    onChange={(e) => setNewDiaryNotes(e.target.value)}
+                    className="bg-[#121A24] border border-[#202B37] rounded px-3 py-1.5 text-xs text-white focus:outline-none focus:border-[#FFB300]"
+                  />
+                  <div className="flex items-center space-x-2 justify-end">
+                    <label className="text-[11px] text-gray-400 flex items-center space-x-1 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={hasLocationConsent}
+                        onChange={(e) => setHasLocationConsent(e.target.checked)}
+                        className="rounded"
+                      />
+                      <span>Consentir Local</span>
+                    </label>
+                    <Button
+                      size="sm"
+                      onClick={handleAddDiaryEntry}
+                      className="btn-touch-automotive bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs h-8 px-4"
+                    >
+                      <Plus className="w-3.5 h-3.5 mr-1" />
+                      Salvar
+                    </Button>
+                  </div>
+                </div>
+              )}
 
-              {/* Lista de Momentos Salvos */}
-              <div className="space-y-2">
+              {/* Lista dos últimos momentos registrados */}
+              <div className="space-y-1 overflow-y-auto no-scrollbar max-h-28 flex-1">
                 {diaryEntries.length === 0 ? (
-                  <div className="text-center py-6 text-xs text-gray-400">
-                    Nenhum momento registrado ainda nesta viagem. Use o comando &quot;
-                    {assistantIdentity.name || 'Assistente'}, marca esse momento&quot; ou o
-                    formulário acima.
+                  <div className="text-center py-2 text-xs text-gray-400">
+                    Nenhuma parada registrada nesta viagem.
                   </div>
                 ) : (
                   diaryEntries.map((d, i) => (
                     <div
                       key={i}
-                      className="bg-[#0B0F14] p-3 rounded-lg border border-[#202B37] text-xs flex items-center justify-between"
+                      className="bg-[#0B0F14] p-2 rounded-lg border border-[#202B37] text-xs flex items-center justify-between"
                     >
                       <div>
                         <span className="font-bold text-white">{d.title}</span>
                         {d.notes && <p className="text-gray-400 text-[11px]">{d.notes}</p>}
-                        {d.has_location_consent && (
-                          <span className="text-[10px] text-emerald-400 mt-0.5 block">
-                            ✓ Ponto geográfico autorizado
-                          </span>
-                        )}
                       </div>
                       <span className="text-[11px] text-gray-400 font-mono">
                         {new Date(d.timestamp_utc).toLocaleTimeString('pt-BR')}
@@ -853,93 +1144,42 @@ export const NetworkCarDrive: React.FC = () => {
           </div>
         )}
 
-        {/* ======================= ABA: ENTRETENIMENTO ======================= */}
-        {activeTab === 'ENTRETENIMENTO' && (
-          <div className="space-y-6 max-w-5xl mx-auto">
-            {/* Banner Diversão / Jogos de Estrada */}
-            <div className="bg-gradient-to-r from-purple-950/60 to-blue-950/60 border border-purple-800/60 rounded-xl p-5 flex flex-col md:flex-row items-center justify-between gap-4">
-              <div className="space-y-1">
-                <span className="text-xs font-bold text-purple-300 uppercase tracking-widest flex items-center space-x-1.5">
+        {/* ========================= ABA: DIVERSÃO ========================= */}
+        {activeTab === 'DIVERSAO' && (
+          <div className="flex-1 flex flex-col justify-between max-w-6xl mx-auto w-full gap-2 sm:gap-3 min-h-0">
+            {/* Banner de Entretenimento Seguro */}
+            <div className="bg-gradient-to-r from-purple-950/60 to-blue-950/60 border border-purple-800/60 rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+              <div className="space-y-0.5 text-center sm:text-left">
+                <span className="text-xs font-bold text-purple-300 uppercase tracking-widest flex items-center justify-center sm:justify-start space-x-1.5">
                   <Sparkles className="w-4 h-4 text-[#FFB300]" />
-                  <span>Modo Diversão {getAssistantDisplayName(assistantIdentity)}</span>
+                  <span>Central de Diversão & Jogos de Estrada</span>
                 </span>
-                <div className="text-lg font-bold text-white">
-                  Jogos de Viagem Por Voz para Motorista e Passageiros
+                <div className="text-base font-bold text-white">
+                  Controles Grandes de Entretenimento com Prioridade Automotiva
                 </div>
                 <p className="text-xs text-gray-300">
-                  Participe sem tirar as mãos do volante nem os olhos da pista! A assistente faz
-                  perguntas e pontua por voz.
+                  Os alertas do veículo interrompem o áudio imediatamente em caso de anomalia.
                 </p>
               </div>
 
               <Button
                 size="lg"
                 onClick={handleStartEntertainmentMode}
-                className="bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs h-11 px-6 rounded-xl shadow-lg"
+                className="btn-touch-automotive bg-purple-600 hover:bg-purple-700 text-white font-bold text-xs sm:text-sm px-6 rounded-xl shadow-lg shrink-0"
               >
                 <Flame className="w-4 h-4 mr-1.5" />
-                {assistantIdentity.name || 'Assistente'}, anima a viagem!
+                Anima a Viagem!
               </Button>
             </div>
 
-            {/* Quiz Interativo Ativo */}
-            {quizActive && (
-              <div className="bg-[#121A24] border-2 border-purple-500 rounded-xl p-5 space-y-4">
-                <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">
-                    Pergunta {quizQuestionIndex + 1} de {TRAVEL_QUIZ_QUESTIONS.length}
-                  </span>
-                  <div className="flex items-center space-x-2 text-xs font-mono font-bold text-white bg-purple-950 px-2.5 py-1 rounded border border-purple-800">
-                    <Award className="w-3.5 h-3.5 text-[#FFB300]" />
-                    <span>Placar: {quizScore} pts</span>
-                  </div>
-                </div>
-
-                <div className="text-base font-bold text-white">{currentQuiz.question}</div>
-
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-2">
-                  {currentQuiz.options.map((opt, idx) => (
-                    <button
-                      key={idx}
-                      type="button"
-                      onClick={() => handleAnswerQuiz(idx)}
-                      disabled={quizSelectedOption !== null}
-                      className={`p-3 rounded-lg border text-left text-xs font-medium transition-all ${
-                        quizSelectedOption === idx
-                          ? idx === currentQuiz.correctIndex
-                            ? 'bg-emerald-950 border-emerald-500 text-emerald-200'
-                            : 'bg-red-950 border-red-500 text-red-200'
-                          : 'bg-[#0B0F14] border-[#202B37] text-gray-300 hover:bg-[#1C2633]'
-                      }`}
-                    >
-                      <span className="font-bold mr-2">{String.fromCharCode(65 + idx)})</span>
-                      {opt}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="flex justify-end pt-2">
-                  <Button
-                    size="sm"
-                    variant="ghost"
-                    onClick={() => setQuizActive(false)}
-                    className="text-xs text-gray-400 hover:text-white"
-                  >
-                    Encerrar Quiz
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Status do Ducking de Áudio */}
+            {/* Aviso de Áudio Ducking Ativo */}
             {isAudioDucked && (
-              <div className="bg-amber-950/60 border border-amber-600/70 rounded-xl p-3 text-xs text-amber-200 flex items-center justify-between animate-pulse">
+              <div className="bg-amber-950/70 border border-amber-600 rounded-xl p-2.5 text-xs text-amber-200 flex items-center justify-between animate-pulse shrink-0">
                 <div className="flex items-center space-x-2">
-                  <Volume2 className="w-4 h-4 text-amber-400" />
+                  <Volume2 className="w-4 h-4 text-amber-400 shrink-0" />
                   <span>
-                    <strong>Áudio Ducking Ativo:</strong> Entretenimento atenuado temporariamente
-                    para boletim prioritário de voz da assistente (
-                    {getAssistantDisplayName(assistantIdentity)}).
+                    <strong>Áudio Ducking Ativo:</strong> Entretenimento temporariamente atenuado
+                    para fala de boletim prioritário da assistente ({assistantTabLabel}).
                   </span>
                 </div>
                 <span className="text-[10px] font-mono bg-amber-500/20 px-2 py-0.5 rounded border border-amber-500/40">
@@ -948,25 +1188,72 @@ export const NetworkCarDrive: React.FC = () => {
               </div>
             )}
 
-            {/* Atalhos para Players de Música Externos */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-5 space-y-3">
+            {/* Quiz Ativo de Estrada com Botões Grandes de Toque */}
+            {quizActive && (
+              <div className="bg-[#121A24] border-2 border-purple-500 rounded-xl p-3 sm:p-3.5 space-y-2 shrink-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-purple-400 uppercase tracking-wider">
+                    Pergunta {quizQuestionIndex + 1} de {TRAVEL_QUIZ_QUESTIONS.length}
+                  </span>
+                  <div className="flex items-center space-x-1.5 text-xs font-mono font-bold text-white bg-purple-950 px-2.5 py-0.5 rounded border border-purple-800">
+                    <Award className="w-3.5 h-3.5 text-[#FFB300]" />
+                    <span>Placar: {quizScore} pts</span>
+                  </div>
+                </div>
+
+                <div className="text-xs sm:text-sm font-bold text-white">
+                  {currentQuiz.question}
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                  {currentQuiz.options.map((opt, idx) => (
+                    <button
+                      key={idx}
+                      type="button"
+                      onClick={() => handleAnswerQuiz(idx)}
+                      disabled={quizSelectedOption !== null}
+                      className={`btn-touch-automotive p-2.5 rounded-xl border text-left text-xs font-medium transition-all ${
+                        quizSelectedOption === idx
+                          ? idx === currentQuiz.correctIndex
+                            ? 'bg-emerald-950 border-emerald-500 text-emerald-200 font-bold'
+                            : 'bg-red-950 border-red-500 text-red-200 font-bold'
+                          : 'bg-[#0B0F14] border-[#202B37] text-gray-200 hover:bg-[#1C2633]'
+                      }`}
+                    >
+                      <span className="font-bold mr-2">{String.fromCharCode(65 + idx)})</span>
+                      {opt}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="flex justify-end">
+                  <Button
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => setQuizActive(false)}
+                    className="text-xs text-gray-400 hover:text-white h-7 px-2"
+                  >
+                    Encerrar Quiz
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* Atalhos Grandes para Players Automotivos */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 space-y-2 flex-1">
               <h3 className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
                 <Music className="w-4 h-4 text-cyan-400" />
-                <span>Central de Áudio & Streaming</span>
+                <span>Central de Áudio & Reprodutores</span>
               </h3>
-              <p className="text-xs text-gray-400">
-                Integração com reprodutores instalados no dispositivo ou navegadores (com atenuação
-                automática / ducking ao falar boletim):
-              </p>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-1">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
                 {EXTERNAL_MEDIA_SHORTCUTS.map((media) => (
                   <a
                     key={media.name}
                     href={media.url}
                     target="_blank"
                     rel="noopener noreferrer"
-                    className="bg-[#0B0F14] border border-[#202B37] rounded-lg p-3 hover:bg-[#1A232E] transition-all flex items-center justify-between group"
+                    className="btn-touch-automotive bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 hover:bg-[#1A232E] transition-all flex items-center justify-between group"
                   >
                     <div>
                       <span className="text-xs font-bold text-white group-hover:text-[#FFB300] block">
@@ -982,51 +1269,43 @@ export const NetworkCarDrive: React.FC = () => {
           </div>
         )}
 
-        {/* ======================= ABA: ASSISTENTE PERSONALIZÁVEL ======================= */}
-        {activeTab === 'NINA' && (
-          <div className="space-y-4 max-w-4xl mx-auto flex flex-col h-[calc(100vh-180px)]">
-            {/* Header da Assistente */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 flex items-center justify-between">
-              <div className="flex items-center space-x-3">
-                <div className="w-10 h-10 rounded-full bg-[#FFB300]/20 border border-[#FFB300] flex items-center justify-center text-[#FFB300]">
-                  <Bot className="w-5 h-5" />
+        {/* ========================= ABA: ASSISTENTE ========================= */}
+        {activeTab === 'ASSISTENTE' && (
+          <div className="flex-1 flex flex-col justify-between max-w-5xl mx-auto w-full gap-2 sm:gap-3 min-h-0">
+            {/* Topo da Assistente: Botão Grande de Voz e Configuração */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
+              <div className="flex items-center space-x-3 text-center sm:text-left">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-[#FFB300]/20 border border-[#FFB300] flex items-center justify-center text-[#FFB300] shrink-0">
+                  <Bot className="w-5 h-5 sm:w-6 sm:h-6" />
                 </div>
                 <div>
-                  <div className="flex items-center space-x-2">
-                    <span className="font-bold text-white text-sm">
+                  <div className="flex items-center space-x-2 justify-center sm:justify-start">
+                    <span className="font-black text-sm sm:text-base text-white">
                       {getAssistantDisplayName(assistantIdentity)}
                     </span>
-                    <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-1.5 py-0.5 rounded font-mono font-bold">
-                      NATIVE AGENT
-                    </span>
                     <span className="text-[10px] bg-purple-950 text-purple-300 border border-purple-800 px-1.5 py-0.5 rounded font-mono font-bold">
-                      E6.2 CUSTOMIZÁVEL
+                      {assistantIdentity.isCustomized ? 'PERSONALIZADA' : 'PADRÃO'}
                     </span>
                     <span className="text-[10px] bg-cyan-950 text-cyan-300 border border-cyan-800 px-1.5 py-0.5 rounded font-mono">
                       {assistantIdentity.style}
                     </span>
                   </div>
-                  <p className="text-xs text-gray-400">
+                  <p className="text-[11px] sm:text-xs text-gray-400 mt-0.5">
                     Wake word: &quot;{assistantIdentity.wakeWord || assistantIdentity.name}&quot; •
-                    Estilo {assistantIdentity.style} • Alertas locais prioritários
+                    Estado:{' '}
+                    {isListeningVoice
+                      ? 'Ouvindo microfone...'
+                      : isSpeakingVoice
+                        ? 'Falando boletim...'
+                        : 'Em espera'}
                   </p>
                 </div>
               </div>
 
-              <div className="flex items-center space-x-2">
+              {/* Botão Gigante de Voz e Atalho "Minha Assistente" */}
+              <div className="flex items-center space-x-2 sm:space-x-3 shrink-0">
                 <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={() => setAssistantModalOpen(true)}
-                  className="text-xs h-8 border-[#2B394A] text-cyan-300 hover:text-white hover:bg-[#1C2633]"
-                  title="Configurar Nome, Wake Word, Voz e Estilo da Assistente"
-                >
-                  <Sparkles className="w-3.5 h-3.5 mr-1 text-[#FFB300]" />
-                  Minha Assistente
-                </Button>
-
-                <Button
-                  size="sm"
+                  size="lg"
                   onClick={() => {
                     if (isListeningVoice) {
                       assistantRef.current?.stopListening()
@@ -1034,337 +1313,198 @@ export const NetworkCarDrive: React.FC = () => {
                       assistantRef.current?.startListening()
                     }
                   }}
-                  className={`text-xs h-8 ${
+                  className={`btn-touch-automotive text-xs sm:text-sm font-bold px-4 sm:px-5 rounded-xl shadow-lg transition-all ${
                     isListeningVoice
                       ? 'bg-red-600 hover:bg-red-700 text-white animate-pulse'
-                      : 'bg-[#1C2633] text-gray-300 hover:text-white border border-[#2B394A]'
+                      : 'bg-[#FFB300] hover:bg-[#e5a000] text-black'
                   }`}
                 >
                   {isListeningVoice ? (
                     <>
-                      <MicOff className="w-3.5 h-3.5 mr-1" /> Ouvindo...
+                      <MicOff className="w-4 h-4 mr-2" /> Ouvindo Agora...
                     </>
                   ) : (
                     <>
-                      <Mic className="w-3.5 h-3.5 mr-1" /> Ativar Microfone
+                      <Mic className="w-4 h-4 mr-2" /> Falar com {assistantTabLabel}
                     </>
                   )}
+                </Button>
+
+                <Button
+                  size="lg"
+                  variant="outline"
+                  onClick={() => setAssistantModalOpen(true)}
+                  className="btn-touch-automotive text-xs border-[#2B394A] text-cyan-300 hover:text-white hover:bg-[#1C2633] px-3 rounded-xl"
+                  title="Configurar Nome, Wake Word e Voz da Assistente"
+                >
+                  <Sparkles className="w-4 h-4 text-[#FFB300] sm:mr-1.5" />
+                  <span className="hidden sm:inline">Minha Assistente</span>
                 </Button>
               </div>
             </div>
 
-            {/* NC-E6.1 / E6.2: PAINEL DE CONTROLE DOS BOLETINS PERIÓDICOS (PT-BR / BOTÕES GRANDES) */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-4 space-y-3">
-              <div className="flex items-center justify-between border-b border-[#202B37] pb-2">
-                <div className="flex items-center space-x-2">
+            {/* Painel do Último Boletim */}
+            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 space-y-2 shrink-0">
+              <div className="flex items-center justify-between border-b border-[#202B37] pb-1.5">
+                <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-1.5">
                   <Volume2 className="w-4 h-4 text-[#FFB300]" />
-                  <span className="text-xs font-bold text-white uppercase tracking-wider">
-                    Boletins Periódicos por Voz ({getAssistantDisplayName(assistantIdentity)})
-                  </span>
-                </div>
-                <div className="flex items-center space-x-2">
-                  <span className="text-[11px] font-mono text-gray-400">
-                    Status:{' '}
-                    <strong
-                      className={bulletinConfig.enabled ? 'text-emerald-400' : 'text-gray-500'}
-                    >
-                      {bulletinConfig.enabled
-                        ? `A cada ${bulletinConfig.effectiveMinutes} min`
-                        : 'Desativado'}
-                    </strong>
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={() => {
-                      if (bulletinServiceRef.current) {
-                        const supportedList = Object.keys(telemetry.currentValues).filter(
-                          (k) => telemetry.currentValues[k]?.quality === 'OK',
-                        )
-                        const b = bulletinServiceRef.current.generateBulletin({
-                          copilotContext: {
-                            vehicleName: selectedVehicle
-                              ? `${selectedVehicle.make} ${selectedVehicle.model}`
-                              : 'Veículo OBD',
-                            vehiclePlate: selectedVehicle?.plate || 'S/P',
-                            connectionStatus: telemetry.connectionState,
-                            transportType: telemetry.transportType,
-                            drivingContext: drivingContext.type,
-                            speedKmh: telemetry.currentValues['0x0D']?.decoded,
-                            rpm: telemetry.currentValues['0x0C']?.decoded,
-                            coolantTemp: telemetry.currentValues['0x05']?.decoded,
-                            batteryVoltage: telemetry.currentValues['0x42']?.decoded,
-                            stft: telemetry.currentValues['0x06']?.decoded,
-                            ltft: telemetry.currentValues['0x07']?.decoded,
-                            activeDtcs: telemetry.dtcList.map((d) => d.dtc_code),
-                            milOn: telemetry.milOn,
-                            safetyLevel,
-                            activeAlerts: safetyAlerts.map((a) => a.title),
-                            isTripActive: Boolean(activeTrip),
-                            tripTitle: activeTrip?.title,
-                            assistantIdentity,
-                          },
-                          supportedPids:
-                            supportedList.length > 0
-                              ? supportedList
-                              : ['0x0C', '0x0D', '0x05', '0x42'],
-                          hasSufficientBaseline: true,
-                        })
-                        executeDuckingSpeech(b.text)
-                        toast({
-                          title: 'Boletim Emitido Manualmente',
-                          description: b.text,
-                        })
-                      }
-                    }}
-                    className="border-[#2B394A] text-xs h-7 px-2.5 text-gray-300 hover:text-white"
-                  >
-                    Ouvir Agora
-                  </Button>
-                </div>
+                  <span>Último Boletim Emitido</span>
+                </span>
+                <span className="text-[11px] font-mono text-gray-400">
+                  Frequência:{' '}
+                  {bulletinConfig.enabled ? `${bulletinConfig.effectiveMinutes} min` : 'Desativado'}
+                </span>
               </div>
 
-              {/* Seletor de Intervalos (Grandes Botões) */}
-              <div>
-                <span className="text-[11px] text-gray-400 uppercase font-semibold block mb-1.5">
-                  Frequência dos Boletins por Voz:
-                </span>
-                <div className="grid grid-cols-3 sm:grid-cols-7 gap-1.5">
-                  {(
-                    ['DESATIVADO', 5, 10, 20, 30, 60, 'PERSONALIZADO'] as BulletinIntervalOption[]
-                  ).map((opt) => (
-                    <button
-                      key={String(opt)}
-                      type="button"
-                      onClick={() => {
-                        if (opt === 'PERSONALIZADO') {
-                          const val = parseInt(customMinutesInput, 10) || 15
-                          bulletinServiceRef.current?.updateConfig({
-                            intervalOption: 'PERSONALIZADO',
-                            customMinutes: val,
-                          })
-                        } else {
-                          bulletinServiceRef.current?.updateConfig({
-                            intervalOption: opt,
-                          })
-                        }
-                      }}
-                      className={`py-2 px-1 text-center rounded-lg text-xs font-bold transition-all border ${
-                        bulletinConfig.intervalOption === opt
-                          ? 'bg-[#FFB300] text-black border-[#FFB300] shadow'
-                          : 'bg-[#0B0F14] text-gray-300 border-[#202B37] hover:bg-[#1C2633]'
-                      }`}
-                    >
-                      {opt === 'DESATIVADO'
-                        ? 'Desativado'
-                        : opt === 'PERSONALIZADO'
-                          ? 'Livre'
-                          : `${opt} min`}
-                    </button>
-                  ))}
-                </div>
-
-                {/* Campo para Intervalo Personalizado */}
-                {bulletinConfig.intervalOption === 'PERSONALIZADO' && (
-                  <div className="mt-2 flex items-center space-x-2 bg-[#0B0F14] p-2 rounded-lg border border-[#202B37]">
-                    <span className="text-xs text-gray-400">Minutos personalizados:</span>
-                    <input
-                      type="number"
-                      min={1}
-                      max={180}
-                      value={customMinutesInput}
-                      onChange={(e) => {
-                        setCustomMinutesInput(e.target.value)
-                        const val = parseInt(e.target.value, 10)
-                        if (val > 0) {
-                          bulletinServiceRef.current?.updateConfig({
-                            intervalOption: 'PERSONALIZADO',
-                            customMinutes: val,
-                          })
-                        }
-                      }}
-                      className="bg-[#121A24] border border-[#202B37] rounded px-2 py-1 text-xs text-white w-20 text-center font-mono focus:outline-none focus:border-[#FFB300]"
-                    />
-                    <span className="text-xs text-gray-400">minutos (1 a 180 min)</span>
+              {recentBulletins.length > 0 ? (
+                <div className="bg-[#0B0F14] p-2.5 rounded-lg border border-[#202B37] space-y-1">
+                  <div className="flex items-center justify-between text-[11px] text-gray-400 font-mono">
+                    <span className="text-[#FFB300] font-bold">
+                      [{recentBulletins[0].detailLevel}]
+                    </span>
+                    <span>
+                      {new Date(recentBulletins[0].timestampUtc).toLocaleTimeString('pt-BR')}
+                    </span>
                   </div>
-                )}
-              </div>
-
-              {/* Seletor de Nível de Detalhe (RESUMIDO / NORMAL / DETALHADO) */}
-              <div>
-                <span className="text-[11px] text-gray-400 uppercase font-semibold block mb-1.5">
-                  Nível de Detalhe:
-                </span>
-                <div className="grid grid-cols-3 gap-2">
-                  {(['RESUMIDO', 'NORMAL', 'DETALHADO'] as BulletinDetailLevel[]).map((lvl) => (
-                    <button
-                      key={lvl}
-                      type="button"
-                      onClick={() => {
-                        bulletinServiceRef.current?.updateConfig({
-                          detailLevel: lvl,
-                        })
-                      }}
-                      className={`py-2 px-2 text-center rounded-lg text-xs font-bold transition-all border ${
-                        bulletinConfig.detailLevel === lvl
-                          ? 'bg-cyan-500 text-black border-cyan-400 shadow'
-                          : 'bg-[#0B0F14] text-gray-300 border-[#202B37] hover:bg-[#1C2633]'
-                      }`}
+                  <p className="text-xs sm:text-sm text-gray-200 font-medium">
+                    {recentBulletins[0].text}
+                  </p>
+                  <div className="flex justify-end pt-1">
+                    <Button
+                      size="sm"
+                      variant="ghost"
+                      onClick={() => executeDuckingSpeech(recentBulletins[0].text)}
+                      className="text-xs text-cyan-300 hover:text-white h-7 px-2"
                     >
-                      {lvl === 'RESUMIDO' ? 'Resumido' : lvl === 'NORMAL' ? 'Normal' : 'Detalhado'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-
-              {/* Dica de Comandos de Voz da Assistente */}
-              <div className="bg-[#0B0F14] p-2.5 rounded-lg border border-[#202B37] text-[11px] text-gray-400 flex flex-wrap items-center justify-between gap-1">
-                <span>Comandos de voz aceitos:</span>
-                <span className="text-[#FFB300] font-mono">
-                  &quot;{assistantIdentity.wakeWord || 'nina'}, me avisa a cada 20 minutos&quot;
-                </span>
-                <span className="text-cyan-400 font-mono">
-                  &quot;{assistantIdentity.wakeWord || 'nina'}, deixa os boletins mais
-                  detalhados&quot;
-                </span>
-                <span className="text-red-400 font-mono">
-                  &quot;{assistantIdentity.wakeWord || 'nina'}, desativa os boletins&quot;
-                </span>
-              </div>
-            </div>
-
-            {/* Chat Messages */}
-            <div className="flex-1 bg-[#0B0F14] border border-[#202B37] rounded-xl p-4 overflow-y-auto space-y-3">
-              {assistantMessages.length === 0 ? (
-                <div className="flex flex-col items-center justify-center h-full text-center space-y-2 text-xs text-gray-400">
-                  <Bot className="w-8 h-8 text-[#FFB300]" />
-                  <p className="font-semibold text-white">
-                    Olá! Eu sou{' '}
-                    {assistantIdentity.isCustomized ? assistantIdentity.name : 'sua assistente'},
-                    sua copiloto no Network Car.
-                  </p>
-                  <p className="max-w-md">
-                    Experimente perguntar por voz ou texto:
-                    <br />
-                    <span className="text-[#FFB300] font-mono">
-                      &quot;{assistantIdentity.wakeWord || 'assistente'}, como está o carro?&quot;
-                    </span>
-                    <br />
-                    <span className="text-cyan-400 font-mono">
-                      &quot;{assistantIdentity.wakeWord || 'assistente'}, aconteceu alguma coisa
-                      diferente?&quot;
-                    </span>
-                    <br />
-                    <span className="text-purple-400 font-mono">
-                      &quot;{assistantIdentity.wakeWord || 'assistente'}, anima a viagem!&quot;
-                    </span>
-                  </p>
+                      <Volume2 className="w-3.5 h-3.5 mr-1" /> Repetir Voz
+                    </Button>
+                  </div>
                 </div>
               ) : (
-                assistantMessages.map((msg) => (
+                <div className="text-center py-2.5 text-xs text-gray-400">
+                  Nenhum boletim emitido ainda nesta sessão. Os boletins são anunciados
+                  automaticamente ou sob comando.
+                </div>
+              )}
+            </div>
+
+            {/* Caixa de Mensagens / Diálogo por Toque */}
+            <div className="flex-1 bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 overflow-y-auto no-scrollbar space-y-1.5 min-h-[60px] max-h-36">
+              {assistantMessages.length === 0 ? (
+                <div className="text-center py-4 text-xs text-gray-400">
+                  Diga &quot;{assistantIdentity.wakeWord || 'assistente'}, como está o carro?&quot;
+                  ou toque no botão acima.
+                </div>
+              ) : (
+                assistantMessages.slice(-6).map((msg) => (
                   <div
                     key={msg.id}
                     className={`flex flex-col ${msg.role === 'user' ? 'items-end' : 'items-start'}`}
                   >
                     <div
-                      className={`max-w-[85%] rounded-xl px-4 py-2.5 text-xs ${
+                      className={`max-w-[85%] rounded-xl px-3 py-1.5 text-xs ${
                         msg.role === 'user'
-                          ? 'bg-[#FFB300] text-black font-medium'
+                          ? 'bg-[#FFB300] text-black font-semibold'
                           : 'bg-[#121A24] border border-[#202B37] text-gray-200'
                       }`}
                     >
                       {msg.content}
                     </div>
-                    <span className="text-[10px] text-gray-400 px-1 mt-0.5 font-mono">
-                      {new Date(msg.timestamp).toLocaleTimeString('pt-BR')}
-                    </span>
                   </div>
                 ))
               )}
             </div>
 
-            {/* Chat Input */}
-            <div className="flex items-center space-x-2">
-              <input
-                type="text"
-                placeholder={`Converse com ${getAssistantDisplayName(assistantIdentity)} ou digite um comando...`}
-                value={assistantInput}
-                disabled={isAssistantLoading}
-                onChange={(e) => setAssistantInput(e.target.value)}
-                onKeyDown={(e) => e.key === 'Enter' && handleSendAssistantMessage()}
-                className="flex-1 bg-[#121A24] border border-[#202B37] rounded-xl px-4 py-2.5 text-xs text-white focus:outline-none focus:border-[#FFB300]"
-              />
-              <Button
-                size="sm"
-                disabled={isAssistantLoading || !assistantInput.trim()}
-                onClick={() => handleSendAssistantMessage()}
-                className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold h-10 px-4 rounded-xl"
-              >
-                Enviar
-              </Button>
-            </div>
+            {/* Input Rápido (em modo passageiro ou parado) */}
+            {(!isVehicleMoving || isPassengerMode) && (
+              <div className="flex items-center space-x-2 shrink-0">
+                <input
+                  type="text"
+                  placeholder={`Digite um comando para ${assistantTabLabel}...`}
+                  value={assistantInput}
+                  disabled={isAssistantLoading}
+                  onChange={(e) => setAssistantInput(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleSendAssistantMessage()}
+                  className="flex-1 bg-[#121A24] border border-[#202B37] rounded-xl px-4 py-2 text-xs text-white focus:outline-none focus:border-[#FFB300]"
+                />
+                <Button
+                  size="sm"
+                  disabled={isAssistantLoading || !assistantInput.trim()}
+                  onClick={() => handleSendAssistantMessage()}
+                  className="btn-touch-automotive bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold h-9 px-4 rounded-xl"
+                >
+                  Enviar
+                </Button>
+              </div>
+            )}
           </div>
         )}
       </main>
 
-      {/* Barra Inferior com Grandes Botões Automotivos (Drive Interface) */}
-      <nav className="bg-[#0E141C] border-t border-[#202B37] px-4 py-2 flex items-center justify-around">
+      {/* ============================================================== */}
+      {/* 4. BARRA DE NAVEGAÇÃO HORIZONTAL AUTOMOTIVA: CARRO | VIAGEM | DIVERSÃO | ASSISTENTE */}
+      {/* ============================================================== */}
+      <nav className="safe-area-pb safe-area-pl safe-area-pr bg-[#0E141C] border-t border-[#202B37] px-2 sm:px-4 py-1.5 flex items-center justify-around shrink-0 z-40">
+        {/* Aba 1: CARRO */}
         <button
           type="button"
           onClick={() => setActiveTab('CARRO')}
-          className={`flex flex-col items-center justify-center py-2 px-6 rounded-xl transition-all ${
+          className={`btn-touch-automotive flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
             activeTab === 'CARRO'
-              ? 'bg-[#1C2633] text-[#FFB300] font-black'
+              ? 'bg-[#1C2633] text-[#FFB300] font-black border border-[#FFB300]/40 shadow'
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          <Car className="w-5 h-5 mb-1" />
-          <span className="text-xs uppercase tracking-wider">CARRO</span>
+          <Car className="w-5 h-5 mb-0.5" />
+          <span className="text-[11px] sm:text-xs uppercase tracking-wider">CARRO</span>
         </button>
 
+        {/* Aba 2: VIAGEM */}
         <button
           type="button"
           onClick={() => setActiveTab('VIAGEM')}
-          className={`flex flex-col items-center justify-center py-2 px-6 rounded-xl transition-all ${
+          className={`btn-touch-automotive flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
             activeTab === 'VIAGEM'
-              ? 'bg-[#1C2633] text-[#FFB300] font-black'
+              ? 'bg-[#1C2633] text-[#FFB300] font-black border border-[#FFB300]/40 shadow'
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          <Compass className="w-5 h-5 mb-1" />
-          <span className="text-xs uppercase tracking-wider">VIAGEM</span>
+          <Compass className="w-5 h-5 mb-0.5" />
+          <span className="text-[11px] sm:text-xs uppercase tracking-wider">VIAGEM</span>
         </button>
 
+        {/* Aba 3: DIVERSÃO */}
         <button
           type="button"
-          onClick={() => setActiveTab('ENTRETENIMENTO')}
-          className={`flex flex-col items-center justify-center py-2 px-6 rounded-xl transition-all ${
-            activeTab === 'ENTRETENIMENTO'
-              ? 'bg-[#1C2633] text-[#FFB300] font-black'
+          onClick={() => setActiveTab('DIVERSAO')}
+          className={`btn-touch-automotive flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
+            activeTab === 'DIVERSAO'
+              ? 'bg-[#1C2633] text-[#FFB300] font-black border border-[#FFB300]/40 shadow'
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          <Music className="w-5 h-5 mb-1" />
-          <span className="text-xs uppercase tracking-wider">DIVERSÃO</span>
+          <Music className="w-5 h-5 mb-0.5" />
+          <span className="text-[11px] sm:text-xs uppercase tracking-wider">DIVERSÃO</span>
         </button>
 
+        {/* Aba 4: ASSISTENTE (Dinâmica: Assume nome personalizado como "LUNA" ou neutro "ASSISTENTE") */}
         <button
           type="button"
-          onClick={() => setActiveTab('NINA')}
-          className={`flex flex-col items-center justify-center py-2 px-6 rounded-xl transition-all ${
-            activeTab === 'NINA'
-              ? 'bg-[#1C2633] text-[#FFB300] font-black'
+          onClick={() => setActiveTab('ASSISTENTE')}
+          className={`btn-touch-automotive flex-1 flex flex-col items-center justify-center py-1.5 px-2 rounded-xl transition-all ${
+            activeTab === 'ASSISTENTE'
+              ? 'bg-[#1C2633] text-[#FFB300] font-black border border-[#FFB300]/40 shadow'
               : 'text-gray-400 hover:text-white'
           }`}
         >
-          <Bot className="w-5 h-5 mb-1" />
-          <span className="text-xs uppercase tracking-wider">
-            {getAssistantDisplayName(assistantIdentity, true)}
+          <Bot className="w-5 h-5 mb-0.5" />
+          <span className="text-[11px] sm:text-xs uppercase tracking-wider truncate max-w-[120px]">
+            {assistantTabLabel}
           </span>
         </button>
       </nav>
 
-      {/* Modal de Personalização da Assistente */}
+      {/* Modal de Personalização Minha Assistente (E6.2) */}
       <AssistantSettingsModal
         open={assistantModalOpen}
         onOpenChange={setAssistantModalOpen}
@@ -1374,8 +1514,8 @@ export const NetworkCarDrive: React.FC = () => {
           assistantRef.current?.setIdentity(newIdentity)
           bulletinServiceRef.current?.setIdentity(newIdentity)
           toast({
-            title: 'Assistente Configurada',
-            description: `Identidade atualizada para "${newIdentity.name}" (Wake Word: "${newIdentity.wakeWord}", Estilo: ${newIdentity.style}).`,
+            title: 'Assistente Atualizada',
+            description: `Identidade configurada para "${newIdentity.name}".`,
           })
         }}
       />

@@ -29,18 +29,57 @@
   }
 
   body {
-    background-color: #0b0f14;
+    background-color: #080b0f;
     color: #f2f5f7;
     font-family:
       'Inter',
       -apple-system,
       BlinkMacSystemFont,
       sans-serif;
+    -webkit-tap-highlight-color: transparent;
+    touch-action: manipulation;
+    overscroll-behavior-y: none;
+  }
+
+  /* Suporte a Safe Areas e telas automotivas Android / Head Unit */
+  .safe-area-pt {
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+  }
+  .safe-area-pb {
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+  }
+  .safe-area-pl {
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+  }
+  .safe-area-pr {
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
+  }
+  .safe-area-inset {
+    padding-top: max(0.5rem, env(safe-area-inset-top, 0px));
+    padding-bottom: max(0.5rem, env(safe-area-inset-bottom, 0px));
+    padding-left: max(0.75rem, env(safe-area-inset-left, 0px));
+    padding-right: max(0.75rem, env(safe-area-inset-right, 0px));
   }
 
   .tabular-nums {
     font-variant-numeric: tabular-nums;
     font-family: 'JetBrains Mono', monospace;
+  }
+
+  /* Head Unit touch target mínimo de 48px/56px para botões automotivos */
+  .btn-touch-automotive {
+    min-height: 48px;
+    min-width: 48px;
+    touch-action: manipulation;
+  }
+
+  /* Ocultar barra de rolagem mantendo scroll funcional quando necessário */
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
+  .no-scrollbar {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
   }
 
   section[aria-label='Notifications alt+T'] {
