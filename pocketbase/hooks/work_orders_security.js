@@ -9,6 +9,7 @@ const COMMERCIAL_COLLECTIONS = [
   'parts_catalog',
   'vehicle_receptions',
   'work_order_audits',
+  'trip_sessions',
 ]
 
 for (let i = 0; i < COMMERCIAL_COLLECTIONS.length; i++) {

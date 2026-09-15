@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-15T14:09:01.840Z",
+  "generatedAt": "2026-09-15T17:51:09.794Z",
   "collections": [
     {
       "name": "users",
@@ -1942,11 +1942,11 @@
       "name": "trip_sessions",
       "type": "base",
       "apiRules": {
-        "list": "@request.auth.id != ''",
-        "view": "@request.auth.id != ''",
+        "list": "@request.auth.id != '' && (@request.auth.workshop_id = '' || workshop_id = '' || workshop_id = @request.auth.workshop_id)",
+        "view": "@request.auth.id != '' && (@request.auth.workshop_id = '' || workshop_id = '' || workshop_id = @request.auth.workshop_id)",
         "create": "@request.auth.id != ''",
-        "update": "@request.auth.id != ''",
-        "delete": "@request.auth.id != ''"
+        "update": "@request.auth.id != '' && (@request.auth.workshop_id = '' || workshop_id = '' || workshop_id = @request.auth.workshop_id)",
+        "delete": "@request.auth.id != '' && (@request.auth.workshop_id = '' || workshop_id = '' || workshop_id = @request.auth.workshop_id)"
       },
       "fields": [
         {
@@ -2072,12 +2072,118 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "workshop_id",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "origin",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "destination",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_price_per_liter",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_type",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["GASOLINA", "ETANOL", "DIESEL", "GNV", "OUTRO"]
+        },
+        {
+          "name": "consumption_source",
+          "type": "select",
+          "required": false,
+          "system": false,
+          "selectValues": ["AUTOMATICO_OBD", "MANUAL_INFORMADO", "ESTIMADO_HISTORICO"]
+        },
+        {
+          "name": "avg_consumption_kml",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estimated_distance_km",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estimated_cost_fuel",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estimated_cost_tolls",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "estimated_cost_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "real_fuel_liters",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel_cost_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tolls_total",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "total_cost",
+          "type": "number",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "tolls_breakdown",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cost_summary_report",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
         "CREATE UNIQUE INDEX idx_trip_id ON trip_sessions (trip_id)",
         "CREATE INDEX idx_trip_status ON trip_sessions (status)",
-        "CREATE INDEX idx_trip_started ON trip_sessions (started_at)"
+        "CREATE INDEX idx_trip_started ON trip_sessions (started_at)",
+        "CREATE INDEX `idx_trip_workshop` ON `trip_sessions` (workshop_id)",
+        "CREATE INDEX `idx_trip_vehicle_ended` ON `trip_sessions` (vehicle_plate, ended_at)"
       ]
     },
     {

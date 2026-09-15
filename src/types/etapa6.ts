@@ -168,6 +168,24 @@ export interface TripSessionModel {
   stop_count: number
   total_events_count: number
   critical_alerts_count: number
+  // OS-ME001-E6.5: Custo Inteligente de Viagem
+  workshop_id?: string
+  origin?: string
+  destination?: string
+  fuel_price_per_liter?: number
+  fuel_type?: 'GASOLINA' | 'ETANOL' | 'DIESEL' | 'GNV' | 'OUTRO'
+  consumption_source?: 'AUTOMATICO_OBD' | 'MANUAL_INFORMADO' | 'ESTIMADO_HISTORICO'
+  avg_consumption_kml?: number
+  estimated_distance_km?: number
+  estimated_cost_fuel?: number
+  estimated_cost_tolls?: number
+  estimated_cost_total?: number
+  real_fuel_liters?: number
+  fuel_cost_total?: number
+  tolls_total?: number
+  total_cost?: number
+  tolls_breakdown?: TollItem[]
+  cost_summary_report?: TripCostSummaryReport
   telemetry_summary?: {
     avgRpm?: number
     maxRpm?: number
@@ -266,6 +284,47 @@ export interface AssistantIdentityConfig {
   isCustomized: boolean
   /** Data da última atualização da identidade */
   updatedAtUtc?: string
+}
+
+// OS-ME001-E6.5: Tipos de Custo de Viagem, Pedágios e Origens de Consumo
+export interface TollItem {
+  id: string
+  name: string
+  amount: number
+  createdAtUtc: string
+  source?: 'MANUAL' | 'AUTOMATICO'
+}
+
+export type ConsumptionSourceType = 'AUTOMATICO_OBD' | 'MANUAL_INFORMADO' | 'ESTIMADO_HISTORICO'
+
+export type FuelType = 'GASOLINA' | 'ETANOL' | 'DIESEL' | 'GNV' | 'OUTRO'
+
+export type DataOriginBadge = 'MEDIDO' | 'ESTIMADO' | 'INFORMADO'
+
+export interface TripCostSummaryReport {
+  origin: string
+  destination: string
+  distanceKm: number
+  distanceOrigin: DataOriginBadge
+  durationFormatted: string
+  durationOrigin: DataOriginBadge
+  avgConsumptionKml: number
+  consumptionOrigin: DataOriginBadge // INFORMADO vs MEDIDO
+  consumptionSourceLabel: 'Consumo automático' | 'Consumo informado'
+  fuelPricePerLiter: number
+  fuelPriceOrigin: DataOriginBadge
+  fuelLitersUsed: number
+  fuelLitersOrigin: DataOriginBadge
+  fuelCost: number
+  fuelCostOrigin: DataOriginBadge
+  tollsTotal: number
+  tollsCount: number
+  tollsOrigin: DataOriginBadge
+  totalCost: number
+  totalCostOrigin: DataOriginBadge
+  estimatedTotalCost?: number
+  costDifference?: number // Real - Estimado (ex: -6.30)
+  closedAtUtc: string
 }
 
 export interface CopilotContext {

@@ -55,6 +55,8 @@ import {
   getAssistantDisplayName,
 } from '@/lib/assistant/assistant-identity-store'
 import { AssistantSettingsModal } from '@/components/assistant/AssistantSettingsModal'
+import { TripCostPanel } from '@/components/trip/TripCostPanel'
+import { TripFinishedSummaryModal } from '@/components/trip/TripFinishedSummaryModal'
 import {
   TRAVEL_QUIZ_QUESTIONS,
   EXTERNAL_MEDIA_SHORTCUTS,
@@ -69,6 +71,9 @@ import {
   NinaBulletinConfig,
   NinaBulletinPayload,
   AssistantIdentityConfig,
+  FuelType,
+  ConsumptionSourceType,
+  TripCostSummaryReport,
 } from '@/types/etapa6'
 
 export const NetworkCarDrive: React.FC = () => {
@@ -114,6 +119,20 @@ export const NetworkCarDrive: React.FC = () => {
   const [safetyAlerts, setSafetyAlerts] = useState<SafetyAlert[]>([])
   const [activeTrip, setActiveTrip] = useState<TripSessionModel | null>(null)
   const [diaryEntries, setDiaryEntries] = useState<TripDiaryEntryModel[]>([])
+  const [finishedCostReport, setFinishedCostReport] = useState<TripCostSummaryReport | null>(null)
+  const [showFinishedCostModal, setShowFinishedCostModal] = useState(false)
+  const [tripHistoryList, setTripHistoryList] = useState<TripSessionModel[]>([])
+
+  // Sincroniza viagem ativa e histórico do tripManager
+  useEffect(() => {
+    const current = tripManagerRef.current.getActiveTrip()
+    if (current) {
+      setActiveTrip(current)
+      setDiaryEntries(tripManagerRef.current.getDiaryEntries())
+    }
+    const hist = tripManagerRef.current.getLocalTripHistory(selectedVehicle?.plate)
+    setTripHistoryList(hist)
+  }, [selectedVehicle?.plate])
 
   // Estados de Boletins e Ducking de Áudio
   const [bulletinConfig, setBulletinConfig] = useState<NinaBulletinConfig>({
@@ -388,15 +407,78 @@ export const NetworkCarDrive: React.FC = () => {
 
   const isVehicleMoving = (rawSpeed || 0) > 5
 
-  // Ações de viagem
-  const handleToggleTrip = () => {
-    if (activeTrip && activeTrip.status === 'EM_ANDAMENTO') {
-      const finished = tripManagerRef.current.endTrip()
+  // Ações de viagem (Custo Inteligente E6.5)
+  const handleStartCostTrip = (params: {
+    title: string
+    origin: string
+    destination: string
+    fuelPricePerLiter: number
+    fuelType: FuelType
+    consumptionKml: number
+    consumptionSource: ConsumptionSourceType
+    estimatedDistanceKm?: number
+    estimatedTolls?: number
+  }) => {
+    const newTrip = tripManagerRef.current.startTrip({
+      title: params.title,
+      origin: params.origin,
+      destination: params.destination,
+      vehiclePlate: selectedVehicle?.plate,
+      vehicleId: selectedVehicle?.id,
+      initialOdometerKm: selectedVehicle?.odometer_km,
+      fuelPricePerLiter: params.fuelPricePerLiter,
+      fuelType: params.fuelType,
+      consumptionKml: params.consumptionKml,
+      consumptionSource: params.consumptionSource,
+      estimatedDistanceKm: params.estimatedDistanceKm,
+      estimatedTolls: params.estimatedTolls,
+    })
+    setActiveTrip(newTrip)
+    toast({
+      title: 'Viagem Iniciada com Custo Inteligente',
+      description: `${params.origin} → ${params.destination} • Preço: R$ ${params.fuelPricePerLiter.toFixed(2)}/L`,
+    })
+  }
+
+  const handleEndCostTrip = () => {
+    const finished = tripManagerRef.current.endTrip()
+    if (finished) {
+      if (finished.cost_summary_report) {
+        setFinishedCostReport(finished.cost_summary_report)
+        setShowFinishedCostModal(true)
+      }
+      setTripHistoryList(tripManagerRef.current.getLocalTripHistory(selectedVehicle?.plate))
       setActiveTrip(null)
       toast({
-        title: 'Viagem Concluída',
-        description: `Distância: ${finished?.distance_km} km | Duração: ${Math.floor((finished?.duration_seconds || 0) / 60)} min`,
+        title: 'Viagem Finalizada',
+        description: `Total: R$ ${(finished.total_cost || 0).toFixed(2)} • Distância: ${finished.distance_km} km`,
       })
+    }
+  }
+
+  const handleAddTollCost = (amount: number, name?: string) => {
+    const toll = tripManagerRef.current.addToll(amount, name)
+    if (toll) {
+      setActiveTrip({ ...tripManagerRef.current.getActiveTrip()! })
+      toast({
+        title: 'Pedágio Adicionado',
+        description: `${toll.name}: R$ ${toll.amount.toFixed(2)}`,
+      })
+    }
+  }
+
+  const handleUpdateFuelPrice = (price: number) => {
+    tripManagerRef.current.updateFuelPrice(price)
+    setActiveTrip({ ...tripManagerRef.current.getActiveTrip()! })
+    toast({
+      title: 'Preço Atualizado',
+      description: `Novo preço do combustível: R$ ${price.toFixed(2)}/L`,
+    })
+  }
+
+  const handleToggleTrip = () => {
+    if (activeTrip && activeTrip.status === 'EM_ANDAMENTO') {
+      handleEndCostTrip()
     } else {
       const newTrip = tripManagerRef.current.startTrip({
         title: `Viagem ${new Date().toLocaleDateString('pt-BR')}`,
@@ -959,100 +1041,19 @@ export const NetworkCarDrive: React.FC = () => {
         {/* ========================= ABA: VIAGEM ========================= */}
         {activeTab === 'VIAGEM' && (
           <div className="flex-1 flex flex-col justify-between max-w-6xl mx-auto w-full gap-2 sm:gap-3 min-h-0">
-            {/* Header / Controle de Iniciar/Finalizar Viagem */}
-            <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 flex flex-col sm:flex-row items-center justify-between gap-2.5 shrink-0">
-              <div>
-                <span className="text-xs font-bold text-[#FFB300] uppercase tracking-wider block mb-0.5">
-                  Modo Viagem Automotivo
-                </span>
-                <div className="text-base sm:text-lg font-black text-white">
-                  {activeTrip ? activeTrip.title : 'Nenhuma viagem em andamento'}
-                </div>
-                <div className="text-[11px] sm:text-xs text-gray-400">
-                  {activeTrip
-                    ? `Em andamento desde ${new Date(activeTrip.started_at).toLocaleTimeString('pt-BR')} • Paradas: ${activeTrip.stop_count}`
-                    : 'Inicie a viagem para registrar duração, distância, paradas e consumo estimado.'}
-                </div>
-              </div>
-
-              {/* Botão de Toque Grande para Iniciar / Parar Viagem */}
-              <Button
-                size="lg"
-                onClick={handleToggleTrip}
-                className={`btn-touch-automotive font-black tracking-wider text-xs sm:text-sm px-6 rounded-xl shadow-lg shrink-0 ${
-                  activeTrip
-                    ? 'bg-red-600 hover:bg-red-700 text-white'
-                    : 'bg-[#2ECC71] hover:bg-[#27ae60] text-black'
-                }`}
-              >
-                {activeTrip ? (
-                  <>
-                    <Square className="w-4 h-4 mr-2 fill-current" />
-                    FINALIZAR VIAGEM
-                  </>
-                ) : (
-                  <>
-                    <Play className="w-4 h-4 mr-2 fill-current" />
-                    INICIAR VIAGEM
-                  </>
-                )}
-              </Button>
-            </div>
-
-            {/* Métricas Principais da Viagem */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-2 sm:gap-2.5 shrink-0">
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
-                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
-                  Distância
-                </span>
-                <div className="flex items-baseline space-x-1 my-0.5">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-white">
-                    {activeTrip ? activeTrip.distance_km : '0.0'}
-                  </span>
-                  <span className="text-xs text-gray-400 font-bold font-mono">km</span>
-                </div>
-                <span className="text-[10px] text-gray-500 font-mono">Baseado em OBD</span>
-              </div>
-
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
-                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
-                  Duração
-                </span>
-                <div className="my-0.5">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-cyan-400">
-                    {activeTrip ? `${Math.floor(activeTrip.duration_seconds / 60)}` : '0'}
-                  </span>
-                  <span className="text-xs text-gray-400 font-bold font-mono ml-1">min</span>
-                </div>
-                <span className="text-[10px] text-gray-500 font-mono">Tempo decorrido</span>
-              </div>
-
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
-                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
-                  Velocidade Média
-                </span>
-                <div className="flex items-baseline space-x-1 my-0.5">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-white">
-                    {activeTrip ? activeTrip.avg_speed_kmh : '0'}
-                  </span>
-                  <span className="text-xs text-gray-400 font-bold font-mono">km/h</span>
-                </div>
-                <span className="text-[10px] text-gray-500 font-mono">Média em movimento</span>
-              </div>
-
-              <div className="bg-[#0B0F14] border border-[#202B37] rounded-xl p-2.5 sm:p-3">
-                <span className="text-[10px] sm:text-xs text-gray-400 font-medium block">
-                  Consumo Estimado
-                </span>
-                <div className="flex items-baseline space-x-1 my-0.5">
-                  <span className="text-2xl sm:text-3xl font-black font-mono text-[#FFB300]">
-                    {activeTrip ? activeTrip.estimated_fuel_liters : '0.0'}
-                  </span>
-                  <span className="text-xs text-gray-400 font-bold font-mono">L</span>
-                </div>
-                <span className="text-[10px] text-gray-500 font-mono">Estimativa MAF/Vel.</span>
-              </div>
-            </div>
+            {/* Painel Centralizado de Custo Inteligente de Viagem (OS-ME001-E6.5) */}
+            <TripCostPanel
+              activeTrip={activeTrip}
+              vehiclePlate={selectedVehicle?.plate}
+              isVehicleMoving={isVehicleMoving}
+              isPassengerMode={isPassengerMode}
+              isNightMode={isNightMode}
+              onStartTrip={handleStartCostTrip}
+              onEndTrip={handleEndCostTrip}
+              onAddToll={handleAddTollCost}
+              onUpdateFuelPrice={handleUpdateFuelPrice}
+              tripHistory={tripHistoryList}
+            />
 
             {/* Diário e Paradas: Durante movimento reduz elementos interativos */}
             <div className="bg-[#121A24] border border-[#202B37] rounded-xl p-3 sm:p-3.5 space-y-2 flex-1 min-h-0 flex flex-col justify-between">
@@ -1118,7 +1119,7 @@ export const NetworkCarDrive: React.FC = () => {
               )}
 
               {/* Lista dos últimos momentos registrados */}
-              <div className="space-y-1 overflow-y-auto no-scrollbar max-h-28 flex-1">
+              <div className="space-y-1 overflow-y-auto no-scrollbar max-h-24 flex-1">
                 {diaryEntries.length === 0 ? (
                   <div className="text-center py-2 text-xs text-gray-400">
                     Nenhuma parada registrada nesta viagem.
@@ -1518,6 +1519,13 @@ export const NetworkCarDrive: React.FC = () => {
             description: `Identidade configurada para "${newIdentity.name}".`,
           })
         }}
+      />
+
+      {/* Modal de Resumo da Viagem com Custo (E6.5) */}
+      <TripFinishedSummaryModal
+        isOpen={showFinishedCostModal}
+        report={finishedCostReport}
+        onClose={() => setShowFinishedCostModal(false)}
       />
     </div>
   )
