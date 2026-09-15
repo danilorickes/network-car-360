@@ -114,6 +114,7 @@ const App = () => (
                 </ProtectedRoute>
               }
             />
+            <Route path="/network-car-drive" element={<Navigate to="/drive" replace />} />
 
             <Route element={<Layout />}>
               {/* E6: Homologação de Hardware e Simulador Drive Integrados ao Painel */}
