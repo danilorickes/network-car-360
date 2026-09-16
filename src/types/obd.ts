@@ -10,7 +10,11 @@ export type EventType =
   | 'outro/livre'
 
 export type SessionStatus = 'ATIVO' | 'ENCERRADO' | 'INTERROMPIDO'
-export type AdapterType = 'SIMULADOR' | 'OBD REAL' | 'OBD REAL BLUETOOTH'
+export type AdapterType =
+  | 'SIMULADOR'
+  | 'OBD REAL'
+  | 'OBD REAL BLUETOOTH'
+  | 'OBD REAL BLUETOOTH CLASSIC'
 export type DtcStatus = 'ATIVO' | 'PENDENTE'
 
 export interface PidDefinition {
@@ -73,6 +77,8 @@ export interface RawSampleModel {
   decoded_value?: number
   unit?: string
   quality: SampleQuality
+  origin?: 'REAL' | 'SIMULATED'
+  maintenance_stage?: 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO' | 'PADRAO'
   created?: string
 }
 

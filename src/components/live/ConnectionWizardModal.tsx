@@ -11,8 +11,10 @@ import { ConnectionDiscoveryWizard } from '@/lib/obd/connection-discovery-wizard
 import { SimulatedTransport } from '@/lib/obd/transports/simulated-transport'
 import { BluetoothTransport } from '@/lib/obd/transports/bluetooth-transport'
 import { RealSerialTransport } from '@/lib/obd/transports/real-serial-transport'
+import { AndroidBluetoothTransport } from '@/lib/obd/transports/android-bluetooth-transport'
 import { AndroidNativeTransport } from '@/lib/obd/transports/android-native-transport'
 import { ConnectionWizardStep, ConnectionDiscoveryResult } from '@/types/etapa6'
+import { useTelemetry } from '@/contexts/TelemetryContext'
 import {
   Wifi,
   CheckCircle2,
@@ -36,9 +38,14 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
   onClose,
   onConnectionSuccess,
 }) => {
+  const { setTransportType, startSession } = useTelemetry()
   const [selectedTransport, setSelectedTransport] = useState<
-    'SIMULADOR' | 'BLE' | 'USB_SERIAL' | 'ANDROID_NATIVE'
-  >('SIMULADOR')
+    'SIMULADOR' | 'BLUETOOTH_CLASSIC' | 'BLE' | 'USB_SERIAL' | 'ANDROID_NATIVE'
+  >('BLUETOOTH_CLASSIC')
+  const [maintenanceStage, setMaintenanceStage] = useState<
+    'PADRAO' | 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO'
+  >('PADRAO')
+  const btEnv = AndroidBluetoothTransport.inspectEnvironment()
   const [currentStep, setCurrentStep] = useState<ConnectionWizardStep>('SELECIONAR_TRANSPORTE')
   const [stepMessage, setStepMessage] = useState('Selecione o meio físico de conexão.')
   const [progress, setProgress] = useState(0)
@@ -61,6 +68,8 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
 
     if (selectedTransport === 'SIMULADOR') {
       transportInstance = new SimulatedTransport('NORMAL')
+    } else if (selectedTransport === 'BLUETOOTH_CLASSIC') {
+      transportInstance = new AndroidBluetoothTransport()
     } else if (selectedTransport === 'BLE') {
       transportInstance = new BluetoothTransport()
     } else if (selectedTransport === 'USB_SERIAL') {
@@ -81,7 +90,18 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
     setResult(res)
     setIsDiscovering(false)
     if (res.step === 'CONECTADO' || res.step === 'CONEXAO_LIMITADA') {
+      const mediumMap: Record<string, any> = {
+        SIMULADOR: 'SIMULADOR',
+        BLUETOOTH_CLASSIC: 'OBD REAL BLUETOOTH CLASSIC',
+        BLE: 'OBD REAL BLUETOOTH',
+        USB_SERIAL: 'OBD REAL',
+        ANDROID_NATIVE: 'OBD REAL',
+      }
+      setTransportType(mediumMap[selectedTransport] || 'SIMULADOR')
       onConnectionSuccess(res)
+      if (maintenanceStage !== 'PADRAO') {
+        startSession(undefined, maintenanceStage)
+      }
     }
   }
 
@@ -106,7 +126,39 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
               <label className="text-xs font-semibold text-gray-300 block">
                 Escolha o Adaptador / Transporte:
               </label>
-              <div className="grid grid-cols-2 gap-2">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                {/* Opção 1: ELM327 Bluetooth Classic (SPP/RFCOMM) — Homologado Ford EcoSport + Xiaomi */}
+                <button
+                  type="button"
+                  onClick={() => setSelectedTransport('BLUETOOTH_CLASSIC')}
+                  className={`p-3 rounded-lg border text-left flex flex-col justify-between transition-all col-span-1 sm:col-span-2 ${
+                    selectedTransport === 'BLUETOOTH_CLASSIC'
+                      ? 'bg-amber-950/60 border-[#FFB300] text-white ring-1 ring-[#FFB300]'
+                      : 'bg-[#0B0F14] border-[#263340] text-[#9AA7B4] hover:bg-[#1A232E]'
+                  }`}
+                >
+                  <div className="flex items-center justify-between mb-1">
+                    <div className="flex items-center space-x-2">
+                      <Bluetooth className="w-4 h-4 text-[#FFB300]" />
+                      <span className="text-xs font-bold text-white">
+                        ELM327 Bluetooth Classic (SPP / Android)
+                      </span>
+                    </div>
+                    <span className="text-[10px] bg-[#FFB300] text-black font-extrabold px-1.5 py-0.2 rounded font-mono">
+                      PILOTO ECOSPORT
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-gray-300">
+                    Adaptador ELM327 Mini Bluetooth pareado no Android (RFCOMM Chrome 138+ / Ponte
+                    Nativa)
+                  </span>
+                  {selectedTransport === 'BLUETOOTH_CLASSIC' && (
+                    <div className="mt-2 text-[11px] text-amber-200/90 bg-[#121A24] p-2 rounded border border-amber-800/60">
+                      <strong>Diagnóstico Técnico do Navegador:</strong> {btEnv.diagnosticMessage}
+                    </div>
+                  )}
+                </button>
+
                 <button
                   type="button"
                   onClick={() => setSelectedTransport('SIMULADOR')}
@@ -136,7 +188,7 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
                 >
                   <div className="flex items-center space-x-2 mb-1">
                     <Bluetooth className="w-4 h-4 text-cyan-400" />
-                    <span className="text-xs font-bold">Bluetooth BLE</span>
+                    <span className="text-xs font-bold">Bluetooth BLE (GATT)</span>
                   </div>
                   <span className="text-[11px] text-gray-400">
                     Vgate iCar Pro, Veepeak, BLE4.0+
@@ -170,10 +222,61 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
                 >
                   <div className="flex items-center space-x-2 mb-1">
                     <Smartphone className="w-4 h-4 text-emerald-400" />
-                    <span className="text-xs font-bold">Android Nativo SPP</span>
+                    <span className="text-xs font-bold">Ponte Nativa Android</span>
                   </div>
-                  <span className="text-[11px] text-gray-400">Multimídias e tablets Android</span>
+                  <span className="text-[11px] text-gray-400">Wrapper APK / Webview Interface</span>
                 </button>
+              </div>
+
+              {/* Seletor de Gravação Diagnóstica: ANTES vs DEPOIS DA MANUTENÇÃO */}
+              <div className="bg-[#121A24] border border-[#202B37] rounded-lg p-3 space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-xs font-bold text-gray-200">
+                    Modo de Gravação Diagnóstica (E7):
+                  </span>
+                  <span className="text-[10px] font-mono text-[#FFB300] bg-amber-950/60 px-1.5 py-0.5 rounded border border-amber-800/60">
+                    COMPARAÇÃO COMPORTAMENTAL
+                  </span>
+                </div>
+                <div className="grid grid-cols-3 gap-1.5 text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setMaintenanceStage('PADRAO')}
+                    className={`py-1.5 px-2 rounded border font-semibold text-center transition-all ${
+                      maintenanceStage === 'PADRAO'
+                        ? 'bg-blue-950/70 border-blue-500 text-white'
+                        : 'bg-[#0B0F14] border-[#263340] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Padrão
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMaintenanceStage('ANTES_MANUTENCAO')}
+                    className={`py-1.5 px-2 rounded border font-semibold text-center transition-all ${
+                      maintenanceStage === 'ANTES_MANUTENCAO'
+                        ? 'bg-amber-950/80 border-[#FFB300] text-white ring-1 ring-[#FFB300]'
+                        : 'bg-[#0B0F14] border-[#263340] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Antes da Manutenção
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setMaintenanceStage('DEPOIS_MANUTENCAO')}
+                    className={`py-1.5 px-2 rounded border font-semibold text-center transition-all ${
+                      maintenanceStage === 'DEPOIS_MANUTENCAO'
+                        ? 'bg-emerald-950/80 border-emerald-500 text-white ring-1 ring-emerald-500'
+                        : 'bg-[#0B0F14] border-[#263340] text-gray-400 hover:text-white'
+                    }`}
+                  >
+                    Depois da Manutenção
+                  </button>
+                </div>
+                <p className="text-[11px] text-gray-400">
+                  Permite gravar telemetria com timestamp carimbado para comparar o comportamento do
+                  veículo antes e após a intervenção técnica na oficina.
+                </p>
               </div>
 
               <div className="bg-[#0B0F14] p-3 rounded-lg border border-[#263340] text-xs text-[#9AA7B4] flex items-start space-x-2">

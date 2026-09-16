@@ -390,20 +390,40 @@ export const NetworkCarDrive: React.FC = () => {
   const isSimulated = telemetry.transportType === 'SIMULADOR'
 
   const rawSpeed = telemetry.currentValues['0x0D']?.decoded
-  const hasSpeedPid = isConnected && rawSpeed !== undefined
-  const displaySpeed = hasSpeedPid ? String(Math.round(rawSpeed)) : '—'
+  const speedQuality = telemetry.currentValues['0x0D']?.quality
+  const hasSpeedPid = isConnected && rawSpeed !== undefined && speedQuality === 'OK'
+  const displaySpeed = hasSpeedPid
+    ? String(Math.round(rawSpeed))
+    : speedQuality === 'UNSUPPORTED'
+      ? 'NÃO SUPORTADO'
+      : '—'
 
   const rawRpm = telemetry.currentValues['0x0C']?.decoded
-  const hasRpmPid = isConnected && rawRpm !== undefined
-  const displayRpm = hasRpmPid ? String(Math.round(rawRpm)) : '—'
+  const rpmQuality = telemetry.currentValues['0x0C']?.quality
+  const hasRpmPid = isConnected && rawRpm !== undefined && rpmQuality === 'OK'
+  const displayRpm = hasRpmPid
+    ? String(Math.round(rawRpm))
+    : rpmQuality === 'UNSUPPORTED'
+      ? 'NÃO SUPORTADO'
+      : '—'
 
   const rawCoolant = telemetry.currentValues['0x05']?.decoded
-  const hasCoolantPid = isConnected && rawCoolant !== undefined
-  const displayCoolant = hasCoolantPid ? String(Math.round(rawCoolant)) : '—'
+  const coolantQuality = telemetry.currentValues['0x05']?.quality
+  const hasCoolantPid = isConnected && rawCoolant !== undefined && coolantQuality === 'OK'
+  const displayCoolant = hasCoolantPid
+    ? String(Math.round(rawCoolant))
+    : coolantQuality === 'UNSUPPORTED'
+      ? 'NÃO SUPORTADO'
+      : '—'
 
   const rawVolt = telemetry.currentValues['0x42']?.decoded
-  const hasVoltPid = isConnected && rawVolt !== undefined
-  const displayVolt = hasVoltPid ? Number(rawVolt).toFixed(1) : '—'
+  const voltQuality = telemetry.currentValues['0x42']?.quality
+  const hasVoltPid = isConnected && rawVolt !== undefined && voltQuality === 'OK'
+  const displayVolt = hasVoltPid
+    ? Number(rawVolt).toFixed(1)
+    : voltQuality === 'UNSUPPORTED'
+      ? 'NÃO SUPORTADO'
+      : '—'
 
   const isVehicleMoving = (rawSpeed || 0) > 5
 
@@ -653,6 +673,7 @@ export const NetworkCarDrive: React.FC = () => {
 
           {/* Badge de Estado da Conexão com o Veículo */}
           <div
+            data-testid="badge-status-veiculo"
             className={`px-2 py-0.5 rounded text-[11px] font-bold font-mono uppercase flex items-center space-x-1 border ${
               isConnected
                 ? 'bg-emerald-950/70 text-emerald-300 border-emerald-700'
@@ -665,7 +686,7 @@ export const NetworkCarDrive: React.FC = () => {
             {isConnected ? <Wifi className="w-3 h-3" /> : <WifiOff className="w-3 h-3" />}
             <span>
               {isConnected
-                ? 'OBD CONECTADO'
+                ? 'VEÍCULO CONECTADO'
                 : telemetry.connectionState === 'CONECTANDO'
                   ? 'OBD CONECTANDO'
                   : telemetry.connectionState === 'RECONECTANDO'
@@ -674,15 +695,50 @@ export const NetworkCarDrive: React.FC = () => {
             </span>
           </div>
 
-          {/* Tag Simulador claramente identificado (Requisito 13) */}
-          {isSimulated && (
+          {/* Origem dos dados: DADOS REAIS vs DADOS SIMULADOS */}
+          {isConnected && !isSimulated ? (
+            <span
+              data-testid="banner-dados-reais"
+              className="hidden md:inline-flex text-[10px] font-mono font-bold bg-emerald-500/20 text-emerald-300 border border-emerald-500/50 px-2 py-0.5 rounded tracking-wide"
+            >
+              DADOS REAIS • ELM327
+            </span>
+          ) : isSimulated ? (
             <span
               data-testid="banner-dados-simulados"
               className="hidden md:inline-flex text-[10px] font-mono font-bold bg-amber-500/20 text-[#FFB300] border border-amber-500/50 px-2 py-0.5 rounded tracking-wide animate-pulse"
             >
               DADOS SIMULADOS ({activeScenario})
             </span>
-          )}
+          ) : null}
+
+          {/* Informações de Conexão Física (ELM327, ECU, Protocolo) */}
+          <div className="hidden xl:flex items-center space-x-2 text-[10px] font-mono text-gray-400 bg-[#0B0F14] px-2 py-0.5 rounded border border-[#202B37]">
+            <span>
+              ELM327:{' '}
+              <strong className={isConnected ? 'text-emerald-400' : 'text-red-400'}>
+                {isConnected ? 'conectado' : 'desconectado'}
+              </strong>
+            </span>
+            <span>•</span>
+            <span>
+              ECU:{' '}
+              <strong className={isConnected ? 'text-emerald-400' : 'text-red-400'}>
+                {isConnected ? 'conectada' : 'desconectada'}
+              </strong>
+            </span>
+            <span>•</span>
+            <span>
+              Protocolo:{' '}
+              <strong className="text-[#FFB300]">
+                {isConnected
+                  ? isSimulated
+                    ? 'ISO 15765-4 CAN (11 bit)'
+                    : 'ISO 15765-4 CAN (11 bit)'
+                  : '—'}
+              </strong>
+            </span>
+          </div>
         </div>
 
         {/* Centro: Telemetria Essencial de Leitura Rápida */}
@@ -772,12 +828,16 @@ export const NetworkCarDrive: React.FC = () => {
         </div>
       </header>
 
-      {/* Banner de Dados Simulados em telas pequenas */}
-      {isSimulated && (
+      {/* Banner de Dados Simulados ou Reais em telas pequenas */}
+      {isSimulated ? (
         <div className="md:hidden bg-amber-950/60 border-b border-amber-600/60 px-3 py-1 text-center text-[10px] font-mono text-[#FFB300] font-bold shrink-0">
           DADOS SIMULADOS ({activeScenario}) — AVALIAÇÃO VISUAL SEM HARDWARE REAL
         </div>
-      )}
+      ) : isConnected ? (
+        <div className="md:hidden bg-emerald-950/60 border-b border-emerald-600/60 px-3 py-1 text-center text-[10px] font-mono text-emerald-300 font-bold shrink-0">
+          DADOS REAIS • ELM327 BLUETOOTH
+        </div>
+      ) : null}
 
       {/* ============================================================== */}
       {/* 2. ALERTA CRÍTICO DETERMINÍSTICO (PRIORIDADE ABSOLUTA DE INTERRUPÇÃO) */}

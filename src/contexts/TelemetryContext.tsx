@@ -19,6 +19,7 @@ import {
 } from '@/lib/obd/transports/simulated-transport'
 import { RealSerialTransport } from '@/lib/obd/transports/real-serial-transport'
 import { BluetoothTransport } from '@/lib/obd/transports/bluetooth-transport'
+import { AndroidBluetoothTransport } from '@/lib/obd/transports/android-bluetooth-transport'
 import { SamplerScheduler } from '@/lib/obd/sampler-scheduler'
 import { RawRecorder } from '@/lib/obd/raw-recorder'
 import { EventMarker } from '@/lib/obd/event-marker'
@@ -44,7 +45,10 @@ interface TelemetryContextType {
   setTransportType: (type: AdapterType) => void
   connectTransport: () => Promise<boolean>
   disconnectTransport: () => Promise<void>
-  startSession: (vehicleIdOrName?: string) => Promise<boolean>
+  startSession: (
+    vehicleIdOrName?: string,
+    maintenanceStage?: 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO' | 'PADRAO',
+  ) => Promise<boolean>
   endSession: () => Promise<void>
   markSymptom: (type: any, description: string) => Promise<EventModel | null>
   simulateCommunicationDrop: () => void
@@ -203,6 +207,16 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           }))
         })
         transportRef.current = sim
+      } else if (type === 'OBD REAL BLUETOOTH CLASSIC') {
+        const btClassic = new AndroidBluetoothTransport(config.baudRate, config.reconnectAttempts)
+        btClassic.on('statusChange', (status, msg) => {
+          setTelemetry((prev) => ({
+            ...prev,
+            connectionState: status,
+            lastError: status === 'FALHA' ? msg : undefined,
+          }))
+        })
+        transportRef.current = btClassic
       } else if (type === 'OBD REAL BLUETOOTH') {
         const bt = new BluetoothTransport()
         bt.on('statusChange', (status, msg) => {
@@ -255,6 +269,8 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         if (transportRef.current instanceof SimulatedTransport) {
           protocolDetected = transportRef.current.getProtocol()
           vinRead = transportRef.current.getVin()
+        } else if (transportRef.current instanceof AndroidBluetoothTransport) {
+          protocolDetected = transportRef.current.getProtocol()
         }
 
         // Consulta DTCs e MIL iniciais
@@ -381,7 +397,10 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }
 
   // Início de Sessão associada ao Perfil do Veículo
-  const startSession = async (vehicleIdOrName?: string): Promise<boolean> => {
+  const startSession = async (
+    vehicleIdOrName?: string,
+    maintenanceStage: 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO' | 'PADRAO' = 'PADRAO',
+  ): Promise<boolean> => {
     if (!transportRef.current || !transportRef.current.isConnected()) {
       toast({
         title: 'Conexão Necessária',
@@ -409,9 +428,11 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     const transportDetail =
       adapterType === 'SIMULADOR'
         ? `Simulador (${SIMULATOR_SCENARIOS.find((s) => s.id === activeScenario)?.name || activeScenario})`
-        : adapterType === 'OBD REAL BLUETOOTH'
-          ? 'Web Bluetooth — ELM327 BLE (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
-          : 'Web Serial — ELM327 USB (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
+        : adapterType === 'OBD REAL BLUETOOTH CLASSIC'
+          ? 'Bluetooth Classic SPP/RFCOMM (Android Xiaomi + Ford EcoSport 1.5 Dragon)'
+          : adapterType === 'OBD REAL BLUETOOTH'
+            ? 'Web Bluetooth — ELM327 BLE (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
+            : 'Web Serial — ELM327 USB (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
 
     let pbSessId: string | null = null
     try {
@@ -459,6 +480,8 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       config.priorityFreqHz,
       config.secondaryFreqHz,
     )
+    sampler.setOrigin(adapterType === 'SIMULADOR' ? 'SIMULATED' : 'REAL')
+    sampler.setMaintenanceStage(maintenanceStage)
     samplerRef.current = sampler
 
     const discovered = await sampler.discoverSupportedPids()

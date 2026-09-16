@@ -10,6 +10,7 @@ import {
 } from '@/components/ui/select'
 import { RealSerialTransport } from '@/lib/obd/transports/real-serial-transport'
 import { BluetoothTransport } from '@/lib/obd/transports/bluetooth-transport'
+import { AndroidBluetoothTransport } from '@/lib/obd/transports/android-bluetooth-transport'
 import { detectPlatformCapabilities } from '@/lib/obd/platform-detector'
 import { SIMULATOR_SCENARIOS, SimulatorScenario } from '@/lib/obd/transports/simulated-transport'
 import {
@@ -51,11 +52,13 @@ export const ConnectionControlPanel: React.FC = () => {
 
   const isWebSerialAvailable = RealSerialTransport.isWebSerialSupported()
   const isWebBluetoothAvailable = BluetoothTransport.isWebBluetoothSupported()
+  const btClassicEnv = AndroidBluetoothTransport.inspectEnvironment()
   const platform = detectPlatformCapabilities()
 
   const isConnected = telemetry.connectionState === 'CONECTADO'
   const isTesting = telemetry.sessionState === 'TESTE ATIVO'
   const isSimulator = telemetry.transportType === 'SIMULADOR'
+  const isBluetoothClassic = telemetry.transportType === 'OBD REAL BLUETOOTH CLASSIC'
   const isBluetooth = telemetry.transportType === 'OBD REAL BLUETOOTH'
   const isSerial = telemetry.transportType === 'OBD REAL'
 
@@ -91,13 +94,26 @@ export const ConnectionControlPanel: React.FC = () => {
             <button
               type="button"
               disabled={isTesting}
+              onClick={() => setTransportType('OBD REAL BLUETOOTH CLASSIC')}
+              className={`px-3 py-1 text-xs font-semibold rounded transition-all flex items-center space-x-1 ${
+                isBluetoothClassic
+                  ? 'bg-amber-600 text-white shadow'
+                  : 'text-[#9AA7B4] hover:text-white'
+              }`}
+            >
+              <Bluetooth className="w-3.5 h-3.5 mr-0.5 inline text-[#FFB300]" />
+              <span>BLUETOOTH CLASSIC (SPP/Xiaomi)</span>
+            </button>
+            <button
+              type="button"
+              disabled={isTesting}
               onClick={() => setTransportType('OBD REAL BLUETOOTH')}
               className={`px-3 py-1 text-xs font-semibold rounded transition-all flex items-center space-x-1 ${
                 isBluetooth ? 'bg-cyan-600 text-white shadow' : 'text-[#9AA7B4] hover:text-white'
               }`}
             >
               <Bluetooth className="w-3.5 h-3.5 mr-0.5 inline" />
-              <span>BLUETOOTH (BLE/Android)</span>
+              <span>BLE (GATT)</span>
             </button>
           </div>
 
@@ -110,6 +126,12 @@ export const ConnectionControlPanel: React.FC = () => {
           {isBluetooth && !isWebBluetoothAvailable && (
             <span className="text-xs text-amber-400 bg-amber-950/40 border border-amber-800 px-2 py-0.5 rounded">
               Aviso: Web Bluetooth requer navegador compatível (Chrome Android/Desktop)
+            </span>
+          )}
+
+          {isBluetoothClassic && (
+            <span className="text-xs text-amber-300 bg-amber-950/50 border border-amber-700 px-2 py-0.5 rounded">
+              {btClassicEnv.diagnosticMessage}
             </span>
           )}
 

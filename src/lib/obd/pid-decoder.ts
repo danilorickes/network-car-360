@@ -191,6 +191,42 @@ export const PID_DEFINITIONS: Record<string, PidDefinition> = {
       return `${mins}m ${secs}s`
     },
   },
+  '0x14': {
+    pid: '0x14',
+    mode: '01',
+    name: 'Sensor O2 / Lambda (Banco 1, Sensor 1)',
+    shortName: 'O2 B1S1 (Tensão)',
+    bytesCount: 2,
+    unit: 'V',
+    min: 0,
+    max: 1.275,
+    isPriority: false,
+    decode: (bytes: number[]) => {
+      // Byte A: Tensão da Sonda = A / 200 (em Volts)
+      // Byte B: STFT correspondente = (B - 128) * 100 / 128 (%)
+      const A = bytes[0]
+      return Math.round((A / 200) * 1000) / 1000
+    },
+    format: (v: number) => `${v.toFixed(3)} V`,
+  },
+  '0x24': {
+    pid: '0x24',
+    mode: '01',
+    name: 'Sensor Lambda Banda Larga (Razão de Equivalência)',
+    shortName: 'Lambda / O2',
+    bytesCount: 4,
+    unit: 'λ',
+    min: 0,
+    max: 2,
+    isPriority: false,
+    decode: (bytes: number[]) => {
+      // Razão de equivalência Lambda = ((A * 256) + B) * 2 / 65536
+      const [A, B] = bytes
+      const lambda = ((A * 256 + B) * 2) / 65535
+      return Math.round(lambda * 1000) / 1000
+    },
+    format: (v: number) => `λ ${v.toFixed(3)}`,
+  },
 }
 
 export class PidDecoder {

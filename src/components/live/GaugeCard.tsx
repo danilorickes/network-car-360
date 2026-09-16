@@ -93,8 +93,8 @@ export const GaugeCard: React.FC<GaugeCardProps> = ({
         )
       case 'UNSUPPORTED':
         return (
-          <span className="text-[10px] text-gray-400 font-semibold bg-gray-900 px-1.5 py-0.5 rounded border border-gray-700">
-            N/D
+          <span className="text-[10px] text-amber-300 font-semibold bg-amber-950/70 px-1.5 py-0.5 rounded border border-amber-700/60 font-mono">
+            NÃO SUPORTADO
           </span>
         )
       case 'INVALID':
@@ -141,8 +141,8 @@ export const GaugeCard: React.FC<GaugeCardProps> = ({
       <div className="flex items-baseline justify-between mt-1">
         <div className="tabular-nums font-bold tracking-tight text-white flex items-baseline space-x-1.5">
           {isDisconnectedOrError ? (
-            <span className="text-xl sm:text-2xl text-[#9AA7B4]/60 font-mono">
-              {quality === 'UNSUPPORTED' ? 'N/D' : '--'}
+            <span className="text-sm sm:text-base text-amber-400/80 font-mono font-bold tracking-tight">
+              {quality === 'UNSUPPORTED' ? 'NÃO SUPORTADO' : '--'}
             </span>
           ) : (
             <>

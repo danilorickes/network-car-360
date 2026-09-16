@@ -69,11 +69,16 @@ export default function Index() {
               <span className="text-cyan-400 font-mono text-xs font-semibold bg-cyan-950/60 border border-cyan-800/60 px-2 py-0.5 rounded">
                 Touch Automotivo • Widescreen
               </span>
-              {telemetry.transportType === 'SIMULADOR' && (
+              {telemetry.connectionState === 'CONECTADO' &&
+              telemetry.transportType !== 'SIMULADOR' ? (
+                <span className="text-emerald-400 font-mono text-[11px] font-bold bg-emerald-950/60 border border-emerald-800/80 px-2 py-0.5 rounded">
+                  DADOS REAIS • ELM327 CONECTADO
+                </span>
+              ) : telemetry.transportType === 'SIMULADOR' ? (
                 <span className="text-amber-400 font-mono text-[11px] font-bold bg-amber-950/60 border border-amber-800/80 px-2 py-0.5 rounded">
                   DADOS SIMULADOS DISPONÍVEIS
                 </span>
-              )}
+              ) : null}
             </div>
 
             <div>

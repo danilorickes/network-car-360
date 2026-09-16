@@ -21,10 +21,23 @@ export class SamplerScheduler {
   private priorityFreqHz: number
   private secondaryFreqHz: number
   private supportedPids: string[] = []
+  private origin: 'REAL' | 'SIMULATED' = 'REAL'
+  private maintenanceStage: 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO' | 'PADRAO' = 'PADRAO'
 
-  // PIDs a consultar
+  // PIDs a consultar (prioritários e secundários para homologação Ford EcoSport 1.5 Dragon)
   private priorityPids: string[] = ['0x0C', '0x0D', '0x05', '0x04', '0x11']
-  private secondaryPids: string[] = ['0x10', '0x0B', '0x42', '0x06', '0x07', '0x0E', '0x0F', '0x1F']
+  private secondaryPids: string[] = [
+    '0x10',
+    '0x0B',
+    '0x42',
+    '0x06',
+    '0x07',
+    '0x0E',
+    '0x0F',
+    '0x1F',
+    '0x14',
+    '0x24',
+  ]
 
   // Controle de frequência efetiva
   private sampleTimestampsMono: number[] = []
@@ -47,14 +60,31 @@ export class SamplerScheduler {
     this.secondaryFreqHz = secondaryFreqHz
   }
 
+  setOrigin(origin: 'REAL' | 'SIMULATED'): void {
+    this.origin = origin
+  }
+
+  setMaintenanceStage(stage: 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO' | 'PADRAO'): void {
+    this.maintenanceStage = stage
+  }
+
   setSupportedPids(pids: string[]): void {
     this.supportedPids = pids
     this.priorityPids = ['0x0C', '0x0D', '0x05', '0x04', '0x11'].filter(
       (p) => pids.length === 0 || pids.includes(p),
     )
-    this.secondaryPids = ['0x10', '0x0B', '0x42', '0x06', '0x07', '0x0E', '0x0F', '0x1F'].filter(
-      (p) => pids.length === 0 || pids.includes(p),
-    )
+    this.secondaryPids = [
+      '0x10',
+      '0x0B',
+      '0x42',
+      '0x06',
+      '0x07',
+      '0x0E',
+      '0x0F',
+      '0x1F',
+      '0x14',
+      '0x24',
+    ].filter((p) => pids.length === 0 || pids.includes(p))
   }
 
   on<K extends keyof SamplerEvents>(event: K, listener: SamplerEvents[K]): void {
@@ -223,6 +253,8 @@ export class SamplerScheduler {
         ts_mono_offset_ms: monoOffsetMs,
         pid: pidHex,
         quality: 'NO_RESPONSE',
+        origin: this.origin,
+        maintenance_stage: this.maintenanceStage,
       }
       const rec = this.recorder.recordSample(sample)
       this.emit('sample', rec)
@@ -264,10 +296,12 @@ export class SamplerScheduler {
         ts_utc: utcIso,
         ts_mono_offset_ms: monoOffsetMs,
         pid: pidHex,
-        raw_value: rawVal,
-        decoded_value: decodedVal,
+        raw_value: quality === 'UNSUPPORTED' ? undefined : rawVal,
+        decoded_value: quality === 'UNSUPPORTED' ? undefined : decodedVal,
         unit,
         quality,
+        origin: this.origin,
+        maintenance_stage: this.maintenanceStage,
       }
 
       const recorded = this.recorder.recordSample(sample)
@@ -284,6 +318,8 @@ export class SamplerScheduler {
         ts_mono_offset_ms: monoOffsetMs,
         pid: pidHex,
         quality,
+        origin: this.origin,
+        maintenance_stage: this.maintenanceStage,
       }
 
       const recorded = this.recorder.recordSample(sample)

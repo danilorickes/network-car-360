@@ -38,15 +38,25 @@ export function detectPlatformCapabilities(): PlatformCapabilities {
   let recommendedTransport: 'SIMULADOR' | 'OBD REAL SERIAL' | 'OBD REAL BLUETOOTH' = 'SIMULADOR'
   let guidanceText = ''
 
+  const chromeMatch = userAgent.match(/chrome\/(\d+)/i)
+  const chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : null
+
   if (isAndroid) {
-    if (hasWebBluetooth) {
+    if (hasWebSerial && chromeVersion !== null && chromeVersion >= 138) {
+      recommendedTransport = 'OBD REAL BLUETOOTH'
+      guidanceText = `Chrome Android ${chromeVersion} detectado: Suporte direto a ELM327 Bluetooth Classic via Web Serial RFCOMM (SPP UUID 00001101). Pareie nas configurações do Android e selecione o dispositivo no assistente.`
+    } else if (hasWebSerial) {
+      recommendedTransport = 'OBD REAL SERIAL'
+      guidanceText =
+        'Ambiente Android com Web Serial detectado. Para adaptadores Bluetooth Classic SPP no Android, o Chrome 138+ oferece suporte nativo RFCOMM; em versões anteriores utilize cabo USB-OTG ou a ponte nativa Android.'
+    } else if (hasWebBluetooth) {
       recommendedTransport = 'OBD REAL BLUETOOTH'
       guidanceText =
-        'Ambiente Android detectado. Recomendado: ELM327 Bluetooth BLE via Web Bluetooth no Chrome/Edge. Para adaptadores Bluetooth Clássico SPP (v1.5/2.1), use o modo Bridge/Proxy Local ou pareamento via Web Serial OTG.'
+        'Ambiente Android detectado: Web Bluetooth (GATT/BLE) ativo. Para adaptador Bluetooth Classic SPP (v1.5/v2.1), utilize Chrome 138+ com RFCOMM ou a ponte nativa Android.'
     } else {
       recommendedTransport = 'SIMULADOR'
       guidanceText =
-        'Ambiente Android sem Web Bluetooth ativo. Habilite chrome://flags/#enable-web-bluetooth-new-permissions-backend ou utilize navegador compatível.'
+        'Ambiente Android sem suporte a portas seriais no navegador. Utilize Chrome 138+ ou o aplicativo nativo Android.'
     }
   } else if (hasWebSerial) {
     recommendedTransport = 'OBD REAL SERIAL'

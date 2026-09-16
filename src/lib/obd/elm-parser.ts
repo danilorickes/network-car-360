@@ -52,7 +52,12 @@ export class ElmProtocolParser {
       }
     }
 
-    if (cleaned.includes('UNABLE TO CONNECT') || cleaned.includes('BUS INIT: ERROR')) {
+    if (
+      cleaned.includes('UNABLE TO CONNECT') ||
+      cleaned.includes('BUS INIT: ERROR') ||
+      cleaned.includes('CAN ERROR') ||
+      cleaned.includes('BUS BUSY')
+    ) {
       return {
         mode: '01',
         pid: `0x${normalizedPid}`,
@@ -63,7 +68,7 @@ export class ElmProtocolParser {
       }
     }
 
-    if (cleaned.includes('?') || cleaned.includes('BUFFER FULL')) {
+    if (cleaned.includes('?') || cleaned.includes('BUFFER FULL') || cleaned.includes('FB ERROR')) {
       return {
         mode: '01',
         pid: `0x${normalizedPid}`,
