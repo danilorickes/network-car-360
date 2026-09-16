@@ -33,10 +33,15 @@ export const vehicleService = {
 
   async create(data: Omit<VehicleModel, 'id' | 'created' | 'updated'>): Promise<VehicleModel> {
     const cleanPlate = data.plate.trim().toUpperCase()
-    return await pb.collection('vehicles').create<VehicleModel>({
+    const authWorkshopId = (pb.authStore.record as any)?.workshop_id || ''
+    const payload: any = {
       ...data,
       plate: cleanPlate,
-    })
+    }
+    if (authWorkshopId && !payload.workshop_id) {
+      payload.workshop_id = authWorkshopId
+    }
+    return await pb.collection('vehicles').create<VehicleModel>(payload)
   },
 
   async update(id: string, data: Partial<VehicleModel>): Promise<VehicleModel> {

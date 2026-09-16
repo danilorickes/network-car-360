@@ -27,6 +27,7 @@ import {
   Plus,
 } from 'lucide-react'
 import { useNavigate } from 'react-router-dom'
+import { toast } from 'sonner'
 
 import { ConnectionWizardModal } from './ConnectionWizardModal'
 
@@ -147,7 +148,16 @@ export const ConnectionControlPanel: React.FC = () => {
           {!isConnected ? (
             <Button
               size="sm"
-              onClick={() => connectTransport()}
+              onClick={() => {
+                if (!selectedVehicle && vehicles.length === 0) {
+                  toast.error(
+                    'Nenhum veículo cadastrado. Cadastre o cliente e o veículo antes de iniciar a conexão OBD.',
+                  )
+                  navigate('/clientes')
+                  return
+                }
+                connectTransport()
+              }}
               className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-semibold shadow"
             >
               <Wifi className="w-4 h-4 mr-1.5" />
@@ -169,14 +179,22 @@ export const ConnectionControlPanel: React.FC = () => {
           {isConnected && !isTesting && (
             <Button
               size="sm"
-              onClick={() => startSession(selectedVehicle?.id)}
+              onClick={() => {
+                if (!selectedVehicle && vehicles.length === 0) {
+                  toast.error(
+                    'Veículo Obrigatório: cadastre ou selecione um veículo com seu respectivo cliente.',
+                  )
+                  navigate('/clientes')
+                  return
+                }
+                startSession(selectedVehicle?.id)
+              }}
               className="bg-[#2ECC71] hover:bg-[#27ae60] text-black font-bold tracking-wide shadow"
             >
               <Play className="w-4 h-4 mr-1.5 fill-current" />
               INICIAR TESTE
             </Button>
           )}
-
           {isTesting && (
             <Button
               size="sm"
@@ -228,10 +246,25 @@ export const ConnectionControlPanel: React.FC = () => {
               ))}
             </SelectContent>
           </Select>
-          {selectedVehicle && (
+          {selectedVehicle ? (
             <div className="text-[11px] text-[#9AA7B4] mt-1 font-mono truncate">
               VIN: {selectedVehicle.vin || 'N/D'} • Km:{' '}
               {selectedVehicle.odometer_km?.toLocaleString('pt-BR') || '--'}
+            </div>
+          ) : vehicles.length === 0 ? (
+            <div className="mt-1.5 p-2 bg-[#1A232E] border border-amber-800/60 rounded text-[11px] text-amber-300 flex items-center justify-between">
+              <span>Nenhum cliente/veículo registrado ainda.</span>
+              <button
+                type="button"
+                onClick={() => navigate('/clientes')}
+                className="bg-[#FFB300] hover:bg-[#e09e00] text-black font-bold px-2 py-0.5 rounded text-[10px]"
+              >
+                Cadastrar Cliente & Veículo
+              </button>
+            </div>
+          ) : (
+            <div className="text-[11px] text-gray-500 mt-1 italic">
+              Selecione o veículo acima para vincular os dados OBD à ordem e histórico técnico.
             </div>
           )}
         </div>

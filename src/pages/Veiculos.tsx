@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
 import { vehicleService, obdCapabilityService } from '@/services/vehicles'
 import { clientService, workOrderService } from '@/services/commercial'
 import { investigationService } from '@/services/investigations'
@@ -36,11 +37,15 @@ import {
   FileText,
   Calendar,
   Layers,
+  Zap,
+  Users,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
 
 export default function Veiculos() {
+  const navigate = useNavigate()
+  const [searchParams] = useSearchParams()
   const { toast } = useToast()
   const { vehicles, selectedVehicle, setSelectedVehicle, refreshVehicles } = useTelemetry()
   const [modalOpen, setModalOpen] = useState(false)
@@ -71,10 +76,32 @@ export default function Veiculos() {
     client: '',
   })
 
-  // Carrega clientes disponíveis
+  // Carrega clientes disponíveis e trata query param ?client=... ou ?new=true
   useEffect(() => {
-    clientService.getAll().then((cls) => setClients(cls))
-  }, [])
+    clientService.getAll().then((cls) => {
+      setClients(cls)
+      const clientParam = searchParams.get('client')
+      const newParam = searchParams.get('new')
+      if (newParam === 'true' || clientParam) {
+        setEditingVehicle(null)
+        setFormData({
+          plate: '',
+          make: '',
+          model: '',
+          version: '',
+          year_model: '',
+          engine: '',
+          fuel: 'Flex',
+          transmission: 'Manual',
+          odometer_km: 0,
+          vin: '',
+          notes: '',
+          client: clientParam || '',
+        })
+        setModalOpen(true)
+      }
+    })
+  }, [searchParams])
 
   // Carrega histórico técnico e ordens anteriores do veículo selecionado (Requisito 3 & 13)
   useEffect(() => {
@@ -321,14 +348,30 @@ export default function Veiculos() {
                     </span>
                   </div>
 
-                  <Button
-                    size="sm"
-                    onClick={() => openEditModal(selectedVehicle)}
-                    className="bg-[#1A232E] hover:bg-[#263340] text-white border border-[#263340] text-xs"
-                  >
-                    <Edit2 className="w-3.5 h-3.5 mr-1.5" />
-                    Editar Perfil
-                  </Button>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      size="sm"
+                      onClick={() => {
+                        toast({
+                          title: 'Veículo Selecionado',
+                          description: `${selectedVehicle.plate} direcionado para diagnóstico OBD.`,
+                        })
+                        navigate('/')
+                      }}
+                      className="bg-[#2ECC71] hover:bg-[#27ae60] text-black font-bold text-xs"
+                    >
+                      <Zap className="w-3.5 h-3.5 mr-1.5" />
+                      Conectar OBD
+                    </Button>
+                    <Button
+                      size="sm"
+                      onClick={() => openEditModal(selectedVehicle)}
+                      className="bg-[#1A232E] hover:bg-[#263340] text-white border border-[#263340] text-xs"
+                    >
+                      <Edit2 className="w-3.5 h-3.5 mr-1.5" />
+                      Editar Perfil
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Proprietário Atual (Requisito 3) */}
@@ -348,18 +391,39 @@ export default function Veiculos() {
                         )}
                       </div>
                     ) : (
-                      <span className="text-gray-400 text-xs italic">
-                        Nenhum proprietário vinculado. Edite o perfil para associar um cliente.
-                      </span>
+                      <div className="flex items-center gap-2 mt-0.5">
+                        <span className="text-gray-400 text-xs italic">
+                          Nenhum proprietário vinculado. Edite o perfil ou selecione um cliente.
+                        </span>
+                        <Button
+                          size="sm"
+                          variant="ghost"
+                          onClick={() => navigate('/clientes')}
+                          className="h-6 text-[11px] text-[#FFB300] hover:underline p-0"
+                        >
+                          Ir para Clientes
+                        </Button>
+                      </div>
                     )}
                   </div>
-                  {currentOwner && (
-                    <Badge
+                  {currentOwner ? (
+                    <Button
+                      size="sm"
                       variant="outline"
-                      className="border-[#FFB300] text-[#FFB300] text-[10px]"
+                      onClick={() => navigate('/clientes')}
+                      className="border-[#FFB300] text-[#FFB300] hover:bg-[#FFB300] hover:text-black text-xs font-semibold h-7"
                     >
-                      Cliente Oficina
-                    </Badge>
+                      <Users className="w-3.5 h-3.5 mr-1" />
+                      Ver Cliente
+                    </Button>
+                  ) : (
+                    <Button
+                      size="sm"
+                      onClick={() => openEditModal(selectedVehicle)}
+                      className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-semibold text-xs h-7"
+                    >
+                      Vincular Cliente
+                    </Button>
                   )}
                 </div>
 

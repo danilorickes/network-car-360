@@ -17,11 +17,31 @@ for (let i = 0; i < COMMERCIAL_COLLECTIONS.length; i++) {
 
   onRecordCreate((e) => {
     const record = e.record
-    const authUser = e.auth
+    const authUser = e.auth || (e.requestInfo && e.requestInfo().auth)
 
-    // Se a requisição veio via HTTP com usuário autenticado, força a oficina do usuário
+    // Se a requisição possui usuário autenticado, força a oficina do usuário
     if (authUser) {
-      const userWorkshop = authUser.getString('workshop_id')
+      let userWorkshop = ''
+      try {
+        if (typeof authUser.getString === 'function') {
+          userWorkshop = authUser.getString('workshop_id')
+        } else if (authUser.workshop_id) {
+          userWorkshop = String(authUser.workshop_id)
+        }
+      } catch (_) {}
+
+      // Se ainda vazio, tenta recuperar pelo record ID do usuário
+      if (!userWorkshop && authUser.id) {
+        try {
+          const freshUser = $app.findCollectionByNameOrId('users')
+            ? $app.findRecordById('users', authUser.id)
+            : null
+          if (freshUser) {
+            userWorkshop = freshUser.getString('workshop_id')
+          }
+        } catch (_) {}
+      }
+
       if (!userWorkshop) {
         throw new BadRequestError(
           'Operação negada: usuário autenticado não possui vínculo com nenhuma oficina.',
@@ -75,12 +95,30 @@ for (let i = 0; i < COMMERCIAL_COLLECTIONS.length; i++) {
 
 onRecordCreate((e) => {
   const record = e.record
-  const authUser = e.auth
+  const authUser = e.auth || (e.requestInfo && e.requestInfo().auth)
 
   // 1. Obter e validar workshop_id da sessão técnica (NC-E5-SEC-02)
   let workshopId = ''
   if (authUser) {
-    workshopId = authUser.getString('workshop_id')
+    try {
+      if (typeof authUser.getString === 'function') {
+        workshopId = authUser.getString('workshop_id')
+      } else if (authUser.workshop_id) {
+        workshopId = String(authUser.workshop_id)
+      }
+    } catch (_) {}
+
+    if (!workshopId && authUser.id) {
+      try {
+        const freshUser = $app.findCollectionByNameOrId('users')
+          ? $app.findRecordById('users', authUser.id)
+          : null
+        if (freshUser) {
+          workshopId = freshUser.getString('workshop_id')
+        }
+      } catch (_) {}
+    }
+
     if (!workshopId) {
       throw new BadRequestError('Operação negada: usuário sem oficina associada.')
     }
