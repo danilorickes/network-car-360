@@ -17,7 +17,14 @@ for (let i = 0; i < COMMERCIAL_COLLECTIONS.length; i++) {
 
   onRecordCreate((e) => {
     const record = e.record
-    const authUser = e.auth || (e.requestInfo && e.requestInfo().auth)
+    // No PocketBase v0.23+ (Skip Cloud), o usuário autenticado do contexto HTTP de requisição
+    // pode ser acessado via e.auth OU e.requestInfo()?.auth OU e.httpContext?.get('authRecord')
+    let authUser = e.auth || (typeof e.requestInfo === 'function' ? e.requestInfo()?.auth : null)
+    if (!authUser && e.httpContext && typeof e.httpContext.get === 'function') {
+      try {
+        authUser = e.httpContext.get('authRecord')
+      } catch (_) {}
+    }
 
     // Se a requisição possui usuário autenticado, força a oficina do usuário
     if (authUser) {
@@ -56,8 +63,9 @@ for (let i = 0; i < COMMERCIAL_COLLECTIONS.length; i++) {
       }
       record.set('workshop_id', userWorkshop)
     } else {
-      // Criação interna/seed sem contexto HTTP direto: deve exigir workshop_id explicitado
-      if (!record.getString('workshop_id')) {
+      // Criação interna/seed ou requisição com workshop_id fornecido no payload
+      const providedWorkshop = record.getString('workshop_id')
+      if (!providedWorkshop) {
         throw new BadRequestError('workshop_id é obrigatório.')
       }
     }
@@ -95,7 +103,12 @@ for (let i = 0; i < COMMERCIAL_COLLECTIONS.length; i++) {
 
 onRecordCreate((e) => {
   const record = e.record
-  const authUser = e.auth || (e.requestInfo && e.requestInfo().auth)
+  let authUser = e.auth || (typeof e.requestInfo === 'function' ? e.requestInfo()?.auth : null)
+  if (!authUser && e.httpContext && typeof e.httpContext.get === 'function') {
+    try {
+      authUser = e.httpContext.get('authRecord')
+    } catch (_) {}
+  }
 
   // 1. Obter e validar workshop_id da sessão técnica (NC-E5-SEC-02)
   let workshopId = ''

@@ -33,15 +33,50 @@ export const vehicleService = {
 
   async create(data: Omit<VehicleModel, 'id' | 'created' | 'updated'>): Promise<VehicleModel> {
     const cleanPlate = data.plate.trim().toUpperCase()
-    const authWorkshopId = (pb.authStore.record as any)?.workshop_id || ''
+    let authWorkshopId = (pb.authStore.record as any)?.workshop_id || ''
+
+    // Fallback: se não estiver direto no authStore.record, checa no localStorage
+    if (!authWorkshopId && typeof window !== 'undefined' && window.localStorage) {
+      try {
+        const rawAuth = window.localStorage.getItem('pocketbase_auth')
+        if (rawAuth) {
+          const parsed = JSON.parse(rawAuth)
+          if (parsed?.record?.workshop_id) {
+            authWorkshopId = parsed.record.workshop_id
+          }
+        }
+      } catch {
+        /* intentionally ignored */
+      }
+    }
+
     const payload: any = {
       ...data,
       plate: cleanPlate,
     }
-    if (authWorkshopId && !payload.workshop_id) {
+
+    // Garante que workshop_id seja explicitamente preenchido
+    if (data.workshop_id) {
+      payload.workshop_id = data.workshop_id
+    } else if (authWorkshopId) {
       payload.workshop_id = authWorkshopId
     }
-    return await pb.collection('vehicles').create<VehicleModel>(payload)
+
+    try {
+      return await pb.collection('vehicles').create<VehicleModel>(payload)
+    } catch (err: any) {
+      // Log técnico temporário de diagnóstico exigido na tarefa
+      // authenticated_user_id, resolved_workshop_id, customer_id
+      const diagUserId = pb.authStore.record?.id || 'none'
+      const diagWorkshopId = payload.workshop_id || authWorkshopId || 'none'
+      const diagCustomerId = (data as any)?.client || 'none'
+      console.error(
+        `[DIAG_VEHICLE_CREATE_FAIL] Falha ao cadastrar veículo: ${err?.message || err}. ` +
+          `authenticated_user_id=${diagUserId}, resolved_workshop_id=${diagWorkshopId}, customer_id=${diagCustomerId}`,
+        { error: err, payload },
+      )
+      throw err
+    }
   },
 
   async update(id: string, data: Partial<VehicleModel>): Promise<VehicleModel> {

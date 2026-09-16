@@ -3,6 +3,7 @@ import { useNavigate, useSearchParams } from 'react-router-dom'
 import { vehicleService, obdCapabilityService } from '@/services/vehicles'
 import { clientService, workOrderService } from '@/services/commercial'
 import { investigationService } from '@/services/investigations'
+import pb from '@/lib/pocketbase/client'
 import { VehicleModel, ObdCapabilityModel } from '@/types/obd'
 import { ClientModel, WorkOrderModel } from '@/types/commercial'
 import { DiagnosticInvestigationModel } from '@/types/investigation'
@@ -191,6 +192,11 @@ export default function Veiculos() {
       setModalOpen(false)
       await refreshVehicles()
     } catch (err: any) {
+      const authRecord = pb.authStore.record as any
+      console.error(
+        `[DIAG_VEHICLE_PAGE_VEICULOS] authenticated_user_id=${authRecord?.id || 'none'}, resolved_workshop_id=${authRecord?.workshop_id || 'none'}, customer_id=${formData.client || 'none'}`,
+        err,
+      )
       toast({
         title: 'Erro ao Salvar',
         description: err?.message || 'Falha na gravação do perfil veicular.',

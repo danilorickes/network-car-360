@@ -33,6 +33,8 @@ export interface PidDefinition {
 
 export interface VehicleModel {
   id?: string
+  workshop_id?: string
+  client?: string
   plate: string
   make: string
   model: string

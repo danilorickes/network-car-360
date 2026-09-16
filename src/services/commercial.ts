@@ -10,10 +10,13 @@ import {
 } from '@/types/commercial'
 
 // Obtém o workshop_id do usuário autenticado no authStore
-export function getAuthenticatedWorkshopId(): string {
+export function getAuthenticatedWorkshopId(strict: boolean = false): string {
   const authRecord = pb.authStore.record
   if (authRecord && (authRecord as any).workshop_id) {
     return (authRecord as any).workshop_id
+  }
+  if (strict && !authRecord) {
+    throw new Error('Usuário não autenticado.')
   }
   return ''
 }

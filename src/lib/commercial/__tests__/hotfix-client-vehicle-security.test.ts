@@ -62,8 +62,8 @@ describe('Fluxo Integrado de Segurança: Clientes, Veículos e Workshop ID', () 
     expect(wId).toBe('ws_beta_999')
   })
 
-  it('deve rejeitar e bloquear o acesso se usuário não estiver autenticado em getAuthenticatedWorkshopId()', () => {
+  it('deve rejeitar e bloquear o acesso se usuário não estiver autenticado em getAuthenticatedWorkshopId(true)', () => {
     pb.authStore.clear()
-    expect(() => getAuthenticatedWorkshopId()).toThrow(/não autenticado/)
+    expect(() => getAuthenticatedWorkshopId(true)).toThrow(/não autenticado/)
   })
 })

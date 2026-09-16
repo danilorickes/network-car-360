@@ -215,8 +215,11 @@ export default function Clientes() {
     }
 
     setSavingVehicle(true)
+    const resolvedWorkshopId =
+      (user as any)?.workshop_id || targetClientForVehicle.workshop_id || ''
     try {
       const createdVehicle = await vehicleService.create({
+        workshop_id: resolvedWorkshopId,
         plate: vFormPlate.trim().toUpperCase(),
         make: vFormMake.trim(),
         model: vFormModel.trim(),
@@ -239,6 +242,11 @@ export default function Clientes() {
       // Mantém cliente selecionado
       setSelectedClient(targetClientForVehicle)
     } catch (err: any) {
+      // Log técnico de diagnóstico sem expor detalhes sensíveis na UI
+      console.error(
+        `[DIAG_VEHICLE_PAGE_CLIENTES] authenticated_user_id=${user?.id || 'none'}, resolved_workshop_id=${resolvedWorkshopId || 'none'}, customer_id=${targetClientForVehicle.id}`,
+        err,
+      )
       toast.error(err?.message || 'Erro ao cadastrar veículo no backend.')
     } finally {
       setSavingVehicle(false)
