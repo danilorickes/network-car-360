@@ -31,6 +31,9 @@ jobs:
       - name: Instalar Dependências Frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Gerar Recursos e Ícones Android (Mipmaps E6.6.1)
+        run: node scripts/generate-android-icons.mjs
+
       - name: Compilar Frontend React Vite (Web Build)
         run: pnpm run build
 
