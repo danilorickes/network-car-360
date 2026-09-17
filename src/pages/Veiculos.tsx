@@ -340,21 +340,21 @@ export default function Veiculos() {
               {/* Card 1: Ficha Técnica e Proprietário */}
               <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-5">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-[#263340]">
-                  <div>
-                    <div className="flex items-center space-x-2">
-                      <span className="text-lg font-bold text-white">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center space-x-2 flex-wrap">
+                      <span className="text-base sm:text-lg font-bold text-white truncate">
                         {selectedVehicle.make} {selectedVehicle.model} {selectedVehicle.version}
                       </span>
-                      <span className="bg-[#FFB300] text-black font-bold font-mono text-xs px-2 py-0.5 rounded">
+                      <span className="bg-[#FFB300] text-black font-bold font-mono text-xs px-2 py-0.5 rounded flex-shrink-0">
                         {selectedVehicle.plate}
                       </span>
                     </div>
-                    <span className="text-xs font-mono text-[#9AA7B4]">
+                    <span className="text-xs font-mono text-[#9AA7B4] block truncate">
                       VIN / Chassi: {selectedVehicle.vin || 'Não disponível'}
                     </span>
                   </div>
 
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                     <Button
                       size="sm"
                       onClick={() => {
@@ -364,7 +364,7 @@ export default function Veiculos() {
                         })
                         navigate('/')
                       }}
-                      className="bg-[#2ECC71] hover:bg-[#27ae60] text-black font-bold text-xs"
+                      className="bg-[#2ECC71] hover:bg-[#27ae60] text-black font-bold text-xs flex-1 sm:flex-none"
                     >
                       <Zap className="w-3.5 h-3.5 mr-1.5" />
                       Conectar OBD
@@ -372,14 +372,13 @@ export default function Veiculos() {
                     <Button
                       size="sm"
                       onClick={() => openEditModal(selectedVehicle)}
-                      className="bg-[#1A232E] hover:bg-[#263340] text-white border border-[#263340] text-xs"
+                      className="bg-[#1A232E] hover:bg-[#263340] text-white border border-[#263340] text-xs flex-1 sm:flex-none"
                     >
                       <Edit2 className="w-3.5 h-3.5 mr-1.5" />
                       Editar Perfil
                     </Button>
                   </div>
                 </div>
-
                 {/* Proprietário Atual (Requisito 3) */}
                 <div className="bg-[#1A232E] p-3 rounded border border-[#263340] flex items-center justify-between">
                   <div>

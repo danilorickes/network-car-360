@@ -434,10 +434,10 @@ export default function Clientes() {
                       : 'bg-[#131A22] border-[#263340] hover:border-gray-500'
                   }`}
                 >
-                  <div className="flex items-start justify-between">
-                    <div>
-                      <div className="flex items-center gap-2">
-                        <span className="font-bold text-white text-sm hover:text-[#FFB300] transition-colors">
+                  <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-3">
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <span className="font-bold text-white text-sm hover:text-[#FFB300] transition-colors truncate">
                           {c.name}
                         </span>
                         {c.active ? (
@@ -455,7 +455,7 @@ export default function Clientes() {
                           <Phone className="w-3 h-3 text-[#FFB300]" /> {c.phone}
                         </span>
                         {c.email && (
-                          <span className="flex items-center gap-1">
+                          <span className="flex items-center gap-1 truncate max-w-[200px]">
                             <Mail className="w-3 h-3 text-[#FFB300]" /> {c.email}
                           </span>
                         )}
@@ -463,21 +463,21 @@ export default function Clientes() {
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-2 flex-wrap sm:flex-nowrap">
                       <Button
                         size="sm"
                         variant="outline"
                         onClick={(e) => openAddVehicleModal(c, e)}
-                        className="h-8 border-[#263340] bg-[#0B0F14] text-[#FFB300] hover:bg-[#FFB300] hover:text-black text-xs font-semibold"
+                        className="h-8 border-[#263340] bg-[#0B0F14] text-[#FFB300] hover:bg-[#FFB300] hover:text-black text-xs font-semibold flex-1 sm:flex-none"
                         title="Adicionar Veículo a este cliente"
                       >
                         <Plus className="w-3.5 h-3.5 mr-1" />
                         Adicionar Veículo
                       </Button>
 
-                      <div className="flex items-center gap-1 text-xs text-white font-mono bg-[#0B0F14] px-2.5 py-1 rounded border border-[#263340]">
+                      <div className="flex items-center gap-1 text-xs text-white font-mono bg-[#0B0F14] px-2.5 py-1 rounded border border-[#263340] flex-shrink-0">
                         <Car className="w-3.5 h-3.5 text-[#FFB300]" />
-                        <span>{cVehicles.length} veículo(s)</span>
+                        <span>{cVehicles.length} vec</span>
                       </div>
                     </div>
                   </div>
