@@ -1,5 +1,6 @@
 import { OBDTransport, OBDTransportEvents } from './obd-transport'
 import { AndroidNativeTransport } from './android-native-transport'
+import { techLogStore } from '../tech-log-store'
 
 /**
  * Bluetooth Classic SPP Service Class ID padrão:
@@ -8,6 +9,28 @@ import { AndroidNativeTransport } from './android-native-transport'
  * (Chrome 117+ no Desktop e Chrome 138+ no Android sob Finch flag BluetoothRfcommAndroid).
  */
 export const BLUETOOTH_CLASSIC_SPP_UUID = '00001101-0000-1000-8000-00805f9b34fb'
+
+/**
+ * Estados detalhados de conexão OBD/Bluetooth exigidos pela especificação:
+ * - BLUETOOTH_DESLIGADO: Bluetooth do rádio desativado no aparelho
+ * - DISPOSITIVO_NAO_PAREADO: Adaptador ELM327 não pareado nas configurações do sistema
+ * - ELM327_ENCONTRADO: Dispositivo OBDII selecionado/reconhecido
+ * - CONECTANDO_ELM327: Canal RFCOMM / serial sendo aberto
+ * - ELM327_CONECTADO: Modem ELM327 respondeu comandos ATZ / ATE0
+ * - ECU_NAO_RESPONDEU: ELM327 ativo, mas veículo/injeção não enviou dados
+ * - VEICULO_CONECTADO: ECU respondeu PIDs (0100/010C) com sucesso
+ */
+export type DetailedOBDConnectionStatus =
+  | 'DESCONECTADO'
+  | 'BLUETOOTH_DESLIGADO'
+  | 'DISPOSITIVO_NAO_PAREADO'
+  | 'ELM327_ENCONTRADO'
+  | 'CONECTANDO_ELM327'
+  | 'ELM327_CONECTADO'
+  | 'ECU_NAO_RESPONDEU'
+  | 'VEICULO_CONECTADO'
+  | 'RECONECTANDO'
+  | 'FALHA'
 
 export interface BluetoothClassicEnvironment {
   isSupported: boolean
@@ -45,10 +68,29 @@ export class AndroidBluetoothTransport implements OBDTransport {
   private reconnectAttempts = 3
   private baudRate = 38400
   private detectedProtocol = 'ISO 15765-4 (CAN 11/500)'
+  private detailedStatus: DetailedOBDConnectionStatus = 'DESCONECTADO'
+  private deviceName: string = 'OBDII'
 
   constructor(baudRate = 38400, reconnectAttempts = 3) {
     this.baudRate = baudRate
     this.reconnectAttempts = reconnectAttempts
+  }
+
+  getDetailedStatus(): DetailedOBDConnectionStatus {
+    return this.detailedStatus
+  }
+
+  getDeviceName(): string {
+    return this.deviceName
+  }
+
+  private setDetailedStatus(status: DetailedOBDConnectionStatus, message?: string) {
+    this.detailedStatus = status
+    techLogStore.addEntry({
+      direction: status === 'FALHA' || status === 'ECU_NAO_RESPONDEU' ? 'ERR' : 'INFO',
+      stage: 'STATUS',
+      details: `[${status}] ${message || ''}`.trim(),
+    })
   }
 
   /**
@@ -95,11 +137,11 @@ export class AndroidBluetoothTransport implements OBDTransport {
     if (canUseWebSerialRfcomm) {
       diagnosticMessage = isAndroid
         ? `Chrome Android ${chromeVersion} detectado: suporte nativo a Web Serial RFCOMM sobre Bluetooth Classic (SPP 00001101).`
-        : `Desktop Chrome ${chromeVersion || ''} detectado: suporte a Web Serial RFCOMM sobre Bluetooth Classic.`
+        : `Desktop Chromium ${chromeVersion || ''} detectado: suporte a Web Serial RFCOMM sobre Bluetooth Classic.`
     } else if (hasNativeBridge) {
       diagnosticMessage = 'Ponte nativa Android detectada (window.AndroidOBD / Capacitor).'
     } else if (isAndroid) {
-      diagnosticMessage = `Chrome Android ${chromeVersion || 'antigo'} detectado: Web Serial sobre Bluetooth Classic SPP requer Chrome 138+ (chromestatus: Web serial over Bluetooth on Android). Para versões anteriores, utilize a ponte nativa Android (APK wrapper).`
+      diagnosticMessage = `Chrome Android ${chromeVersion || 'detectado'}: O seletor Web Serial para adaptadores Bluetooth Classic SPP ("OBDII") requer Chrome 138+ (flag BluetoothRfcommAndroid) ou APK wrapper nativo (window.AndroidOBD). Se o seletor informar "Nenhum dispositivo compatível encontrado", atualize o Chrome no Xiaomi para 138+ ou instale o APK nativo.`
     } else {
       diagnosticMessage = 'Navegador sem suporte a Web Serial RFCOMM ou Bluetooth Classic SPP.'
     }
@@ -157,7 +199,75 @@ export class AndroidBluetoothTransport implements OBDTransport {
   async connect(): Promise<boolean> {
     const env = AndroidBluetoothTransport.inspectEnvironment()
 
-    // 1. Tenta Web Serial RFCOMM (se suportado ou disponível no navegador)
+    techLogStore.addEntry({
+      direction: 'INFO',
+      stage: 'CONNECT_INIT',
+      details: `Iniciando conexão. Android: ${env.isAndroid}, Chrome: ${env.chromeVersion}, WebSerial: ${env.isWebSerialAvailable}, NativeBridge: ${env.hasNativeBridge}`,
+    })
+
+    // 1. Tenta reabrir porta previamente concedida/autorizada (Reutilização de pareamento — Requisito 7)
+    if (env.isWebSerialAvailable && (navigator as any).serial?.getPorts) {
+      try {
+        const ports = await (navigator as any).serial.getPorts()
+        if (ports && ports.length > 0) {
+          const reusedPort = ports[0]
+          techLogStore.addEntry({
+            direction: 'INFO',
+            stage: 'REUSE_PORT',
+            details: `Porta serial/Bluetooth previamente autorizada encontrada. Tentando reabertura rápida...`,
+          })
+          try {
+            await reusedPort.open({
+              baudRate: this.baudRate,
+              dataBits: 8,
+              stopBits: 1,
+              parity: 'none',
+              bufferSize: 4096,
+            })
+            this.port = reusedPort
+            this.connected = false // Falso até validar a ECU
+            this.activeMode = 'WEB_SERIAL_RFCOMM'
+            this.setDetailedStatus(
+              'ELM327_ENCONTRADO',
+              'Porta Bluetooth reutilizada do pareamento salvo.',
+            )
+
+            await this.runElmInitSequence()
+            this.connected = true
+            this.setDetailedStatus(
+              'VEICULO_CONECTADO',
+              `Veículo conectado. Protocolo: ${this.detectedProtocol}`,
+            )
+            this.emit(
+              'statusChange',
+              'CONECTADO',
+              `Conexão ELM327 Bluetooth Classic restabelecida. Protocolo: ${this.detectedProtocol}`,
+            )
+            return true
+          } catch (reuseErr: any) {
+            techLogStore.addEntry({
+              direction: 'ERR',
+              stage: 'REUSE_FAIL',
+              details: `Falha ao reabrir porta salva: ${reuseErr?.message || reuseErr}. Abrindo seletor...`,
+            })
+            // Prossegue para o requestPort normal
+          }
+        }
+      } catch (getPortsErr) {
+        console.warn('Erro ao consultar getPorts():', getPortsErr)
+      }
+    }
+
+    // 2. Se houver ponte nativa presente (window.AndroidOBD / Capacitor), prioriza ou faz fallback
+    if (env.hasNativeBridge) {
+      try {
+        return await this.connectNativeBridge()
+      } catch (bridgeErr) {
+        if (!env.isWebSerialAvailable) throw bridgeErr
+      }
+    }
+
+    // 3. Tenta Web Serial RFCOMM
     if (env.isWebSerialAvailable) {
       try {
         const ok = await this.connectWebSerialRfcomm()
@@ -167,7 +277,6 @@ export class AndroidBluetoothTransport implements OBDTransport {
         }
       } catch (err: any) {
         console.warn('Tentativa Web Serial RFCOMM falhou:', err?.message)
-        // Se houver ponte nativa, faz fallback
         if (env.hasNativeBridge) {
           return this.connectNativeBridge()
         }
@@ -176,22 +285,19 @@ export class AndroidBluetoothTransport implements OBDTransport {
       }
     }
 
-    // 2. Se não houver Web Serial ou for Chrome Android < 138, tenta Native Bridge
-    if (env.hasNativeBridge) {
-      return this.connectNativeBridge()
-    }
-
-    // 3. Nem Web Serial RFCOMM nem Native Bridge disponíveis: relatório claro da limitação
+    // 4. Sem suporte
     const errMsg = env.diagnosticMessage || 'Bluetooth Classic SPP indisponível neste navegador.'
+    this.setDetailedStatus('FALHA', errMsg)
     this.emit('statusChange', 'FALHA', errMsg)
     throw new Error(errMsg)
   }
 
   private async connectWebSerialRfcomm(): Promise<boolean> {
+    this.setDetailedStatus('CONECTANDO_ELM327', 'Aguardando seleção do dispositivo OBDII...')
     this.emit(
       'statusChange',
       'CONECTANDO',
-      'Selecione o adaptador ELM327 Bluetooth Classic pareado no Android/PC...',
+      'Selecione o adaptador ELM327 Bluetooth ("OBDII") pareado nas configurações...',
     )
 
     const serial = (navigator as any).serial
@@ -200,22 +306,41 @@ export class AndroidBluetoothTransport implements OBDTransport {
     }
 
     try {
-      // Solicita porta serial filtrando pelo UUID padrão SPP (RFCOMM)
+      techLogStore.addEntry({
+        direction: 'INFO',
+        stage: 'REQUEST_PORT',
+        details: `Solicitando requestPort com allowedBluetoothServiceClassIds: [${BLUETOOTH_CLASSIC_SPP_UUID}]`,
+      })
+
+      // Solicita porta serial permitindo o UUID padrão SPP (RFCOMM)
       try {
         this.port = await serial.requestPort({
           allowedBluetoothServiceClassIds: [BLUETOOTH_CLASSIC_SPP_UUID],
         })
       } catch (filterErr: any) {
-        // Fallback: se o navegador recusar o parâmetro allowedBluetoothServiceClassIds, tenta requestPort comum
-        console.warn('requestPort com filtro SPP não suportado, tentando sem filtro:', filterErr)
+        techLogStore.addEntry({
+          direction: 'ERR',
+          stage: 'REQUEST_PORT_FILTER_ERR',
+          details: `Filtro SPP recusado pelo navegador: ${filterErr?.message || filterErr}. Tentando requestPort sem opções...`,
+        })
+        // Fallback: se o navegador recusar allowedBluetoothServiceClassIds, tenta requestPort() comum
         this.port = await serial.requestPort()
       }
 
       if (!this.port) {
+        this.setDetailedStatus(
+          'DISPOSITIVO_NAO_PAREADO',
+          'Nenhum dispositivo Bluetooth OBDII selecionado.',
+        )
         throw new Error('Nenhum adaptador Bluetooth OBD-II selecionado.')
       }
 
+      this.setDetailedStatus(
+        'ELM327_ENCONTRADO',
+        'Dispositivo OBDII selecionado. Abrindo canal RFCOMM...',
+      )
       this.emit('statusChange', 'CONECTANDO', 'Abrindo canal RFCOMM SPP (38400 baud)...')
+
       await this.port.open({
         baudRate: this.baudRate,
         dataBits: 8,
@@ -224,11 +349,24 @@ export class AndroidBluetoothTransport implements OBDTransport {
         bufferSize: 4096,
       })
 
+      techLogStore.addEntry({
+        direction: 'INFO',
+        stage: 'PORT_OPEN',
+        details: `Porta RFCOMM SPP aberta com sucesso a ${this.baudRate} bauds. Iniciando handshake ELM327...`,
+      })
+
+      this.setDetailedStatus('CONECTANDO_ELM327', 'Porta RFCOMM aberta. Inicializando ELM327...')
+
+      // Executa sequência de inicialização ELM327 e validação de ECU
+      await this.runElmInitSequence()
+
+      // NUNCA marcar como VEÍCULO CONECTADO antes da validação completa do ELM e da ECU
       this.connected = true
       this.activeMode = 'WEB_SERIAL_RFCOMM'
-
-      // Executa sequência de inicialização ELM327
-      await this.runElmInitSequence()
+      this.setDetailedStatus(
+        'VEICULO_CONECTADO',
+        `Veículo conectado. Protocolo: ${this.detectedProtocol}`,
+      )
 
       this.emit(
         'statusChange',
@@ -239,11 +377,25 @@ export class AndroidBluetoothTransport implements OBDTransport {
     } catch (err: any) {
       this.connected = false
       this.port = null
+      const msg = err?.message || 'Falha na conexão Bluetooth SPP'
+      if (
+        msg.includes('No device selected') ||
+        msg.includes('cancelled') ||
+        msg.includes('AbortError')
+      ) {
+        this.setDetailedStatus(
+          'DISPOSITIVO_NAO_PAREADO',
+          'Seleção cancelada pelo usuário ou nenhum dispositivo pareado encontrado.',
+        )
+      } else {
+        this.setDetailedStatus('FALHA', msg)
+      }
       throw err
     }
   }
 
   private async connectNativeBridge(): Promise<boolean> {
+    this.setDetailedStatus('CONECTANDO_ELM327', 'Conectando via ponte nativa Android SPP...')
     this.emit('statusChange', 'CONECTANDO', 'Conectando via ponte nativa Android SPP...')
     this.nativeTransport = new AndroidNativeTransport()
 
@@ -255,9 +407,10 @@ export class AndroidBluetoothTransport implements OBDTransport {
 
     const ok = await this.nativeTransport.connect()
     if (ok) {
-      this.connected = true
       this.activeMode = 'NATIVE_BRIDGE'
       await this.runElmInitSequence()
+      this.connected = true
+      this.setDetailedStatus('VEICULO_CONECTADO', `Veículo conectado via ponte nativa Android.`)
       this.emit(
         'statusChange',
         'CONECTADO',
@@ -270,9 +423,11 @@ export class AndroidBluetoothTransport implements OBDTransport {
 
   /**
    * Sequência rigorosa de inicialização ELM327 com tolerância a clones:
-   * ATZ -> ATE0 -> ATL0 -> ATH0 -> ATS0 -> ATSP0 (ou protocolo específico Ford) -> confirmação de ECU
+   * ATZ -> ATE0 -> ATL0 -> ATH0 -> ATS0 -> ATSP0 (ou protocolo específico Ford) -> confirmação de ECU (0100) -> RPM (010C)
+   * NUNCA mostrar "Veículo conectado" se a ECU não responder.
    */
   private async runElmInitSequence(): Promise<void> {
+    this.setDetailedStatus('CONECTANDO_ELM327', 'Enviando ATZ (Reset do adaptador)...')
     this.emit(
       'statusChange',
       'CONECTANDO',
@@ -280,11 +435,16 @@ export class AndroidBluetoothTransport implements OBDTransport {
     )
 
     // 1. Reset ATZ
+    let atzResp = ''
     try {
-      await this.sendRaw('ATZ', 3500)
+      atzResp = await this.sendRaw('ATZ', 3500)
       await new Promise((r) => setTimeout(r, 400))
-    } catch {
-      // Tolera timeout em clones lentos
+    } catch (e) {
+      techLogStore.addEntry({
+        direction: 'ERR',
+        stage: 'ATZ_TIMEOUT',
+        details: 'Timeout no ATZ. Tentando prosseguir com ATE0...',
+      })
     }
 
     // 2. Parâmetros essenciais de formatação
@@ -299,27 +459,67 @@ export class AndroidBluetoothTransport implements OBDTransport {
     for (const item of setupCommands) {
       try {
         await this.sendRaw(item.cmd, 2500)
-        await new Promise((r) => setTimeout(r, 100))
+        await new Promise((r) => setTimeout(r, 80))
       } catch (e) {
         console.warn(`Comando ${item.cmd} (${item.desc}) ignorado ou timeout:`, e)
       }
     }
 
+    this.setDetailedStatus(
+      'ELM327_CONECTADO',
+      `ELM327 respondeu handshake AT. Versão/ID: ${atzResp.replace(/[>\r\n]/g, '').trim() || 'ELM327'}`,
+    )
+
     // 3. Confirmação de comunicação com a ECU via 0100
+    this.setDetailedStatus('CONECTANDO_ELM327', 'Consultando PID 0100 para handshake com a ECU...')
     this.emit('statusChange', 'CONECTANDO', 'Confirmando comunicação com a ECU do motor...')
+    let ecuResponded = false
+
     try {
-      const resp0100 = await this.sendRaw('0100', 4000)
-      if (resp0100.includes('UNABLE TO CONNECT') || resp0100.includes('BUS INIT: ERROR')) {
+      const resp0100 = await this.sendRaw('0100', 4500)
+      const clean0100 = resp0100.replace(/[>\r\n]/g, '').trim()
+
+      if (clean0100.includes('41 00') || clean0100.includes('4100')) {
+        ecuResponded = true
+      } else if (
+        clean0100.includes('UNABLE TO CONNECT') ||
+        clean0100.includes('BUS INIT: ERROR') ||
+        clean0100.includes('NO DATA') ||
+        clean0100.includes('ERROR')
+      ) {
         // Tenta protocolo específico ISO 15765-4 CAN (11 bit / 500k) — comum no EcoSport Dragon
+        techLogStore.addEntry({
+          direction: 'INFO',
+          stage: 'ECU_RETRY',
+          details: `0100 retornou "${clean0100}". Forçando protocolo ATSP6 (CAN 11bit 500k Ford)...`,
+        })
         try {
-          await this.sendRaw('ATSP6', 2000) // Protocol 6 = ISO 15765-4 (CAN 11/500)
-          await this.sendRaw('0100', 3500)
+          await this.sendRaw('ATSP6', 2000)
+          const respRetry = await this.sendRaw('0100', 4000)
+          if (respRetry.includes('41 00') || respRetry.includes('4100')) {
+            ecuResponded = true
+          }
         } catch {
           /* continua */
         }
       }
-    } catch {
-      /* tolera falha inicial e prossegue */
+    } catch (e: any) {
+      techLogStore.addEntry({
+        direction: 'ERR',
+        stage: '0100_TIMEOUT',
+        details: `Timeout ou erro na consulta 0100: ${e?.message || e}`,
+      })
+    }
+
+    if (!ecuResponded) {
+      this.setDetailedStatus(
+        'ECU_NAO_RESPONDEU',
+        'ELM327 conectado com sucesso, mas a ECU do veículo não respondeu (verifique se a ignição está ligada).',
+      )
+      // NUNCA declarar veículo conectado se a ECU não respondeu
+      throw new Error(
+        'ECU NÃO RESPONDEU: O adaptador ELM327 está conectado, mas a central do veículo não enviou resposta. Certifique-se de que a ignição está ligada.',
+      )
     }
 
     // 4. Detecção de protocolo
@@ -342,8 +542,35 @@ export class AndroidBluetoothTransport implements OBDTransport {
   }
 
   private async sendRaw(cmd: string, timeoutMs = 2500): Promise<string> {
+    const startTime = performance.now()
+
+    techLogStore.addEntry({
+      direction: 'TX',
+      command: cmd,
+      stage: 'SEND',
+    })
+
     if (this.activeMode === 'NATIVE_BRIDGE' && this.nativeTransport) {
-      return this.nativeTransport.send(cmd, timeoutMs)
+      try {
+        const res = await this.nativeTransport.send(cmd, timeoutMs)
+        const latency = Math.round(performance.now() - startTime)
+        techLogStore.addEntry({
+          direction: 'RX',
+          response: res,
+          latencyMs: latency,
+          stage: 'RECV_BRIDGE',
+        })
+        return res
+      } catch (e: any) {
+        const latency = Math.round(performance.now() - startTime)
+        techLogStore.addEntry({
+          direction: 'ERR',
+          command: cmd,
+          latencyMs: latency,
+          details: e?.message || 'Erro envio bridge',
+        })
+        throw e
+      }
     }
 
     if (!this.port) {
@@ -381,10 +608,30 @@ export class AndroidBluetoothTransport implements OBDTransport {
       }
 
       reader.releaseLock()
+      const latency = Math.round(performance.now() - startTime)
+      techLogStore.addEntry({
+        direction: 'RX',
+        command: cmd,
+        response: response.replace(/[>\r\n]/g, ' ').trim(),
+        latencyMs: latency,
+        stage: 'RECV_SERIAL',
+      })
+
       this.emit('data', response)
       return response
     } catch (err: any) {
-      if (err?.message === 'TIMEOUT_READ') {
+      const latency = Math.round(performance.now() - startTime)
+      const isTimeout = err?.message === 'TIMEOUT_READ'
+      techLogStore.addEntry({
+        direction: 'ERR',
+        command: cmd,
+        latencyMs: latency,
+        details: isTimeout
+          ? 'TIMEOUT de leitura (sem prompt >)'
+          : err?.message || 'Erro físico I/O',
+      })
+
+      if (isTimeout) {
         throw new Error('TIMEOUT de comunicação Bluetooth ELM327')
       }
       this.emit('error', err)

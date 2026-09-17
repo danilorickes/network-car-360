@@ -64,6 +64,7 @@ interface TelemetryContextType {
 const initialTelemetry: TelemetryState = {
   currentValues: {},
   connectionState: 'DESCONECTADO',
+  detailedConnectionStatus: 'DESCONECTADO',
   transportType: 'SIMULADOR',
   sessionState: 'IDLE',
   durationMs: 0,
@@ -243,6 +244,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         ...prev,
         transportType: type,
         connectionState: 'DESCONECTADO',
+        detailedConnectionStatus: 'DESCONECTADO',
       }))
     },
     [
@@ -266,17 +268,100 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         let vinRead = selectedVehicle?.vin || '9BFBJ55E6L8104921'
         let milState = false
 
+        let detailedSt: any = 'VEICULO_CONECTADO'
         if (transportRef.current instanceof SimulatedTransport) {
           protocolDetected = transportRef.current.getProtocol()
           vinRead = transportRef.current.getVin()
         } else if (transportRef.current instanceof AndroidBluetoothTransport) {
           protocolDetected = transportRef.current.getProtocol()
+          detailedSt = transportRef.current.getDetailedStatus()
         }
 
-        // Consulta DTCs e MIL iniciais
+        // Testes de verificação inicial obrigatórios: RPM (010C), Velocidade (010D), ECT (0105) e DTCs (03)
         let dtcCodes: string[] = []
         try {
-          const milResp = await transportRef.current.send('0101')
+          // PID 010C: RPM
+          const rpmResp = await transportRef.current.send('010C', 2500)
+          if (rpmResp.includes('41 0C') || rpmResp.includes('410C')) {
+            const parts = rpmResp
+              .replace(/[>\r\n]/g, '')
+              .trim()
+              .split(' ')
+            const hexA = parts[2] || '0'
+            const hexB = parts[3] || '0'
+            const rpmVal = Math.round((parseInt(hexA, 16) * 256 + parseInt(hexB, 16)) / 4)
+            if (!isNaN(rpmVal)) {
+              setTelemetry((p) => ({
+                ...p,
+                currentValues: {
+                  ...p.currentValues,
+                  '0x0C': {
+                    decoded: rpmVal,
+                    raw: rpmVal,
+                    unit: 'RPM',
+                    quality: 'OK',
+                    lastUpdatedUtc: new Date().toISOString(),
+                    sparkline: [rpmVal],
+                  },
+                },
+              }))
+            }
+          }
+
+          // PID 010D: Velocidade
+          const spdResp = await transportRef.current.send('010D', 2000)
+          if (spdResp.includes('41 0D') || spdResp.includes('410D')) {
+            const parts = spdResp
+              .replace(/[>\r\n]/g, '')
+              .trim()
+              .split(' ')
+            const spdVal = parseInt(parts[2] || '0', 16)
+            if (!isNaN(spdVal)) {
+              setTelemetry((p) => ({
+                ...p,
+                currentValues: {
+                  ...p.currentValues,
+                  '0x0D': {
+                    decoded: spdVal,
+                    raw: spdVal,
+                    unit: 'km/h',
+                    quality: 'OK',
+                    lastUpdatedUtc: new Date().toISOString(),
+                    sparkline: [spdVal],
+                  },
+                },
+              }))
+            }
+          }
+
+          // PID 0105: ECT (Temperatura líquido arrefecimento)
+          const ectResp = await transportRef.current.send('0105', 2000)
+          if (ectResp.includes('41 05') || ectResp.includes('4105')) {
+            const parts = ectResp
+              .replace(/[>\r\n]/g, '')
+              .trim()
+              .split(' ')
+            const ectVal = parseInt(parts[2] || '0', 16) - 40
+            if (!isNaN(ectVal)) {
+              setTelemetry((p) => ({
+                ...p,
+                currentValues: {
+                  ...p.currentValues,
+                  '0x05': {
+                    decoded: ectVal,
+                    raw: ectVal,
+                    unit: '°C',
+                    quality: 'OK',
+                    lastUpdatedUtc: new Date().toISOString(),
+                    sparkline: [ectVal],
+                  },
+                },
+              }))
+            }
+          }
+
+          // PID 0101: MIL
+          const milResp = await transportRef.current.send('0101', 2000)
           if (milResp.includes('41 01')) {
             const parts = milResp
               .replace(/[>\r\n]/g, '')
@@ -285,17 +370,30 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
             const byteA = parseInt(parts[2], 16)
             if (!isNaN(byteA) && (byteA & 0x80) !== 0) milState = true
           }
-          const dtcResp = await transportRef.current.send('03')
+
+          // Mode 03: Leitura de DTCs
+          const dtcResp = await transportRef.current.send('03', 2500)
           if (dtcResp.includes('43')) {
-            // Parser simples para extrair código
             const cleaned = dtcResp.replace(/[>\r\n]/g, '').trim()
             if (cleaned.includes('03 01')) dtcCodes.push('P0301')
             if (cleaned.includes('01 71')) dtcCodes.push('P0171')
             if (cleaned.includes('02 99')) dtcCodes.push('P0299')
           }
-        } catch {
-          /* intentionally ignored */
+        } catch (initialPidErr) {
+          console.warn('Erro na consulta rápida pós-conexão:', initialPidErr)
         }
+
+        setTelemetry((p) => ({
+          ...p,
+          connectionState: 'CONECTADO',
+          detailedConnectionStatus: detailedSt,
+          milOn: milState,
+          dtcList: dtcCodes.map((code) => ({
+            dtc_code: code,
+            description: `Código detectado no handshake OBD`,
+            status: 'CONFIRMADO' as any,
+          })),
+        }))
 
         // Persiste/atualiza a capacidade/assinatura OBD do veículo se houver veículo selecionado
         if (selectedVehicle?.id) {
@@ -358,6 +456,11 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (transportRef.current) {
       await transportRef.current.disconnect()
     }
+    setTelemetry((p) => ({
+      ...p,
+      connectionState: 'DESCONECTADO',
+      detailedConnectionStatus: 'DESCONECTADO',
+    }))
   }
 
   const simulateCommunicationDrop = () => {

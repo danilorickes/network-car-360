@@ -6,7 +6,13 @@ export interface PlatformCapabilities {
   isLinux: boolean
   hasWebSerial: boolean
   hasWebBluetooth: boolean
-  recommendedTransport: 'SIMULADOR' | 'OBD REAL SERIAL' | 'OBD REAL BLUETOOTH'
+  chromeVersion: number | null
+  canUseWebSerialRfcomm: boolean
+  recommendedTransport:
+    | 'SIMULADOR'
+    | 'OBD REAL SERIAL'
+    | 'OBD REAL BLUETOOTH'
+    | 'OBD REAL BLUETOOTH CLASSIC'
   guidanceText: string
 }
 
@@ -20,6 +26,8 @@ export function detectPlatformCapabilities(): PlatformCapabilities {
       isLinux: false,
       hasWebSerial: false,
       hasWebBluetooth: false,
+      chromeVersion: null,
+      canUseWebSerialRfcomm: false,
       recommendedTransport: 'SIMULADOR',
       guidanceText: 'Ambiente sem navegador identificado. Operando em modo simulador.',
     }
@@ -35,28 +43,28 @@ export function detectPlatformCapabilities(): PlatformCapabilities {
   const hasWebSerial = typeof navigator !== 'undefined' && 'serial' in navigator
   const hasWebBluetooth = typeof navigator !== 'undefined' && 'bluetooth' in navigator
 
-  let recommendedTransport: 'SIMULADOR' | 'OBD REAL SERIAL' | 'OBD REAL BLUETOOTH' = 'SIMULADOR'
-  let guidanceText = ''
-
   const chromeMatch = userAgent.match(/chrome\/(\d+)/i)
   const chromeVersion = chromeMatch ? parseInt(chromeMatch[1], 10) : null
+  const canUseWebSerialRfcomm =
+    hasWebSerial && (isAndroid ? chromeVersion !== null && chromeVersion >= 138 : true)
+
+  let recommendedTransport:
+    | 'SIMULADOR'
+    | 'OBD REAL SERIAL'
+    | 'OBD REAL BLUETOOTH'
+    | 'OBD REAL BLUETOOTH CLASSIC' = 'SIMULADOR'
+  let guidanceText = ''
 
   if (isAndroid) {
-    if (hasWebSerial && chromeVersion !== null && chromeVersion >= 138) {
-      recommendedTransport = 'OBD REAL BLUETOOTH'
-      guidanceText = `Chrome Android ${chromeVersion} detectado: Suporte direto a ELM327 Bluetooth Classic via Web Serial RFCOMM (SPP UUID 00001101). Pareie nas configurações do Android e selecione o dispositivo no assistente.`
+    // No Android, Bluetooth Classic é a opção PRINCIPAL
+    recommendedTransport = 'OBD REAL BLUETOOTH CLASSIC'
+    if (canUseWebSerialRfcomm) {
+      guidanceText = `Chrome Android ${chromeVersion} detectado: Suporte nativo a ELM327 Bluetooth Classic via Web Serial RFCOMM (SPP 00001101). Dispositivo "OBDII" pareado no Android será listado no seletor.`
     } else if (hasWebSerial) {
-      recommendedTransport = 'OBD REAL SERIAL'
-      guidanceText =
-        'Ambiente Android com Web Serial detectado. Para adaptadores Bluetooth Classic SPP no Android, o Chrome 138+ oferece suporte nativo RFCOMM; em versões anteriores utilize cabo USB-OTG ou a ponte nativa Android.'
-    } else if (hasWebBluetooth) {
-      recommendedTransport = 'OBD REAL BLUETOOTH'
-      guidanceText =
-        'Ambiente Android detectado: Web Bluetooth (GATT/BLE) ativo. Para adaptador Bluetooth Classic SPP (v1.5/v2.1), utilize Chrome 138+ com RFCOMM ou a ponte nativa Android.'
+      guidanceText = `Chrome Android ${chromeVersion || 'atual'} detectado. No Android, o seletor Web Serial para dispositivos Bluetooth Classic SPP ("OBDII") exige Chrome 138+ (flag BluetoothRfcommAndroid) ou APK wrapper nativo (window.AndroidOBD). Se o seletor informar "Nenhum dispositivo compatível encontrado", atualize o Chrome para v138+ ou instale o APK.`
     } else {
-      recommendedTransport = 'SIMULADOR'
       guidanceText =
-        'Ambiente Android sem suporte a portas seriais no navegador. Utilize Chrome 138+ ou o aplicativo nativo Android.'
+        'Ambiente Android detectado. Para Bluetooth Classic ELM327 ("OBDII"), utilize Google Chrome 138+ no Android ou o APK wrapper com ponte nativa.'
     }
   } else if (hasWebSerial) {
     recommendedTransport = 'OBD REAL SERIAL'
@@ -79,6 +87,8 @@ export function detectPlatformCapabilities(): PlatformCapabilities {
     isLinux,
     hasWebSerial,
     hasWebBluetooth,
+    chromeVersion,
+    canUseWebSerialRfcomm,
     recommendedTransport,
     guidanceText,
   }

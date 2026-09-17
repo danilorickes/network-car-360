@@ -234,6 +234,17 @@ export interface TelemetryState {
     }
   >
   connectionState: 'DESCONECTADO' | 'CONECTANDO' | 'CONECTADO' | 'RECONECTANDO' | 'FALHA'
+  detailedConnectionStatus?:
+    | 'DESCONECTADO'
+    | 'BLUETOOTH_DESLIGADO'
+    | 'DISPOSITIVO_NAO_PAREADO'
+    | 'ELM327_ENCONTRADO'
+    | 'CONECTANDO_ELM327'
+    | 'ELM327_CONECTADO'
+    | 'ECU_NAO_RESPONDEU'
+    | 'VEICULO_CONECTADO'
+    | 'RECONECTANDO'
+    | 'FALHA'
   transportType: AdapterType
   sessionState: 'IDLE' | 'TESTE ATIVO' | 'ENCERRADO'
   activeSessionId?: string

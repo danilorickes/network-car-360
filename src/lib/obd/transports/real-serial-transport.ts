@@ -1,4 +1,5 @@
 import { OBDTransport, OBDTransportEvents } from './obd-transport'
+import { techLogStore } from '../tech-log-store'
 
 /**
  * RealSerialTransport: Implementação Web Serial API para adaptador ELM327 físico (USB/Bluetooth Serial).
@@ -111,6 +112,13 @@ export class RealSerialTransport implements OBDTransport {
       throw new Error('SEM COMUNICAÇÃO: Transporte serial desconectado.')
     }
 
+    const startTime = performance.now()
+    techLogStore.addEntry({
+      direction: 'TX',
+      command: cmd,
+      stage: 'SERIAL_SEND',
+    })
+
     try {
       const textEncoder = new TextEncoder()
       const textDecoder = new TextDecoder()
@@ -143,9 +151,25 @@ export class RealSerialTransport implements OBDTransport {
       }
 
       reader.releaseLock()
+      const latency = Math.round(performance.now() - startTime)
+      techLogStore.addEntry({
+        direction: 'RX',
+        command: cmd,
+        response: response.replace(/[>\r\n]/g, ' ').trim(),
+        latencyMs: latency,
+        stage: 'SERIAL_RECV',
+      })
+
       this.emit('data', response)
       return response
     } catch (err: any) {
+      const latency = Math.round(performance.now() - startTime)
+      techLogStore.addEntry({
+        direction: 'ERR',
+        command: cmd,
+        latencyMs: latency,
+        details: err?.message || 'Erro serial',
+      })
       if (err?.message === 'TIMEOUT_READ') {
         throw new Error('TIMEOUT de comunicação serial')
       }
@@ -158,6 +182,11 @@ export class RealSerialTransport implements OBDTransport {
 
   private async handleDisconnect(): Promise<void> {
     this.connected = false
+    techLogStore.addEntry({
+      direction: 'ERR',
+      stage: 'SERIAL_DISCONNECT',
+      details: 'Perda de comunicação física serial USB. Tentando restabelecer...',
+    })
     this.emit('statusChange', 'RECONECTANDO', 'Tentando recuperar comunicação serial...')
 
     for (let i = 1; i <= this.reconnectAttempts; i++) {
@@ -167,6 +196,11 @@ export class RealSerialTransport implements OBDTransport {
           await this.port.close().catch(() => {})
           await this.port.open({ baudRate: this.baudRate })
           this.connected = true
+          techLogStore.addEntry({
+            direction: 'INFO',
+            stage: 'SERIAL_RECONNECT_OK',
+            details: `Reconexão serial USB bem-sucedida na tentativa ${i}!`,
+          })
           this.emit('statusChange', 'CONECTADO', 'Reconexão serial bem-sucedida!')
           return
         }
