@@ -43,7 +43,7 @@ interface TelemetryContextType {
   activeScenario: SimulatorScenario
   setActiveScenario: (s: SimulatorScenario) => void
   setTransportType: (type: AdapterType) => void
-  connectTransport: () => Promise<boolean>
+  connectTransport: (targetMacAddress?: string, deviceName?: string) => Promise<boolean>
   disconnectTransport: () => Promise<void>
   startSession: (
     vehicleIdOrName?: string,
@@ -258,8 +258,16 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   )
 
   // Conexão OBD & Descoberta com registro de assinatura (Requisito 2)
-  const connectTransport = async (): Promise<boolean> => {
+  const connectTransport = async (
+    targetMacAddress?: string,
+    deviceName?: string,
+  ): Promise<boolean> => {
     if (!transportRef.current) return false
+
+    if (transportRef.current instanceof AndroidBluetoothTransport && targetMacAddress) {
+      transportRef.current.setTargetDevice(targetMacAddress, deviceName)
+    }
+
     try {
       const ok = await transportRef.current.connect()
       if (ok) {

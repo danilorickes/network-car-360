@@ -70,10 +70,21 @@ export class AndroidBluetoothTransport implements OBDTransport {
   private detectedProtocol = 'ISO 15765-4 (CAN 11/500)'
   private detailedStatus: DetailedOBDConnectionStatus = 'DESCONECTADO'
   private deviceName: string = 'OBDII'
+  private targetMacAddress?: string
 
-  constructor(baudRate = 38400, reconnectAttempts = 3) {
+  constructor(baudRate = 38400, reconnectAttempts = 3, targetMacAddress?: string) {
     this.baudRate = baudRate
     this.reconnectAttempts = reconnectAttempts
+    this.targetMacAddress = targetMacAddress
+  }
+
+  setTargetDevice(address: string, name?: string) {
+    this.targetMacAddress = address
+    if (name) this.deviceName = name
+  }
+
+  getNativeTransport(): AndroidNativeTransport | null {
+    return this.nativeTransport
   }
 
   getDetailedStatus(): DetailedOBDConnectionStatus {
@@ -258,11 +269,16 @@ export class AndroidBluetoothTransport implements OBDTransport {
       }
     }
 
-    // 2. Se houver ponte nativa presente (window.AndroidOBD / Capacitor), prioriza ou faz fallback
+    // 2. Se houver ponte nativa presente (window.AndroidOBD / Capacitor), prioriza a conexão nativa
     if (env.hasNativeBridge) {
       try {
         return await this.connectNativeBridge()
       } catch (bridgeErr) {
+        techLogStore.addEntry({
+          direction: 'ERR',
+          stage: 'BRIDGE_FALLBACK',
+          details: `Falha na ponte nativa Android: ${bridgeErr?.message || bridgeErr}. Verificando Web Serial...`,
+        })
         if (!env.isWebSerialAvailable) throw bridgeErr
       }
     }
@@ -402,9 +418,16 @@ export class AndroidBluetoothTransport implements OBDTransport {
   }
 
   private async connectNativeBridge(): Promise<boolean> {
-    this.setDetailedStatus('CONECTANDO_ELM327', 'Conectando via ponte nativa Android SPP...')
-    this.emit('statusChange', 'CONECTANDO', 'Conectando via ponte nativa Android SPP...')
+    this.setDetailedStatus('CONECTANDO_ELM327', 'Conectando via ponte nativa Android SPP/RFCOMM...')
+    this.emit('statusChange', 'CONECTANDO', 'Conectando via ponte nativa Android SPP/RFCOMM...')
     this.nativeTransport = new AndroidNativeTransport()
+
+    if (this.targetMacAddress) {
+      this.nativeTransport.setSelectedDevice({
+        address: this.targetMacAddress,
+        name: this.deviceName || 'OBDII',
+      })
+    }
 
     this.nativeTransport.on('statusChange', (st, msg) => {
       this.emit('statusChange', st, msg)
@@ -412,20 +435,45 @@ export class AndroidBluetoothTransport implements OBDTransport {
     this.nativeTransport.on('data', (d) => this.emit('data', d))
     this.nativeTransport.on('error', (e) => this.emit('error', e))
 
-    const ok = await this.nativeTransport.connect()
-    if (ok) {
-      this.activeMode = 'NATIVE_BRIDGE'
-      await this.runElmInitSequence()
-      this.connected = true
-      this.setDetailedStatus('VEICULO_CONECTADO', `Veículo conectado via ponte nativa Android.`)
-      this.emit(
-        'statusChange',
-        'CONECTADO',
-        `Conexão ELM327 Bluetooth ativa via ponte nativa Android. Protocolo: ${this.detectedProtocol}`,
-      )
-      return true
+    try {
+      const ok = await this.nativeTransport.connect(this.targetMacAddress)
+      if (ok) {
+        this.activeMode = 'NATIVE_BRIDGE'
+        const dev = this.nativeTransport.getSelectedDevice()
+        if (dev) {
+          this.deviceName = dev.name
+          this.setDetailedStatus(
+            'ELM327_ENCONTRADO',
+            `Dispositivo ${dev.name} (${dev.address}) conectado via RFCOMM.`,
+          )
+        }
+
+        // Executa handshake com ELM327 e ECU
+        await this.runElmInitSequence()
+        this.connected = true
+        this.setDetailedStatus('VEICULO_CONECTADO', `Veículo conectado via ponte nativa Android.`)
+        this.emit(
+          'statusChange',
+          'CONECTADO',
+          `Conexão ELM327 Bluetooth ativa via ponte nativa Android (${this.deviceName}). Protocolo: ${this.detectedProtocol}`,
+        )
+        return true
+      }
+      return false
+    } catch (err: any) {
+      this.connected = false
+      const msg = err?.message || 'Falha na conexão via ponte nativa Android'
+      if (msg.includes('Bluetooth desligado')) {
+        this.setDetailedStatus('BLUETOOTH_DESLIGADO', msg)
+      } else if (msg.includes('Nenhum dispositivo')) {
+        this.setDetailedStatus('DISPOSITIVO_NAO_PAREADO', msg)
+      } else if (msg.includes('ECU NÃO RESPONDEU')) {
+        this.setDetailedStatus('ECU_NAO_RESPONDEU', msg)
+      } else {
+        this.setDetailedStatus('FALHA', msg)
+      }
+      throw err
     }
-    return false
   }
 
   /**

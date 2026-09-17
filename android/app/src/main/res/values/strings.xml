@@ -1,0 +1,6 @@
+<resources>
+    <string name="app_name">NETWORK CAR — TESTE/HOMOLOGAÇÃO</string>
+    <string name="title_activity_main">NETWORK CAR — TESTE/HOMOLOGAÇÃO</string>
+    <string name="package_name">br.com.networkcar.diagnostico360</string>
+    <string name="custom_url_scheme">br.com.networkcar.diagnostico360</string>
+</resources>

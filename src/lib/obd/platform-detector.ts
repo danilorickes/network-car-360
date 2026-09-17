@@ -8,6 +8,7 @@ export interface PlatformCapabilities {
   hasWebBluetooth: boolean
   chromeVersion: number | null
   canUseWebSerialRfcomm: boolean
+  hasNativeBridge?: boolean
   recommendedTransport:
     | 'SIMULADOR'
     | 'OBD REAL SERIAL'
@@ -89,6 +90,13 @@ export function detectPlatformCapabilities(): PlatformCapabilities {
     hasWebBluetooth,
     chromeVersion,
     canUseWebSerialRfcomm,
+    hasNativeBridge:
+      typeof window !== 'undefined' &&
+      Boolean(
+        (window as any).AndroidOBD ||
+        (window as any).Capacitor?.Plugins?.AndroidOBD ||
+        (window as any).Capacitor?.Plugins?.OBDPlugin,
+      ),
     recommendedTransport,
     guidanceText,
   }

@@ -1,0 +1,15 @@
+{
+  "appId": "br.com.networkcar.diagnostico360",
+  "appName": "NETWORK CAR — TESTE/HOMOLOGAÇÃO",
+  "webDir": "dist",
+  "bundledWebRuntime": false,
+  "server": {
+    "androidScheme": "https",
+    "cleartext": true
+  },
+  "android": {
+    "allowMixedContent": true,
+    "captureInput": true,
+    "webContentsDebuggingEnabled": true
+  }
+}
