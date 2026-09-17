@@ -55,7 +55,7 @@ class MainActivity : AppCompatActivity() {
         setupErrorPanelActions()
 
         // Log inicial com detalhes de versão e diretório
-        logDiagnostic("INFO", "MainActivity iniciada. Versão 0.0.36-homologacao-e6.6.1")
+        logDiagnostic("INFO", "MainActivity iniciada. Versão 0.0.39-homologacao-e6.6.1")
         verifyAssetPresence()
 
         // Configurações do WebView

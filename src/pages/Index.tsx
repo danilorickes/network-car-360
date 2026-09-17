@@ -145,12 +145,12 @@ export default function Index() {
               </p>
             </div>
           </div>
-          <a
-            href={`/replay${telemetry.activeSessionId ? `?session=${telemetry.activeSessionId}` : ''}`}
+          <Link
+            to={`/replay${telemetry.activeSessionId ? `?session=${telemetry.activeSessionId}` : ''}`}
             className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs px-4 py-2 rounded-lg flex items-center space-x-1.5 shrink-0 shadow"
           >
             <span>Abrir Diagnóstico 360</span>
-          </a>
+          </Link>
         </div>
       )}
 

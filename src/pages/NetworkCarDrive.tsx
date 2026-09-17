@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react'
+import { Link } from 'react-router-dom'
 import {
   Car,
   Compass,
@@ -1084,13 +1085,13 @@ export const NetworkCarDrive: React.FC = () => {
                   </div>
                   <div className="bg-[#121A24] p-2 rounded border border-[#202B37]">
                     <span className="text-[10px] text-gray-400 block">Acesso Diagnóstico</span>
-                    <a
-                      href="/replay"
+                    <Link
+                      to="/replay"
                       className="text-cyan-400 underline flex items-center space-x-1"
                     >
                       <span>Abrir Caixa-Preta</span>
                       <ExternalLink className="w-3 h-3" />
-                    </a>
+                    </Link>
                   </div>
                 </div>
               </div>
