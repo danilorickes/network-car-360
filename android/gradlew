@@ -7,4 +7,19 @@
 
 # Attempt to set APP_HOME
 APP_HOME=$(cd "$(dirname "$0")" && pwd -P)
-exec "$APP_HOME/gradle/wrapper/gradle-wrapper.jar" "$@"
+WRAPPER_JAR="$APP_HOME/gradle/wrapper/gradle-wrapper.jar"
+
+if [ -f "$WRAPPER_JAR" ]; then
+    exec java -jar "$WRAPPER_JAR" "$@"
+else
+    # Fallback caso o JAR do wrapper nao tenha sido commitado:
+    # usa gradle do sistema para regenerar o wrapper na versao 8.2 configurada
+    # em gradle-wrapper.properties, garantindo que o Gradle 8.2 execute a compilacao
+    # e nunca o Gradle 9+ do sistema (que causa mutacao tardia de debugCompileClasspath).
+    gradle wrapper --gradle-version 8.2 --distribution-type all >/dev/null 2>&1 || true
+    if [ -f "$WRAPPER_JAR" ]; then
+        exec java -jar "$WRAPPER_JAR" "$@"
+    else
+        exec gradle "$@"
+    fi
+fi

@@ -57,14 +57,18 @@ jobs:
           cd android
           chmod +x gradlew || true
 
+      - name: Configurar Gradle Wrapper 8.2
+        run: |
+          cd android
+          if [ ! -f "gradle/wrapper/gradle-wrapper.jar" ]; then
+            echo "Gerando Gradle Wrapper 8.2 explicitamente..."
+            gradle wrapper --gradle-version 8.2 --distribution-type all
+          fi
+
       - name: Compilar APK Debug
         run: |
           cd android
-          if [ -f "gradle/wrapper/gradle-wrapper.jar" ]; then
-            ./gradlew assembleDebug --no-daemon --stacktrace
-          else
-            gradle assembleDebug --no-daemon --stacktrace || (echo "Instalando wrapper..." && gradle wrapper && ./gradlew assembleDebug)
-          fi
+          ./gradlew assembleDebug --no-daemon --stacktrace
 
       - name: Renomear APK de Homologação
         run: |
