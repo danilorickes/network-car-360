@@ -16,23 +16,28 @@ jobs:
       - name: Checkout do Repositório
         uses: actions/checkout@v4
 
-      - name: Configurar Node.js (v20)
+      - name: Configurar pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          run_install: false
+
+      - name: Configurar Node.js (v22 LTS)
         uses: actions/setup-node@v4
         with:
-          node-version: 20
-          cache: 'npm'
+          node-version: 22
+          cache: 'pnpm'
 
       - name: Instalar Dependências Frontend
-        run: npm ci
+        run: pnpm install --frozen-lockfile
 
       - name: Compilar Frontend React Vite (Web Build)
-        run: npm run build
+        run: pnpm run build
 
       - name: Copiar Bundle Web para Assets do App Android
         run: |
           mkdir -p android/app/src/main/assets
           cp -r dist/* android/app/src/main/assets/
-          echo "Assets copiados para android/app/src/main/assets/"
+          echo "Assets copiados para android/app/src/main/assets/:"
           ls -la android/app/src/main/assets/
 
       - name: Configurar JDK 17
@@ -61,11 +66,12 @@ jobs:
       - name: Renomear APK de Homologação
         run: |
           APK_PATH=$(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
-          if [ -f "$APK_PATH" ]; then
+          if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
             cp "$APK_PATH" network-car-teste-homologacao-e6.6.1.apk
-            echo "APK preparado: network-car-teste-homologacao-e6.6.1.apk"
+            echo "APK preparado: network-car-teste-homologacao-e6.6.1.apk a partir de $APK_PATH"
           else
-            echo "Aviso: APK não encontrado no caminho padrão."
+            echo "Erro: APK não encontrado no diretório android/app/build/outputs/apk/debug/"
+            exit 1
           fi
 
       - name: Publicar Artefato APK (Download Direto)
@@ -75,4 +81,5 @@ jobs:
           path: |
             network-car-teste-homologacao-e6.6.1.apk
             android/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
           retention-days: 30
