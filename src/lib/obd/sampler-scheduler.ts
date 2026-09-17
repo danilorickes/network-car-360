@@ -1,6 +1,7 @@
 import { OBDTransport } from './transports/obd-transport'
 import { PID_DEFINITIONS, PidDecoder } from './pid-decoder'
 import { ElmProtocolParser } from './elm-parser'
+import { OBDPipelineEngine } from './obd-pipeline-engine'
 import { RawRecorder } from './raw-recorder'
 import { RawSampleModel, SampleQuality } from '../types/obd'
 import { techLogStore } from './tech-log-store'
@@ -127,8 +128,8 @@ export class SamplerScheduler {
         discovered.push(...PidDecoder.parseSupportedPidsBitmap(0, parsed00.bytes))
       }
 
-      // 01 20: PIDs 21 a 40 (se PID 20 estiver presente)
-      if (discovered.includes('0x20') || discovered.length > 0) {
+      // 01 20: PIDs 21 a 40 (se PID 20 for suportado)
+      if (discovered.includes('0x20')) {
         const res20 = await this.transport.send('0120', 2500).catch(() => '')
         const parsed20 = ElmProtocolParser.parseMode01(res20, '20')
         if (!parsed20.isError && parsed20.bytes.length >= 4) {
@@ -136,7 +137,7 @@ export class SamplerScheduler {
         }
       }
 
-      // 01 40: PIDs 41 a 60
+      // 01 40: PIDs 41 a 60 (se PID 40 for suportado)
       if (discovered.includes('0x40')) {
         const res40 = await this.transport.send('0140', 2500).catch(() => '')
         const parsed40 = ElmProtocolParser.parseMode01(res40, '40')
@@ -144,14 +145,23 @@ export class SamplerScheduler {
           discovered.push(...PidDecoder.parseSupportedPidsBitmap(64, parsed40.bytes))
         }
       }
+
+      // 01 60: PIDs 61 a 80 (se PID 60 for suportado)
+      if (discovered.includes('0x60')) {
+        const res60 = await this.transport.send('0160', 2500).catch(() => '')
+        const parsed60 = ElmProtocolParser.parseMode01(res60, '60')
+        if (!parsed60.isError && parsed60.bytes.length >= 4) {
+          discovered.push(...PidDecoder.parseSupportedPidsBitmap(96, parsed60.bytes))
+        }
+      }
     } catch {
       // Fallback gracioso
     }
 
-    // Se a ECU não respondeu bitmask (ou modo simulado customizado), inclui lista padrão
+    // Se a ECU não respondeu bitmask (ou modo simulado customizado), inclui lista padrão universal
     const finalList =
       discovered.length > 0
-        ? discovered
+        ? Array.from(new Set(discovered))
         : [
             '0x0C',
             '0x0D',
@@ -264,52 +274,68 @@ export class SamplerScheduler {
 
     try {
       const rawText = await this.transport.send(`01${cleanHex}`, 1500)
-      const parsed = ElmProtocolParser.parseMode01(rawText, cleanHex)
+      const pipelineResult = OBDPipelineEngine.processPidResponse(
+        rawText,
+        cleanHex,
+        '01',
+        monoOffsetMs,
+      )
 
       let quality: SampleQuality = 'OK'
       let decodedVal: number | undefined
       let rawVal: number | undefined
       let unit: string | undefined
 
-      if (parsed.isError) {
-        if (parsed.errorMessage === 'NO DATA') {
-          quality = 'UNSUPPORTED'
-        } else if (parsed.errorMessage === 'UNABLE TO CONNECT') {
-          quality = 'TIMEOUT'
-        } else {
-          quality = 'INVALID'
-        }
-
-        // REGISTRO DE NÃO-MÁSCARA: sempre que uma resposta falhar ou for classificada como INVALID/UNSUPPORTED/TIMEOUT,
-        // registrar no TechLogStore com rawText bruto e o motivo exato apontado pelo parser
+      if (pipelineResult.sampleStatus === 'OK') {
+        decodedVal = pipelineResult.decodedValue
+        unit = pipelineResult.unit
+        rawVal = pipelineResult.dataBytes[0]
+        quality = 'OK'
+      } else if (pipelineResult.sampleStatus === 'PID_NAO_SUPORTADO') {
+        quality = 'UNSUPPORTED'
         techLogStore.addEntry({
           direction: 'ERR',
           command: `01${cleanHex}`,
           rawResponse: rawText,
           response: rawText.replace(/[>\r\n]/g, ' ').trim(),
           stage: 'PARSER_REJECTED',
-          errorReason: parsed.errorMessage || 'FORMATO NÃO RECONHECIDO',
-          details: `PID ${pidHex} classificado como ${quality} pelo parser: [${parsed.errorMessage || 'FORMATO NÃO RECONHECIDO'}]. Resposta bruta: ${JSON.stringify(rawText)}`,
+          errorReason: 'NO DATA',
+          details: `PID ${pidHex} não suportado pela ECU (NO DATA). Resposta bruta: ${JSON.stringify(rawText)}`,
+        })
+      } else if (pipelineResult.sampleStatus === 'SEM_COMUNICACAO') {
+        quality = 'TIMEOUT'
+        techLogStore.addEntry({
+          direction: 'ERR',
+          command: `01${cleanHex}`,
+          rawResponse: rawText,
+          response: rawText.replace(/[>\r\n]/g, ' ').trim(),
+          stage: 'PARSER_REJECTED',
+          errorReason: 'UNABLE TO CONNECT',
+          details: `ECU sem comunicação: [${pipelineResult.errorReason}]. Resposta bruta: ${JSON.stringify(rawText)}`,
+        })
+      } else if (pipelineResult.sampleStatus === 'ERRO_DECODER') {
+        quality = 'INVALID'
+        techLogStore.addEntry({
+          direction: 'ERR',
+          command: `01${cleanHex}`,
+          rawResponse: rawText,
+          response: rawText.replace(/[>\r\n]/g, ' ').trim(),
+          stage: 'DECODER_REJECTED',
+          errorReason: pipelineResult.errorReason || 'DECODER_UNKNOWN_PID_OR_BYTES',
+          details: `PID ${pidHex} possui bytes [${pipelineResult.dataBytes.join(', ')}] mas falhou no decoder: ${pipelineResult.errorReason}. Resposta bruta: ${JSON.stringify(rawText)}`,
         })
       } else {
-        const decodedInfo = PidDecoder.decodePid(pidHex, parsed.bytes)
-        if (decodedInfo) {
-          decodedVal = decodedInfo.decoded
-          unit = decodedInfo.unit
-          rawVal = parsed.bytes[0]
-          quality = 'OK'
-        } else {
-          quality = 'INVALID'
-          techLogStore.addEntry({
-            direction: 'ERR',
-            command: `01${cleanHex}`,
-            rawResponse: rawText,
-            response: rawText.replace(/[>\r\n]/g, ' ').trim(),
-            stage: 'DECODER_REJECTED',
-            errorReason: 'DECODER_UNKNOWN_PID_OR_BYTES',
-            details: `PID ${pidHex} possui bytes [${parsed.bytes.join(', ')}] mas PidDecoder não pôde decodificar. Resposta bruta: ${JSON.stringify(rawText)}`,
-          })
-        }
+        // ERRO_PARSER / RESPOSTA_INVALIDA / TIMEOUT
+        quality = pipelineResult.sampleStatus === 'TIMEOUT' ? 'TIMEOUT' : 'INVALID'
+        techLogStore.addEntry({
+          direction: 'ERR',
+          command: `01${cleanHex}`,
+          rawResponse: rawText,
+          response: rawText.replace(/[>\r\n]/g, ' ').trim(),
+          stage: 'PARSER_REJECTED',
+          errorReason: pipelineResult.errorReason || 'FORMATO NÃO RECONHECIDO',
+          details: `PID ${pidHex} rejeitado pelo pipeline [${pipelineResult.sampleStatus}]: ${pipelineResult.errorReason}. Resposta bruta: ${JSON.stringify(rawText)}`,
+        })
       }
 
       const sample: RawSampleModel = {
@@ -318,8 +344,8 @@ export class SamplerScheduler {
         ts_utc: utcIso,
         ts_mono_offset_ms: monoOffsetMs,
         pid: pidHex,
-        raw_value: quality === 'UNSUPPORTED' ? undefined : rawVal,
-        decoded_value: quality === 'UNSUPPORTED' ? undefined : decodedVal,
+        raw_value: quality === 'OK' ? rawVal : undefined,
+        decoded_value: quality === 'OK' ? decodedVal : undefined,
         unit,
         quality,
         origin: this.origin,

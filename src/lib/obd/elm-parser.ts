@@ -4,6 +4,8 @@
  * Remove prompts '>', ecos, espaços e trata status: NO DATA, UNABLE TO CONNECT, ?, SEARCHING...
  */
 
+import { OBDPipelineEngine } from './obd-pipeline-engine'
+
 export interface ParsedPidResponse {
   mode: string
   pid: string
@@ -38,97 +40,45 @@ export class ElmProtocolParser {
    * Formato esperado: "41 0C 1A F8" ou em múltiplas linhas
    */
   static parseMode01(raw: string, requestedPid: string): ParsedPidResponse {
-    const cleaned = this.cleanResponse(raw)
-    const normalizedPid = requestedPid.replace(/^0x/i, '').toUpperCase()
+    const cleanPid = requestedPid.replace(/^0x/i, '').toUpperCase().padStart(2, '0')
+    const pidHex = `0x${cleanPid}`
 
-    if (!cleaned || cleaned.includes('NO DATA')) {
+    // Utiliza o motor estruturado OBDPipelineEngine para extração robusta e normalizada de frames
+    const extraction = OBDPipelineEngine.extractFrames(raw, cleanPid, '01')
+
+    if (extraction.adapterStatus) {
+      const st = extraction.adapterStatus.status
+      let errLabel = 'FORMATO NÃO RECONHECIDO'
+      if (st === 'PID_NAO_SUPORTADO') errLabel = 'NO DATA'
+      else if (st === 'SEM_COMUNICACAO') errLabel = 'UNABLE TO CONNECT'
+      else if (st === 'RESPOSTA_INVALIDA') errLabel = 'RESPOSTA INVÁLIDA (?)'
+      else if (st === 'TIMEOUT') errLabel = 'TIMEOUT'
+
       return {
         mode: '01',
-        pid: `0x${normalizedPid}`,
+        pid: pidHex,
         bytes: [],
         rawText: raw,
         isError: true,
-        errorMessage: 'NO DATA',
+        errorMessage: errLabel,
       }
     }
 
-    if (
-      cleaned.includes('UNABLE TO CONNECT') ||
-      cleaned.includes('BUS INIT: ERROR') ||
-      cleaned.includes('CAN ERROR') ||
-      cleaned.includes('BUS BUSY')
-    ) {
+    if (extraction.frames.length > 0) {
+      // Prioriza frame da ECU primária (ex: 7E8 Engine/PCM) se múltiplas responderem
+      const frame = extraction.frames.find((f) => f.ecuId === '7E8') || extraction.frames[0]
       return {
         mode: '01',
-        pid: `0x${normalizedPid}`,
-        bytes: [],
-        rawText: raw,
-        isError: true,
-        errorMessage: 'UNABLE TO CONNECT',
-      }
-    }
-
-    if (cleaned.includes('?') || cleaned.includes('BUFFER FULL') || cleaned.includes('FB ERROR')) {
-      return {
-        mode: '01',
-        pid: `0x${normalizedPid}`,
-        bytes: [],
-        rawText: raw,
-        isError: true,
-        errorMessage: 'RESPOSTA INVÁLIDA (?)',
-      }
-    }
-
-    // Procura padrão 41 <PID> <BYTES...>
-    // Pode vir como "41 0C 1A F8" ou "410C1AF8" ou com headers "7E8 04 41 0C 1A F8"
-    const lines = cleaned.split('\n')
-    for (const line of lines) {
-      const tokens = line
-        .replace(/[^A-Fa-f0-9]/g, ' ')
-        .trim()
-        .split(/\s+/)
-        .filter(Boolean)
-      // Tenta achar o token 41 seguido do PID procurado
-      for (let i = 0; i < tokens.length - 1; i++) {
-        if (tokens[i].toUpperCase() === '41' && tokens[i + 1].toUpperCase() === normalizedPid) {
-          const byteTokens = tokens.slice(i + 2)
-          const bytes = byteTokens.map((t) => parseInt(t, 16)).filter((n) => !isNaN(n))
-          return {
-            mode: '01',
-            pid: `0x${normalizedPid}`,
-            bytes,
-            rawText: line,
-            isError: false,
-          }
-        }
-      }
-
-      // Caso venha concatenado sem espaços: "410C1AF8"
-      const compact = line.replace(/\s+/g, '').toUpperCase()
-      const targetHeader = `41${normalizedPid}`
-      const idx = compact.indexOf(targetHeader)
-      if (idx !== -1) {
-        const hexData = compact.slice(idx + targetHeader.length)
-        const bytes: number[] = []
-        for (let b = 0; b < hexData.length; b += 2) {
-          const byteStr = hexData.slice(b, b + 2)
-          if (byteStr.length === 2) {
-            bytes.push(parseInt(byteStr, 16))
-          }
-        }
-        return {
-          mode: '01',
-          pid: `0x${normalizedPid}`,
-          bytes,
-          rawText: line,
-          isError: false,
-        }
+        pid: pidHex,
+        bytes: frame.dataBytes,
+        rawText: frame.rawFrameText,
+        isError: false,
       }
     }
 
     return {
       mode: '01',
-      pid: `0x${normalizedPid}`,
+      pid: pidHex,
       bytes: [],
       rawText: raw,
       isError: true,
