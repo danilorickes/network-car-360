@@ -180,6 +180,15 @@ describe('E6.6.1 — Ponte Nativa Android / ELM327 Bluetooth Classic', () => {
       expect(restored?.address).toBe('11:22:33:44:55:66')
     })
 
+    it('Resiliência: bridge ausente ou com erro nativo não quebra a aplicação nem lança exceção em topo de módulo', () => {
+      // Garante que mesmo sem bridge, instanciar e checar disponibilidade é 100% tolerante
+      delete globalTarget.AndroidOBD
+      expect(AndroidNativeTransport.getBridge()).toBeNull()
+      expect(AndroidNativeTransport.isNativeBridgeAvailable()).toBe(false)
+      const transport = new AndroidNativeTransport()
+      expect(transport.isConnected()).toBe(false)
+    })
+
     it('Desconecta com segurança encerrando streams e ponte nativa', async () => {
       const transport = new AndroidBluetoothTransport(38400, 3, '00:1D:A5:01:23:45')
       await transport.connect()

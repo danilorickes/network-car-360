@@ -1,5 +1,5 @@
 import React from 'react'
-import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import { BrowserRouter, HashRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { Toaster } from '@/components/ui/toaster'
 import { Toaster as Sonner } from '@/components/ui/sonner'
 import { TooltipProvider } from '@/components/ui/tooltip'
@@ -96,8 +96,24 @@ const PublicOnlyRoute: React.FC<{ children: React.ReactNode }> = ({ children }) 
   return <>{children}</>
 }
 
+// Detecta se a aplicação está rodando encapsulada sob file:// (APK Android WebView ou Capacitor)
+// Em file:///, o BrowserRouter falha ao tentar navegar e manipular history.pushState(/rota)
+// Por isso, em file: usamos HashRouter (#/rota), preservando BrowserRouter 100% intacto no navegador web.
+const isFileProtocol =
+  typeof window !== 'undefined' &&
+  (window.location.protocol === 'file:' ||
+    Boolean((window as any).__IS_ANDROID_NATIVE_CONTAINER) ||
+    Boolean((window as any).AndroidOBD))
+
+const RouterComponent: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  if (isFileProtocol) {
+    return <HashRouter>{children}</HashRouter>
+  }
+  return <BrowserRouter>{children}</BrowserRouter>
+}
+
 const App = () => (
-  <BrowserRouter>
+  <RouterComponent>
     <AuthProvider>
       <TelemetryProvider>
         <TooltipProvider>
@@ -263,7 +279,7 @@ const App = () => (
         </TooltipProvider>
       </TelemetryProvider>
     </AuthProvider>
-  </BrowserRouter>
+  </RouterComponent>
 )
 
 export default App

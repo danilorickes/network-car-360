@@ -10,4 +10,86 @@
         android:layout_height="match_parent"
         android:background="#0B0F14" />
 
+    <!-- Painel Técnico de Homologação: exibido caso haja falha crítica na carga do WebView ou JS -->
+    <ScrollView
+        android:id="@+id/technical_error_panel"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#0B0F14"
+        android:padding="20dp"
+        android:visibility="gone">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="PAINEL TÉCNICO DE HOMOLOGAÇÃO (E6.6.1)"
+                android:textColor="#FFB300"
+                android:textSize="18sp"
+                android:textStyle="bold" />
+
+            <TextView
+                android:id="@+id/error_subtitle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:text="Falha detectada durante o carregamento da WebView ou execução JavaScript."
+                android:textColor="#E0E6ED"
+                android:textSize="13sp" />
+
+            <TextView
+                android:id="@+id/error_details_text"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:background="#151C24"
+                android:fontFamily="monospace"
+                android:lineSpacingExtra="4dp"
+                android:padding="14dp"
+                android:text="Sem detalhes de erro registrados até o momento."
+                android:textColor="#FF5252"
+                android:textSize="11sp" />
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="16dp"
+                android:orientation="horizontal">
+
+                <Button
+                    android:id="@+id/btn_copy_error"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginEnd="6dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#FFB300"
+                    android:text="COPIAR ERRO"
+                    android:textColor="#0B0F14"
+                    android:textStyle="bold" />
+
+                <Button
+                    android:id="@+id/btn_retry_load"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="6dp"
+                    android:layout_weight="1"
+                    android:backgroundTint="#2E3846"
+                    android:text="RECARREGAR"
+                    android:textColor="#FFFFFF" />
+            </LinearLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp"
+                android:text="Dica de diagnóstico: consulte o Logcat com filtro 'tag:NC-WEBVIEW' ou 'tag:AndroidOBD_Bridge' via ADB."
+                android:textColor="#7A8B9E"
+                android:textSize="11sp" />
+        </LinearLayout>
+    </ScrollView>
+
 </FrameLayout>
