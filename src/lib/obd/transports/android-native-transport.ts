@@ -325,6 +325,7 @@ export class AndroidNativeTransport implements OBDTransport {
       direction: 'TX',
       command: cmd,
       stage: 'SEND_NATIVE',
+      transport: 'ANDROID_BRIDGE',
     })
 
     try {
@@ -336,19 +337,24 @@ export class AndroidNativeTransport implements OBDTransport {
         direction: 'RX',
         command: cmd,
         response: res.replace(/[>\r\n]/g, ' ').trim(),
+        rawResponse: res, // Resposta bruta integral sem sanitização
         latencyMs: latency,
         stage: 'RECV_NATIVE',
+        transport: 'ANDROID_BRIDGE',
       })
 
       this.emit('data', res)
       return res
     } catch (e: any) {
       const latency = Math.round(performance.now() - startTime)
+      const errorMsg = e?.message || String(e)
       techLogStore.addEntry({
         direction: 'ERR',
         command: cmd,
         latencyMs: latency,
-        details: `Erro envio bridge: ${e?.message || e}`,
+        errorReason: errorMsg,
+        details: `Erro envio bridge: ${errorMsg}`,
+        transport: 'ANDROID_BRIDGE',
       })
       this.emit('error', e)
       throw e

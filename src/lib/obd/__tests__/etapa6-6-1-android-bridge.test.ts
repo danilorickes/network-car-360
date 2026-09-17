@@ -153,7 +153,7 @@ describe('E6.6.1 — Ponte Nativa Android / ELM327 Bluetooth Classic', () => {
   })
 
   describe('4. Log Técnico e Persistência de Preferência de Reconexão', () => {
-    it('Registra eventos no TechLogStore com direção TX/RX/INFO/ERR', async () => {
+    it('Registra eventos no TechLogStore com direção TX/RX/INFO/ERR e rawResponse não-sanitizado', async () => {
       const transport = new AndroidBluetoothTransport(38400, 3, '00:1D:A5:01:23:45')
       await transport.connect()
       await transport.send('010C')
@@ -163,6 +163,32 @@ describe('E6.6.1 — Ponte Nativa Android / ELM327 Bluetooth Classic', () => {
       expect(entries.some((e) => e.direction === 'TX' && e.command === 'ATZ')).toBe(true)
       expect(entries.some((e) => e.direction === 'RX')).toBe(true)
       expect(entries.some((e) => e.direction === 'INFO')).toBe(true)
+
+      // Verifica presença de rawResponse e exportAsText
+      const rxEntry = entries.find((e) => e.direction === 'RX' && e.command === '010C')
+      expect(rxEntry).toBeDefined()
+      expect(rxEntry?.rawResponse).toContain('41 0C 1F 40')
+
+      const exportedText = techLogStore.exportAsText()
+      expect(exportedText).toContain('TX -> "ATZ"')
+      expect(exportedText).toContain('TX -> "010C"')
+      expect(exportedText).toContain('RX <- "41 0C 1F 40"')
+    })
+
+    it('Captura e registra exceção da bridge nativa em TechLogStore sem mascarar', async () => {
+      ;(mockBridge.send as any).mockRejectedValueOnce(
+        new Error('Bluetooth socket closed by remote peer'),
+      )
+      const transport = new AndroidBluetoothTransport(38400, 3, '00:1D:A5:01:23:45')
+      await transport.connect()
+
+      await expect(transport.send('010C')).rejects.toThrow(/Bluetooth socket closed/i)
+
+      const entries = techLogStore.getEntries()
+      const errEntry = entries.find((e) => e.direction === 'ERR' && e.command === '010C')
+      expect(errEntry).toBeDefined()
+      expect(errEntry?.details).toContain('Bluetooth socket closed by remote peer')
+      expect(errEntry?.errorReason).toContain('Bluetooth socket closed by remote peer')
     })
 
     it('Memoriza o último dispositivo pareado no localStorage para reconexão sem repetição', async () => {

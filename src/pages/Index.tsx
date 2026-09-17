@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useTelemetry } from '@/contexts/TelemetryContext'
 import { PID_DEFINITIONS } from '@/lib/obd/pid-decoder'
 import { Link } from 'react-router-dom'
@@ -6,6 +6,7 @@ import { ConnectionControlPanel } from '@/components/live/ConnectionControlPanel
 import { GaugeCard } from '@/components/live/GaugeCard'
 import { SymptomMarkerButton } from '@/components/live/SymptomMarkerButton'
 import { MiniLiveChart } from '@/components/live/MiniLiveChart'
+import { TechLogLiveView } from '@/components/live/TechLogLiveView'
 import {
   AlertTriangle,
   CheckCircle2,
@@ -15,6 +16,9 @@ import {
   Bot,
   ChevronRight,
   Gauge,
+  Terminal,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import {
   loadAssistantIdentity,
@@ -23,6 +27,7 @@ import {
 
 export default function Index() {
   const { telemetry, recentHistory, selectedVehicle } = useTelemetry()
+  const [showTechLog, setShowTechLog] = useState(true)
   const assistantIdentity = React.useMemo(
     () => loadAssistantIdentity(selectedVehicle?.plate),
     [selectedVehicle?.plate],
@@ -210,10 +215,7 @@ export default function Index() {
                 value={live?.decoded}
                 formattedValue={formatted}
                 unit={def?.unit}
-                quality={
-                  live?.quality ||
-                  (telemetry.connectionState === 'CONECTADO' ? 'OK' : 'NO_RESPONSE')
-                }
+                quality={live?.quality || 'NO_RESPONSE'}
                 sparkline={live?.sparkline || []}
                 isPriority={true}
                 accentColor={colorMap[pid] || '#FFB300'}
@@ -243,10 +245,7 @@ export default function Index() {
                 value={live?.decoded}
                 formattedValue={formatted}
                 unit={def?.unit}
-                quality={
-                  live?.quality ||
-                  (telemetry.connectionState === 'CONECTADO' ? 'OK' : 'NO_RESPONSE')
-                }
+                quality={live?.quality || 'NO_RESPONSE'}
                 sparkline={live?.sparkline || []}
                 isPriority={false}
                 accentColor={colorMap[pid] || '#9AA7B4'}
@@ -258,6 +257,46 @@ export default function Index() {
 
       {/* Mini Live Chart */}
       <MiniLiveChart data={recentHistory} />
+
+      {/* Painel LOG TÉCNICO SERIAL (TX/RX) — Acessível diretamente na tela de teste ativo no APK */}
+      <div data-testid="tech-log-serial-panel" className="space-y-2">
+        <div className="flex flex-wrap items-center justify-between gap-2 bg-[#121A24] px-4 py-2.5 rounded-xl border border-[#202B37]">
+          <div className="flex items-center space-x-2.5">
+            <span className="p-1.5 rounded-lg bg-[#FFB300]/10 text-[#FFB300] border border-[#FFB300]/30">
+              <Terminal className="w-4 h-4" />
+            </span>
+            <div>
+              <div className="flex items-center space-x-2">
+                <span className="text-xs font-black uppercase text-white tracking-wider">
+                  Log Técnico Serial (TX / RX OBD-II)
+                </span>
+                <span className="text-[10px] bg-emerald-950/80 text-emerald-400 border border-emerald-800 px-1.5 py-0.2 rounded font-mono font-bold">
+                  E6.6.1 HOMOLOGAÇÃO
+                </span>
+              </div>
+              <p className="text-[11px] text-[#9AA7B4]">
+                Captura serial bruta completa: handshake ATZ..ATSP0, 0100, 010C, 010D, 0105, 0110 e
+                exceções de transporte
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={() => setShowTechLog(!showTechLog)}
+            className="flex items-center space-x-1.5 text-xs font-bold text-[#FFB300] bg-[#162230] hover:bg-[#1E2E40] border border-[#FFB300]/40 px-3 py-1.5 rounded-lg transition-all"
+          >
+            <span>{showTechLog ? 'Ocultar Terminal' : 'Abrir Terminal TX/RX'}</span>
+            {showTechLog ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+
+        {showTechLog && (
+          <div>
+            <TechLogLiveView compact={false} maxDisplay={300} />
+          </div>
+        )}
+      </div>
 
       {/* Botão Flutuante de Marcar Sintoma */}
       <SymptomMarkerButton />

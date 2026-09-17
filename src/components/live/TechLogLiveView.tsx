@@ -5,6 +5,8 @@ import {
   Terminal,
   Trash2,
   Download,
+  Copy,
+  Check,
   Pause,
   Play,
   ArrowUpRight,
@@ -12,6 +14,8 @@ import {
   AlertCircle,
   Info,
   Clock,
+  Eye,
+  EyeOff,
 } from 'lucide-react'
 
 interface TechLogLiveViewProps {
@@ -21,10 +25,12 @@ interface TechLogLiveViewProps {
 
 export const TechLogLiveView: React.FC<TechLogLiveViewProps> = ({
   compact = false,
-  maxDisplay = 100,
+  maxDisplay = 200,
 }) => {
   const [logs, setLogs] = useState<TechLogEntry[]>([])
   const [isPaused, setIsPaused] = useState(false)
+  const [copied, setCopied] = useState(false)
+  const [showRaw, setShowRaw] = useState(true)
   const isPausedRef = useRef(isPaused)
   isPausedRef.current = isPaused
 
@@ -44,25 +50,33 @@ export const TechLogLiveView: React.FC<TechLogLiveViewProps> = ({
     setLogs([])
   }
 
-  const handleExport = () => {
-    const text = logs
-      .map(
-        (l) =>
-          `[${l.timestamp}] [${l.direction}] ${
-            l.direction === 'TX'
-              ? `TX -> ${l.command}`
-              : l.direction === 'RX'
-                ? `RX <- ${l.response || ''} (${l.latencyMs || 0}ms)`
-                : l.details || l.stage || ''
-          }`,
-      )
-      .join('\n')
+  const handleCopy = async () => {
+    const text = techLogStore.exportAsText()
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text)
+      } else {
+        const ta = document.createElement('textarea')
+        ta.value = text
+        document.body.appendChild(ta)
+        ta.select()
+        document.execCommand('copy')
+        document.body.removeChild(ta)
+      }
+      setCopied(true)
+      setTimeout(() => setCopied(false), 2000)
+    } catch (e) {
+      console.error('Falha ao copiar log:', e)
+    }
+  }
 
+  const handleExport = () => {
+    const text = techLogStore.exportAsText()
     const blob = new Blob([text], { type: 'text/plain;charset=utf-8' })
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     a.href = url
-    a.download = `network-car-techlog-${Date.now()}.txt`
+    a.download = `network-car-techlog-obd-${Date.now()}.txt`
     a.click()
     URL.revokeObjectURL(url)
   }
@@ -81,7 +95,22 @@ export const TechLogLiveView: React.FC<TechLogLiveViewProps> = ({
           </span>
         </div>
 
-        <div className="flex items-center space-x-1.5">
+        <div className="flex flex-wrap items-center gap-1.5">
+          <Button
+            size="sm"
+            variant="ghost"
+            onClick={() => setShowRaw(!showRaw)}
+            className="h-7 px-2 text-[11px] text-gray-300 hover:text-white hover:bg-[#1A232E]"
+            title={showRaw ? 'Ocultar RX bruto não-sanitizado' : 'Exibir RX bruto não-sanitizado'}
+          >
+            {showRaw ? (
+              <EyeOff className="w-3.5 h-3.5 mr-1 text-cyan-400" />
+            ) : (
+              <Eye className="w-3.5 h-3.5 mr-1 text-gray-400" />
+            )}
+            <span>{showRaw ? 'RAW On' : 'RAW Off'}</span>
+          </Button>
+
           <Button
             size="sm"
             variant="ghost"
@@ -100,12 +129,27 @@ export const TechLogLiveView: React.FC<TechLogLiveViewProps> = ({
           <Button
             size="sm"
             variant="ghost"
+            onClick={handleCopy}
+            className="h-7 px-2 text-[11px] text-[#FFB300] hover:text-white hover:bg-[#1A232E] border border-[#FFB300]/40"
+            title="Copiar log técnico completo para a área de transferência"
+          >
+            {copied ? (
+              <Check className="w-3.5 h-3.5 mr-1 text-emerald-400" />
+            ) : (
+              <Copy className="w-3.5 h-3.5 mr-1 text-[#FFB300]" />
+            )}
+            <span>{copied ? 'Copiado!' : 'Copiar Log'}</span>
+          </Button>
+
+          <Button
+            size="sm"
+            variant="ghost"
             onClick={handleExport}
-            className="h-7 px-2 text-[11px] text-gray-300 hover:text-white hover:bg-[#1A232E]"
-            title="Exportar log para arquivo de texto"
+            className="h-7 px-2 text-[11px] text-emerald-400 hover:text-white hover:bg-[#1A232E] border border-emerald-600/40"
+            title="Exportar log para arquivo de texto (.txt)"
           >
             <Download className="w-3.5 h-3.5 mr-1" />
-            <span>Exportar</span>
+            <span>Exportar .TXT</span>
           </Button>
 
           <Button
@@ -182,18 +226,53 @@ export const TechLogLiveView: React.FC<TechLogLiveViewProps> = ({
               </span>
 
               {/* Corpo */}
-              <div className="flex-1 min-w-0 break-all font-mono">
-                {entry.command && (
-                  <span className="font-bold text-white mr-2">
-                    cmd: <span className="text-[#FFB300]">{entry.command}</span>
-                  </span>
+              <div className="flex-1 min-w-0 break-all font-mono space-y-0.5">
+                <div className="flex flex-wrap items-center gap-1.5">
+                  {entry.transport && (
+                    <span className="text-[9px] font-bold px-1 rounded bg-[#1C2633] text-gray-300 border border-[#2B394A]">
+                      {entry.transport}
+                    </span>
+                  )}
+                  {entry.stage && (
+                    <span className="text-[9px] font-bold px-1 rounded bg-amber-950/80 text-amber-300 border border-amber-800/80">
+                      {entry.stage}
+                    </span>
+                  )}
+                  {entry.protocol && (
+                    <span className="text-[9px] font-bold px-1 rounded bg-purple-950 text-purple-300 border border-purple-800">
+                      {entry.protocol}
+                    </span>
+                  )}
+                  {entry.errorReason && (
+                    <span className="text-[9px] font-bold px-1 rounded bg-red-950 text-red-300 border border-red-800">
+                      {entry.errorReason}
+                    </span>
+                  )}
+                </div>
+
+                <div>
+                  {entry.command && (
+                    <span className="font-bold text-white mr-2">
+                      TX: <span className="text-[#FFB300]">{entry.command}</span>
+                    </span>
+                  )}
+                  {entry.response && (
+                    <span className="mr-2">
+                      RX: <span className="text-emerald-200">{entry.response}</span>
+                    </span>
+                  )}
+                  {entry.details && <span className="text-gray-300">{entry.details}</span>}
+                </div>
+
+                {/* Exibição RAW não-sanitizada quando disponível */}
+                {showRaw && entry.rawResponse !== undefined && (
+                  <div className="mt-0.5 text-[10px] text-gray-400 bg-[#080B0E] p-1 rounded border border-[#16202A]">
+                    <span className="text-cyan-400 font-bold mr-1">RAW:</span>
+                    <span className="text-amber-200/90 font-mono">
+                      {JSON.stringify(entry.rawResponse)}
+                    </span>
+                  </div>
                 )}
-                {entry.response && (
-                  <span>
-                    resp: <span className="text-emerald-200">{entry.response}</span>
-                  </span>
-                )}
-                {entry.details && <span className="text-gray-300">{entry.details}</span>}
               </div>
 
               {/* Latência */}

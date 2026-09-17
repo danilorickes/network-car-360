@@ -3,6 +3,7 @@ import { PID_DEFINITIONS, PidDecoder } from './pid-decoder'
 import { ElmProtocolParser } from './elm-parser'
 import { RawRecorder } from './raw-recorder'
 import { RawSampleModel, SampleQuality } from '../types/obd'
+import { techLogStore } from './tech-log-store'
 
 export interface SamplerEvents {
   sample: (sample: RawSampleModel) => void
@@ -278,6 +279,18 @@ export class SamplerScheduler {
         } else {
           quality = 'INVALID'
         }
+
+        // REGISTRO DE NÃO-MÁSCARA: sempre que uma resposta falhar ou for classificada como INVALID/UNSUPPORTED/TIMEOUT,
+        // registrar no TechLogStore com rawText bruto e o motivo exato apontado pelo parser
+        techLogStore.addEntry({
+          direction: 'ERR',
+          command: `01${cleanHex}`,
+          rawResponse: rawText,
+          response: rawText.replace(/[>\r\n]/g, ' ').trim(),
+          stage: 'PARSER_REJECTED',
+          errorReason: parsed.errorMessage || 'FORMATO NÃO RECONHECIDO',
+          details: `PID ${pidHex} classificado como ${quality} pelo parser: [${parsed.errorMessage || 'FORMATO NÃO RECONHECIDO'}]. Resposta bruta: ${JSON.stringify(rawText)}`,
+        })
       } else {
         const decodedInfo = PidDecoder.decodePid(pidHex, parsed.bytes)
         if (decodedInfo) {
@@ -287,6 +300,15 @@ export class SamplerScheduler {
           quality = 'OK'
         } else {
           quality = 'INVALID'
+          techLogStore.addEntry({
+            direction: 'ERR',
+            command: `01${cleanHex}`,
+            rawResponse: rawText,
+            response: rawText.replace(/[>\r\n]/g, ' ').trim(),
+            stage: 'DECODER_REJECTED',
+            errorReason: 'DECODER_UNKNOWN_PID_OR_BYTES',
+            details: `PID ${pidHex} possui bytes [${parsed.bytes.join(', ')}] mas PidDecoder não pôde decodificar. Resposta bruta: ${JSON.stringify(rawText)}`,
+          })
         }
       }
 

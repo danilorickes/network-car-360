@@ -587,6 +587,14 @@ export class AndroidBluetoothTransport implements OBDTransport {
     } catch {
       this.detectedProtocol = 'ISO 15765-4 (CAN 11/500)'
     }
+
+    techLogStore.addEntry({
+      direction: 'INFO',
+      stage: 'PROTOCOL_DETECTED',
+      details: `Protocolo OBD detectado: ${this.detectedProtocol}`,
+      protocol: this.detectedProtocol,
+      transport: this.activeMode === 'NATIVE_BRIDGE' ? 'ANDROID_BRIDGE' : 'WEB_SERIAL',
+    })
   }
 
   async send(cmd: string, timeoutMs = 2500): Promise<string> {
@@ -598,35 +606,22 @@ export class AndroidBluetoothTransport implements OBDTransport {
 
   private async sendRaw(cmd: string, timeoutMs = 2500): Promise<string> {
     const startTime = performance.now()
+    const activeTransportType =
+      this.activeMode === 'NATIVE_BRIDGE' ? 'ANDROID_BRIDGE' : 'WEB_SERIAL'
+
+    // Nota: quando activeMode === 'NATIVE_BRIDGE', o nativeTransport já registra TX e RX/ERR.
+    // Para não duplicar com campos vazios, registramos TX/RX de sendRaw apenas no modo Web Serial
+    // ou se o nativeTransport não estiver ativo.
+    if (this.activeMode === 'NATIVE_BRIDGE' && this.nativeTransport) {
+      return this.nativeTransport.send(cmd, timeoutMs)
+    }
 
     techLogStore.addEntry({
       direction: 'TX',
       command: cmd,
       stage: 'SEND',
+      transport: activeTransportType,
     })
-
-    if (this.activeMode === 'NATIVE_BRIDGE' && this.nativeTransport) {
-      try {
-        const res = await this.nativeTransport.send(cmd, timeoutMs)
-        const latency = Math.round(performance.now() - startTime)
-        techLogStore.addEntry({
-          direction: 'RX',
-          response: res,
-          latencyMs: latency,
-          stage: 'RECV_BRIDGE',
-        })
-        return res
-      } catch (e: any) {
-        const latency = Math.round(performance.now() - startTime)
-        techLogStore.addEntry({
-          direction: 'ERR',
-          command: cmd,
-          latencyMs: latency,
-          details: e?.message || 'Erro envio bridge',
-        })
-        throw e
-      }
-    }
 
     if (!this.port) {
       throw new Error('SEM COMUNICAÇÃO: Porta serial Bluetooth não disponível.')
@@ -668,8 +663,10 @@ export class AndroidBluetoothTransport implements OBDTransport {
         direction: 'RX',
         command: cmd,
         response: response.replace(/[>\r\n]/g, ' ').trim(),
+        rawResponse: response, // Resposta serial bruta sem sanitização
         latencyMs: latency,
         stage: 'RECV_SERIAL',
+        transport: 'WEB_SERIAL',
       })
 
       this.emit('data', response)
@@ -677,13 +674,16 @@ export class AndroidBluetoothTransport implements OBDTransport {
     } catch (err: any) {
       const latency = Math.round(performance.now() - startTime)
       const isTimeout = err?.message === 'TIMEOUT_READ'
+      const errDetails = isTimeout
+        ? 'TIMEOUT de leitura (sem prompt >)'
+        : err?.message || 'Erro físico I/O'
       techLogStore.addEntry({
         direction: 'ERR',
         command: cmd,
         latencyMs: latency,
-        details: isTimeout
-          ? 'TIMEOUT de leitura (sem prompt >)'
-          : err?.message || 'Erro físico I/O',
+        errorReason: errDetails,
+        details: errDetails,
+        transport: 'WEB_SERIAL',
       })
 
       if (isTimeout) {

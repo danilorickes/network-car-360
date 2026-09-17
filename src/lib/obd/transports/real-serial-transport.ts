@@ -117,6 +117,7 @@ export class RealSerialTransport implements OBDTransport {
       direction: 'TX',
       command: cmd,
       stage: 'SERIAL_SEND',
+      transport: 'WEB_SERIAL',
     })
 
     try {
@@ -156,19 +157,24 @@ export class RealSerialTransport implements OBDTransport {
         direction: 'RX',
         command: cmd,
         response: response.replace(/[>\r\n]/g, ' ').trim(),
+        rawResponse: response,
         latencyMs: latency,
         stage: 'SERIAL_RECV',
+        transport: 'WEB_SERIAL',
       })
 
       this.emit('data', response)
       return response
     } catch (err: any) {
       const latency = Math.round(performance.now() - startTime)
+      const errReason = err?.message || 'Erro serial'
       techLogStore.addEntry({
         direction: 'ERR',
         command: cmd,
         latencyMs: latency,
-        details: err?.message || 'Erro serial',
+        errorReason: errReason,
+        details: errReason,
+        transport: 'WEB_SERIAL',
       })
       if (err?.message === 'TIMEOUT_READ') {
         throw new Error('TIMEOUT de comunicação serial')
