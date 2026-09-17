@@ -254,21 +254,29 @@ class ObdBridgePlugin(
                 }
             }
 
-            currentSocket = socket
-            inputStream = socket.inputStream
-            outputStream = socket.outputStream
-            connectedDevice = device
+            val activeSocket = socket ?: throw IllegalStateException("Socket RFCOMM não pôde ser instanciado para o dispositivo $targetAddress")
+            val activeIn = activeSocket.inputStream ?: throw IllegalStateException("InputStream indisponível no socket RFCOMM do dispositivo $targetAddress")
+            val activeOut = activeSocket.outputStream ?: throw IllegalStateException("OutputStream indisponível no socket RFCOMM do dispositivo $targetAddress")
 
-            connectionState = "SOCKET_CONNECTED"
-            lastErrorMessage = null
+            synchronized(this) {
+                currentSocket = activeSocket
+                inputStream = activeIn
+                outputStream = activeOut
+                connectedDevice = device
+                connectionState = "SOCKET_CONNECTED"
+                lastErrorMessage = null
+            }
+
             notifyStateChange()
 
             Log.i(TAG, "Socket RFCOMM conectado com sucesso a ${device.name ?: targetAddress}!")
             true
         } catch (e: Exception) {
             Log.e(TAG, "Erro ao conectar RFCOMM: ${e.message}", e)
-            lastErrorMessage = "Erro socket RFCOMM: ${e.message}"
-            connectionState = "ERROR"
+            synchronized(this) {
+                lastErrorMessage = "Erro socket RFCOMM: ${e.message}"
+                connectionState = "ERROR"
+            }
             disconnect()
             notifyStateChange()
             false
@@ -280,17 +288,18 @@ class ObdBridgePlugin(
      */
     @JavascriptInterface
     fun send(command: String, timeoutMs: Long): String {
-        val out = outputStream
-        val input = inputStream
-
-        if (currentSocket == null || out == null || input == null) {
-            throw IllegalStateException("SEM COMUNICAÇÃO: Socket Bluetooth nativo desconectado.")
-        }
-
         val cleanCmd = command.trim()
         val toSend = "$cleanCmd\r".toByteArray(Charsets.US_ASCII)
 
         return synchronized(this) {
+            val sock = currentSocket
+            val out = outputStream
+            val input = inputStream
+
+            if (sock == null || !sock.isConnected || out == null || input == null) {
+                throw IllegalStateException("SEM COMUNICAÇÃO: Socket Bluetooth nativo desconectado.")
+            }
+
             try {
                 // Limpa bytes remanescentes no buffer de entrada
                 while (input.available() > 0) {
@@ -341,18 +350,24 @@ class ObdBridgePlugin(
     @JavascriptInterface
     fun disconnect(): Boolean {
         Log.i(TAG, "Desconectando socket Bluetooth nativo...")
-        return try {
-            try { inputStream?.close() } catch (_: Exception) {}
-            try { outputStream?.close() } catch (_: Exception) {}
-            try { currentSocket?.close() } catch (_: Exception) {}
-            true
-        } finally {
-            inputStream = null
-            outputStream = null
-            currentSocket = null
-            connectedDevice = null
-            connectionState = "DISCONNECTED"
-            notifyStateChange()
+        return synchronized(this) {
+            val sock = currentSocket
+            val inStream = inputStream
+            val outStream = outputStream
+
+            try {
+                try { inStream?.close() } catch (_: Exception) {}
+                try { outStream?.close() } catch (_: Exception) {}
+                try { sock?.close() } catch (_: Exception) {}
+                true
+            } finally {
+                inputStream = null
+                outputStream = null
+                currentSocket = null
+                connectedDevice = null
+                connectionState = "DISCONNECTED"
+                notifyStateChange()
+            }
         }
     }
 
@@ -362,13 +377,17 @@ class ObdBridgePlugin(
     @SuppressLint("MissingPermission")
     @JavascriptInterface
     fun getConnectionState(): String {
-        val obj = JSONObject()
-        obj.put("connected", currentSocket?.isConnected == true)
-        obj.put("state", connectionState)
-        obj.put("deviceAddress", connectedDevice?.address)
-        obj.put("deviceName", if (checkHasConnectPermission()) connectedDevice?.name else null)
-        obj.put("error", lastErrorMessage)
-        return obj.toString()
+        return synchronized(this) {
+            val sock = currentSocket
+            val dev = connectedDevice
+            val obj = JSONObject()
+            obj.put("connected", sock?.isConnected == true)
+            obj.put("state", connectionState)
+            obj.put("deviceAddress", dev?.address)
+            obj.put("deviceName", if (checkHasConnectPermission()) dev?.name else null)
+            obj.put("error", lastErrorMessage)
+            obj.toString()
+        }
     }
 
     /**
@@ -377,15 +396,17 @@ class ObdBridgePlugin(
     @SuppressLint("MissingPermission")
     @JavascriptInterface
     fun getConnectedDevice(): String? {
-        val dev = connectedDevice ?: return null
-        val obj = JSONObject()
-        obj.put("address", dev.address)
-        if (checkHasConnectPermission()) {
-            obj.put("name", dev.name ?: "OBDII")
-        } else {
-            obj.put("name", "OBDII")
+        return synchronized(this) {
+            val dev = connectedDevice ?: return null
+            val obj = JSONObject()
+            obj.put("address", dev.address)
+            if (checkHasConnectPermission()) {
+                obj.put("name", dev.name ?: "OBDII")
+            } else {
+                obj.put("name", "OBDII")
+            }
+            obj.toString()
         }
-        return obj.toString()
     }
 
     private fun notifyStateChange() {
