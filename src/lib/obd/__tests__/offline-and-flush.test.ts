@@ -82,6 +82,25 @@ describe('Auditoria OS-ME001-E1.1: Testes Obrigatórios NC-02 e NC-03', () => {
       return Array.from((mockStore as any).data.values())
     })
 
+    vi.spyOn(offlineStorage, 'getAllPendingSamplesBatched').mockImplementation(
+      async (batchSize = 250) => {
+        return Array.from((mockStore as any).data.values()).slice(0, batchSize) as any
+      },
+    )
+
+    vi.spyOn(offlineStorage, 'updateSessionDbIdForSession').mockImplementation(
+      async (sessionUid: string, sessionDbId: string) => {
+        let count = 0
+        for (const item of (mockStore as any).data.values()) {
+          if (item.session_id === sessionUid) {
+            item.session_db_id = sessionDbId
+            count++
+          }
+        }
+        return count
+      },
+    )
+
     vi.spyOn(offlineStorage, 'removePendingSamples').mockImplementation(async (ids: string[]) => {
       for (const id of ids) {
         mockStore.delete(id)
@@ -313,6 +332,230 @@ describe('Auditoria OS-ME001-E1.1: Testes Obrigatórios NC-02 e NC-03', () => {
 
       const remainingStorageCount = await offlineStorage.countPendingSamples()
       expect(remainingStorageCount).toBe(0)
+
+      recorder.destroy()
+    })
+
+    it('(a) fila de 2.500 pendentes sincronizada em múltiplos lotes até zerar', async () => {
+      // Mock do PocketBase para aceitar qualquer lote
+      const persistedIds: string[] = []
+      vi.spyOn(pb.collection('raw_samples'), 'create').mockImplementation(async (data: any) => {
+        persistedIds.push(data.sample_id)
+        return { id: `pb_${data.sample_id}`, ...data } as any
+      })
+
+      // Popula 2.500 amostras pendentes no IndexedDB
+      const testSamples: RawSampleModel[] = []
+      for (let i = 1; i <= 2500; i++) {
+        testSamples.push({
+          sample_id: `samp_bulk_${i}`,
+          session_id: 'sess_large_queue',
+          session: 'db_sess_large',
+          ts_utc: new Date().toISOString(),
+          ts_mono_offset_ms: i * 10,
+          pid: '0x0C',
+          decoded_value: 800 + (i % 500),
+          unit: 'RPM',
+          quality: 'OK',
+          ecu: '7E8',
+          raw_frame: '410C0D80 >',
+          status: 'OK',
+        })
+      }
+      await offlineStorage.savePendingSamples(testSamples, 'db_sess_large')
+      expect(await offlineStorage.countPendingSamples()).toBe(2500)
+
+      const recorder = new RawRecorder('db_sess_large')
+      // Reidrata fila inteira (sem limite de 1000)
+      const rehydrated = await recorder.rehydratePendingQueue(5000)
+      expect(rehydrated).toBe(2500)
+      expect(recorder.getPendingCount()).toBe(2500)
+
+      // Executa flush de lotes até zerar
+      let progressEvents = 0
+      await recorder.flushOpportunistic((_processed, remaining) => {
+        progressEvents++
+        expect(remaining).toBeLessThanOrEqual(2500)
+      })
+
+      // Fila zerada e storage zerado
+      expect(recorder.getPendingCount()).toBe(0)
+      expect(await offlineStorage.countPendingSamples()).toBe(0)
+      expect(persistedIds.length).toBe(2500)
+      expect(progressEvents).toBeGreaterThanOrEqual(10) // Múltiplos lotes executados
+
+      recorder.destroy()
+    })
+
+    it('(b) 400 de duplicata (idx_raw_samples_id) tratado como SUCESSO IDEMPOTENTE, amostra expurgada, fila segue', async () => {
+      // Simula erro 400 com erro de unicidade no sample_id
+      const createdPbRecords: string[] = []
+      vi.spyOn(pb.collection('raw_samples'), 'create').mockImplementation(async (data: any) => {
+        if (data.sample_id === 'samp_dup_2') {
+          const err: any = new Error('Failed to create record.')
+          err.status = 400
+          err.data = {
+            data: {
+              sample_id: {
+                code: 'validation_not_unique',
+                message: 'Value must be unique (idx_raw_samples_id).',
+              },
+            },
+          }
+          throw err
+        }
+        createdPbRecords.push(data.sample_id)
+        return { id: `pb_${data.sample_id}`, ...data } as any
+      })
+
+      const recorder = new RawRecorder('db_session_idempotent')
+
+      const s1 = recorder.recordSample({
+        session_id: 'sess_dup',
+        ts_utc: new Date().toISOString(),
+        ts_mono_offset_ms: 10,
+        pid: '0x0C',
+        decoded_value: 900,
+        unit: 'RPM',
+        quality: 'OK',
+      })
+
+      // Amostra que resultará em 400 duplicado
+      const s2 = recorder.recordSample({
+        session_id: 'sess_dup',
+        ts_utc: new Date().toISOString(),
+        ts_mono_offset_ms: 20,
+        pid: '0x0D',
+        decoded_value: 50,
+        unit: 'km/h',
+        quality: 'OK',
+      })
+      s2.sample_id = 'samp_dup_2'
+
+      const s3 = recorder.recordSample({
+        session_id: 'sess_dup',
+        ts_utc: new Date().toISOString(),
+        ts_mono_offset_ms: 30,
+        pid: '0x05',
+        decoded_value: 90,
+        unit: '°C',
+        quality: 'OK',
+      })
+
+      // Executa o flush
+      await recorder.flushOpportunistic()
+
+      // A amostra duplicada NÃO deve travar o lote nem a fila: todas devem ser expurgadas da fila
+      expect(recorder.getPendingCount()).toBe(0)
+      expect(createdPbRecords).toContain(s1.sample_id)
+      expect(createdPbRecords).toContain(s3.sample_id)
+      // s2 foi tratado como sucesso idempotente (removido do IndexedDB)
+      expect(offlineStorage.removePendingSamples).toHaveBeenCalledWith(
+        expect.arrayContaining(['samp_dup_2', s1.sample_id, s3.sample_id]),
+      )
+
+      recorder.destroy()
+    })
+
+    it('(c) 2 falhas transitórias + sucesso → retry com backoff, zero perda antes da confirmação', async () => {
+      let attempts = 0
+      vi.spyOn(pb.collection('raw_samples'), 'create').mockImplementation(async (data: any) => {
+        attempts++
+        if (attempts <= 2) {
+          const err: any = new Error('NetworkError: Failed to fetch')
+          err.status = 0
+          throw err
+        }
+        return { id: 'pb_success', ...data } as any
+      })
+
+      const recorder = new RawRecorder('db_sess_retry')
+      const s1 = recorder.recordSample({
+        session_id: 'sess_retry',
+        ts_utc: new Date().toISOString(),
+        ts_mono_offset_ms: 10,
+        pid: '0x0C',
+        decoded_value: 850,
+        unit: 'RPM',
+        quality: 'OK',
+      })
+
+      await recorder.flushOpportunistic()
+
+      // Deve ter tentado 3 vezes no total (2 falhas + 1 sucesso)
+      expect(attempts).toBe(3)
+      expect(recorder.getPendingCount()).toBe(0)
+      expect(offlineStorage.removePendingSamples).toHaveBeenCalledWith([s1.sample_id])
+
+      recorder.destroy()
+    })
+
+    it('(d) removePendingSamples só é chamado após confirmação do backend, nunca antes', async () => {
+      let backendCalled = false
+      let removeCalled = false
+
+      vi.spyOn(pb.collection('raw_samples'), 'create').mockImplementation(async (data: any) => {
+        backendCalled = true
+        expect(removeCalled).toBe(false) // indexedDB ainda não pode ter removido
+        return { id: 'pb_order_check', ...data } as any
+      })
+
+      const originalRemove = offlineStorage.removePendingSamples
+      vi.spyOn(offlineStorage, 'removePendingSamples').mockImplementation(async (ids: string[]) => {
+        removeCalled = true
+        expect(backendCalled).toBe(true) // Confirmação prévia obrigatória
+        return originalRemove(ids)
+      })
+
+      const recorder = new RawRecorder('db_sess_order')
+      recorder.recordSample({
+        session_id: 'sess_order',
+        ts_utc: new Date().toISOString(),
+        ts_mono_offset_ms: 5,
+        pid: '0x0C',
+        decoded_value: 800,
+        unit: 'RPM',
+        quality: 'OK',
+      })
+
+      await recorder.flushOpportunistic()
+      expect(backendCalled).toBe(true)
+      expect(removeCalled).toBe(true)
+
+      recorder.destroy()
+    })
+
+    it('reidratação preserva ecu, raw_frame e status intactos', async () => {
+      const storedItem = {
+        sample_id: 'samp_fields_1',
+        session_id: 'sess_fields',
+        session_db_id: 'db_sess_fields',
+        ts_utc: '2026-09-17T17:25:00Z',
+        ts_mono_offset_ms: 150,
+        pid: '0x0C',
+        decoded_value: 880,
+        unit: 'RPM',
+        quality: 'OK' as const,
+        origin: 'HARDWARE_REAL',
+        ecu: '7E8',
+        raw_frame: '410C0DC0 >',
+        status: 'OK',
+        queued_at: Date.now(),
+        retry_count: 0,
+      }
+
+      await offlineStorage.savePendingSamples([storedItem as any], 'db_sess_fields')
+
+      const recorder = new RawRecorder()
+      await recorder.rehydratePendingQueue()
+
+      const queue = recorder.getPendingQueueCopy()
+      const sample = queue.find((s) => s.sample_id === 'samp_fields_1')
+      expect(sample).toBeDefined()
+      expect(sample?.ecu).toBe('7E8')
+      expect(sample?.raw_frame).toBe('410C0DC0 >')
+      expect(sample?.status).toBe('OK')
+      expect(sample?.session).toBe('db_sess_fields')
 
       recorder.destroy()
     })

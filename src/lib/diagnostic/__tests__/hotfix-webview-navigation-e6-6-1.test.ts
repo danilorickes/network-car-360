@@ -92,21 +92,21 @@ describe('Hotfix APK Android WebView — Diagnóstico 360 e Prevenção de ERR_F
     })
   })
 
-  describe('4. Versionamento da Aplicação e APK Android (v0.0.40 / versionCode 9)', () => {
-    it('package.json deve estar na versão 0.0.40', () => {
+  describe('4. Versionamento da Aplicação e APK Android (v0.0.41 / versionCode 10)', () => {
+    it('package.json deve estar na versão 0.0.41', () => {
       const pkgJson = JSON.parse(
         fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'),
       )
-      expect(pkgJson.version).toBe('0.0.40')
+      expect(pkgJson.version).toBe('0.0.41')
     })
 
-    it('android/app/build.gradle deve estar com versionCode 9 e versionName "0.0.40-homologacao-e6.6.1"', () => {
+    it('android/app/build.gradle deve estar com versionCode 10 e versionName "0.0.41-homologacao-e6.6.1"', () => {
       const gradleContent = fs.readFileSync(
         path.resolve(process.cwd(), 'android/app/build.gradle'),
         'utf-8',
       )
-      expect(gradleContent).toMatch(/versionCode\s+9/)
-      expect(gradleContent).toMatch(/versionName\s+"0\.0\.40-homologacao-e6\.6\.1"/)
+      expect(gradleContent).toMatch(/versionCode\s+10/)
+      expect(gradleContent).toMatch(/versionName\s+"0\.0\.41-homologacao-e6\.6\.1"/)
     })
   })
 })

@@ -106,7 +106,7 @@ class OfflineStorageService {
   }
 
   /**
-   * Retorna todas as amostras pendentes para reidratação/sincronização
+   * Retorna todas as amostras pendentes para reidratação/sincronização (compatibilidade)
    */
   async getPendingSamples(limit = 200): Promise<StoredPendingSample[]> {
     try {
@@ -114,7 +114,7 @@ class OfflineStorageService {
       return new Promise<StoredPendingSample[]>((resolve, reject) => {
         const tx = db.transaction(STORE_PENDING_SAMPLES, 'readonly')
         const store = tx.objectStore(STORE_PENDING_SAMPLES)
-        const request = store.getAll(null, limit)
+        const request = limit > 0 ? store.getAll(null, limit) : store.getAll()
 
         request.onsuccess = () => {
           resolve(request.result || [])
@@ -123,6 +123,74 @@ class OfflineStorageService {
       })
     } catch {
       return []
+    }
+  }
+
+  /**
+   * Busca amostras pendentes em lote via cursor IndexedDB sem limite rígido.
+   * Suporta paginação limpa para drenar filas com milhares de itens (ex: 10.650 amostras).
+   */
+  async getAllPendingSamplesBatched(batchSize = 250): Promise<StoredPendingSample[]> {
+    try {
+      const db = await this.getDB()
+      return new Promise<StoredPendingSample[]>((resolve, reject) => {
+        const tx = db.transaction(STORE_PENDING_SAMPLES, 'readonly')
+        const store = tx.objectStore(STORE_PENDING_SAMPLES)
+        const results: StoredPendingSample[] = []
+        const request = store.openCursor()
+
+        request.onsuccess = (event: Event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+          if (cursor && results.length < batchSize) {
+            results.push(cursor.value)
+            cursor.continue()
+          } else {
+            resolve(results)
+          }
+        }
+
+        request.onerror = () => reject(request.error)
+      })
+    } catch {
+      return []
+    }
+  }
+
+  /**
+   * Atualiza session_db_id de amostras no IndexedDB para reconciliar amostras órfãs
+   * cujo ID interno do PocketBase foi descoberto ou criado posteriormente.
+   */
+  async updateSessionDbIdForSession(sessionUid: string, sessionDbId: string): Promise<number> {
+    if (!sessionUid || !sessionDbId) return 0
+    try {
+      const db = await this.getDB()
+      return new Promise<number>((resolve, reject) => {
+        const tx = db.transaction(STORE_PENDING_SAMPLES, 'readwrite')
+        const store = tx.objectStore(STORE_PENDING_SAMPLES)
+        let updatedCount = 0
+
+        const request = store.openCursor()
+        request.onsuccess = (event: Event) => {
+          const cursor = (event.target as IDBRequest<IDBCursorWithValue | null>).result
+          if (cursor) {
+            const item: StoredPendingSample = cursor.value
+            if (item.session_id === sessionUid && item.session_db_id !== sessionDbId) {
+              item.session_db_id = sessionDbId
+              cursor.update(item)
+              updatedCount++
+            }
+            cursor.continue()
+          } else {
+            resolve(updatedCount)
+          }
+        }
+
+        request.onerror = () => reject(request.error)
+        tx.onabort = () => reject(tx.error)
+      })
+    } catch (err) {
+      console.warn('Erro ao atualizar session_db_id no IndexedDB:', err)
+      return 0
     }
   }
 

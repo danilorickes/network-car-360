@@ -162,12 +162,46 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
 
     const rec = new RawRecorder()
     recorderRef.current = rec
-    rec.rehydratePendingQueue().then((rehydratedCount) => {
+
+    // Reidratação paginada e sincronizador background não-bloqueante
+    rec.rehydratePendingQueue().then(async (rehydratedCount) => {
       if (rehydratedCount > 0) {
         toast({
           title: 'Dados Offline Recuperados (NC-02)',
           description: `${rehydratedCount} amostra(s) pendente(s) reidratada(s) do IndexedDB para sincronização.`,
         })
+
+        // Sincronizador background em segundo plano se houver autenticação PocketBase ativa
+        if (pb.authStore.isValid) {
+          let batchIndex = 0
+          const initialPending = rec.getPendingCount()
+          const estimatedBatches = Math.ceil(initialPending / 100)
+
+          toast({
+            title: 'Sincronização Offline em Andamento',
+            description: `Sincronizando ${initialPending} amostra(s) pendente(s)...`,
+          })
+
+          try {
+            await rec.flushOpportunistic((_processed, remaining) => {
+              batchIndex++
+              if (remaining === 0) {
+                toast({
+                  title: 'Sincronização Concluída',
+                  description:
+                    'Todas as amostras offline foram sincronizadas com sucesso no PocketBase.',
+                })
+              } else if (batchIndex % 2 === 0 || remaining < 100) {
+                toast({
+                  title: 'Sincronização de Telemetria',
+                  description: `Lote ${batchIndex}/${estimatedBatches || 1} enviado (${remaining} restante(s)).`,
+                })
+              }
+            })
+          } catch (syncErr) {
+            console.warn('[TelemetryContext] Erro no sincronizador background:', syncErr)
+          }
+        }
       }
     })
 
@@ -175,7 +209,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       sim.disconnect().catch(() => {})
       rec.destroy()
     }
-  }, [refreshVehicles])
+  }, [refreshVehicles, toast])
 
   const setActiveScenario = (scenario: SimulatorScenario) => {
     setActiveScenarioState(scenario)
@@ -582,7 +616,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       deviceCollector = 'Simulador de Telemetria Integrado'
     }
 
-    const appVersion = '0.0.40-homologacao-e6.6.1'
+    const appVersion = '0.0.41-homologacao-e6.6.1'
     const customerId = (currentVeh as any)?.client || null
     const workshopId = (currentVeh as any)?.workshop_id || null
 
