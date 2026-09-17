@@ -266,6 +266,7 @@ export class SamplerScheduler {
         quality: 'NO_RESPONSE',
         origin: this.origin,
         maintenance_stage: this.maintenanceStage,
+        status: 'SEM_COMUNICACAO',
       }
       const rec = this.recorder.recordSample(sample)
       this.emit('sample', rec)
@@ -350,8 +351,9 @@ export class SamplerScheduler {
         quality,
         origin: this.origin,
         maintenance_stage: this.maintenanceStage,
+        raw_frame: rawText,
+        status: pipelineResult.sampleStatus,
       }
-
       const recorded = this.recorder.recordSample(sample)
       this.updateFrequency()
       this.emit('sample', recorded)
@@ -368,6 +370,7 @@ export class SamplerScheduler {
         quality,
         origin: this.origin,
         maintenance_stage: this.maintenanceStage,
+        status: isTimeout ? 'TIMEOUT' : 'SEM_COMUNICACAO',
       }
 
       const recorded = this.recorder.recordSample(sample)

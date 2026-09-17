@@ -79,8 +79,11 @@ export interface RawSampleModel {
   decoded_value?: number
   unit?: string
   quality: SampleQuality
-  origin?: 'REAL' | 'SIMULATED'
+  origin?: 'REAL' | 'SIMULATED' | 'HARDWARE_REAL'
   maintenance_stage?: 'ANTES_MANUTENCAO' | 'DEPOIS_MANUTENCAO' | 'PADRAO'
+  ecu?: string
+  raw_frame?: string
+  status?: string
   created?: string
 }
 
@@ -97,6 +100,18 @@ export interface SessionModel {
   started_at: string
   ended_at?: string
   status: SessionStatus
+  origin?: 'HARDWARE_REAL' | 'SIMULADOR'
+  device_collector?: string
+  detected_protocol?: string
+  supported_pids?: string[]
+  app_version?: string
+  customer_id?: string
+  workshop_id?: string
+  connection_state?: string
+  total_samples?: number
+  total_duration_ms?: number
+  anomalies_summary?: any
+  dtcs_summary?: any
   created?: string
   updated?: string
 }

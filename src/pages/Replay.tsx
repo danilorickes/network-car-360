@@ -207,12 +207,21 @@ export default function Replay() {
           }).then((comp) => setVehicleHistoryComp(comp))
         }
 
-        // Busca investigação existente ou cria o caso simulado da EcoSport
+        // Busca investigação existente ou cria com base na sessão real ou caso simulado (E6.6.1)
         investigationService.getByVehicleId(targetVeh.id).then((invList) => {
           if (invList.length > 0) {
             setInvestigationData(invList[0])
           } else {
-            const caseData = SimulatorCaseE4.createEcoSportMisfireCase(targetVeh as VehicleModel)
+            const isReal = sess.origin === 'HARDWARE_REAL' || sess.adapter_type !== 'SIMULADOR'
+            const caseData = isReal
+              ? SimulatorCaseE4.createFromRealSession({
+                  vehicle: targetVeh as VehicleModel,
+                  session: sess,
+                  samples: rawList,
+                  dtcs: dtcList,
+                })
+              : SimulatorCaseE4.createEcoSportMisfireCase(targetVeh as VehicleModel)
+
             setInvestigationData(caseData)
             investigationService.create(caseData).catch(() => {})
           }

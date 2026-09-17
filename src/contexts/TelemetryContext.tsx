@@ -213,31 +213,71 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       } else if (type === 'OBD REAL BLUETOOTH CLASSIC') {
         const btClassic = new AndroidBluetoothTransport(config.baudRate, config.reconnectAttempts)
         btClassic.on('statusChange', (status, msg) => {
-          setTelemetry((prev) => ({
-            ...prev,
-            connectionState: status,
-            lastError: status === 'FALHA' ? msg : undefined,
-          }))
+          setTelemetry((prev) => {
+            if (prev.sessionState === 'TESTE ATIVO' && status === 'FALHA') {
+              const pbId = dbSessionIdRef.current
+              if (pbId) {
+                pb.collection('sessions')
+                  .update(pbId, {
+                    status: 'INTERROMPIDO',
+                    connection_state: 'FALHA',
+                  })
+                  .catch(() => {})
+              }
+            }
+            return {
+              ...prev,
+              connectionState: status,
+              lastError: status === 'FALHA' ? msg : undefined,
+            }
+          })
         })
         transportRef.current = btClassic
       } else if (type === 'OBD REAL BLUETOOTH') {
         const bt = new BluetoothTransport()
         bt.on('statusChange', (status, msg) => {
-          setTelemetry((prev) => ({
-            ...prev,
-            connectionState: status,
-            lastError: status === 'FALHA' ? msg : undefined,
-          }))
+          setTelemetry((prev) => {
+            if (prev.sessionState === 'TESTE ATIVO' && status === 'FALHA') {
+              const pbId = dbSessionIdRef.current
+              if (pbId) {
+                pb.collection('sessions')
+                  .update(pbId, {
+                    status: 'INTERROMPIDO',
+                    connection_state: 'FALHA',
+                  })
+                  .catch(() => {})
+              }
+            }
+            return {
+              ...prev,
+              connectionState: status,
+              lastError: status === 'FALHA' ? msg : undefined,
+            }
+          })
         })
         transportRef.current = bt
       } else {
         const real = new RealSerialTransport(config.baudRate, config.reconnectAttempts)
         real.on('statusChange', (status, msg) => {
-          setTelemetry((prev) => ({
-            ...prev,
-            connectionState: status,
-            lastError: status === 'FALHA' ? msg : undefined,
-          }))
+          setTelemetry((prev) => {
+            // Se a sessão estiver ativa e a conexão cair para FALHA, trata interrupção sem perder sessão
+            if (prev.sessionState === 'TESTE ATIVO' && status === 'FALHA') {
+              const pbId = dbSessionIdRef.current
+              if (pbId) {
+                pb.collection('sessions')
+                  .update(pbId, {
+                    status: 'INTERROMPIDO',
+                    connection_state: 'FALHA',
+                  })
+                  .catch(() => {})
+              }
+            }
+            return {
+              ...prev,
+              connectionState: status,
+              lastError: status === 'FALHA' ? msg : undefined,
+            }
+          })
         })
         transportRef.current = real
       }
@@ -518,14 +558,33 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       ? `${currentVeh.make} ${currentVeh.model} (${currentVeh.plate})`
       : config.defaultVehicleName
     const adapterType = telemetry.transportType
+    const isRealHardware = adapterType !== 'SIMULADOR'
+    const sessionOrigin: 'HARDWARE_REAL' | 'SIMULADOR' = isRealHardware
+      ? 'HARDWARE_REAL'
+      : 'SIMULADOR'
+
     const transportDetail =
       adapterType === 'SIMULADOR'
         ? `Simulador (${SIMULATOR_SCENARIOS.find((s) => s.id === activeScenario)?.name || activeScenario})`
         : adapterType === 'OBD REAL BLUETOOTH CLASSIC'
           ? 'Bluetooth Classic SPP/RFCOMM (Android Xiaomi + Ford EcoSport 1.5 Dragon)'
           : adapterType === 'OBD REAL BLUETOOTH'
-            ? 'Web Bluetooth — ELM327 BLE (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
-            : 'Web Serial — ELM327 USB (AGUARDANDO VALIDAÇÃO EM HARDWARE REAL)'
+            ? 'Web Bluetooth — ELM327 BLE'
+            : 'Web Serial — ELM327 USB'
+
+    let detectedProtocol = 'ISO 15765-4 (CAN 11/500)'
+    let deviceCollector = 'Android / Web OBD Bridge'
+    if (transportRef.current instanceof AndroidBluetoothTransport) {
+      detectedProtocol = transportRef.current.getProtocol()
+      deviceCollector = `Android Bluetooth [${transportRef.current.getDeviceName()}]`
+    } else if (transportRef.current instanceof SimulatedTransport) {
+      detectedProtocol = transportRef.current.getProtocol()
+      deviceCollector = 'Simulador de Telemetria Integrado'
+    }
+
+    const appVersion = '0.0.40-homologacao-e6.6.1'
+    const customerId = (currentVeh as any)?.client || null
+    const workshopId = (currentVeh as any)?.workshop_id || null
 
     let pbSessId: string | null = null
     try {
@@ -536,10 +595,18 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
         adapter_type: adapterType,
         transport_detail: transportDetail,
         vin: currentVeh?.vin || '9BFBJ55E6L8104921',
-        protocol: 'ISO 15765-4 (CAN 11/500)',
+        protocol: detectedProtocol,
         pids_found: [],
         started_at: new Date().toISOString(),
         status: 'ATIVO',
+        origin: sessionOrigin,
+        device_collector: deviceCollector,
+        detected_protocol: detectedProtocol,
+        supported_pids: [],
+        app_version: appVersion,
+        customer_id: customerId,
+        workshop_id: workshopId,
+        connection_state: telemetry.connectionState,
       })
       pbSessId = record.id
       dbSessionIdRef.current = record.id
@@ -573,14 +640,17 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       config.priorityFreqHz,
       config.secondaryFreqHz,
     )
-    sampler.setOrigin(adapterType === 'SIMULADOR' ? 'SIMULATED' : 'REAL')
+    sampler.setOrigin(isRealHardware ? 'REAL' : 'SIMULATED')
     sampler.setMaintenanceStage(maintenanceStage)
     samplerRef.current = sampler
 
     const discovered = await sampler.discoverSupportedPids()
     if (pbSessId) {
       pb.collection('sessions')
-        .update(pbSessId, { pids_found: discovered })
+        .update(pbSessId, {
+          pids_found: discovered,
+          supported_pids: discovered,
+        })
         .catch(() => {})
     }
 
@@ -679,7 +749,9 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return true
   }
 
-  const endSession = async (): Promise<void> => {
+  const endSession = async (
+    forcedStatus: 'ENCERRADO' | 'INTERROMPIDO' = 'ENCERRADO',
+  ): Promise<void> => {
     if (samplerRef.current) {
       samplerRef.current.stop()
     }
@@ -692,12 +764,30 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       durationTimerRef.current = null
     }
 
+    // Flush de qualquer buffer pendente antes de considerar a sessão encerrada
+    if (recorderRef.current) {
+      try {
+        await recorderRef.current.flushAllSync()
+      } catch (flushErr) {
+        console.warn('Erro durante flush final de encerramento:', flushErr)
+      }
+    }
+
+    const finalDurationMs = sessionMonoStartRef.current
+      ? Math.round(performance.now() - sessionMonoStartRef.current)
+      : telemetry.durationMs
+    const totalSamplesCount = telemetry.totalSamples
+
     const pbId = dbSessionIdRef.current
     if (pbId) {
       try {
         await pb.collection('sessions').update(pbId, {
           ended_at: new Date().toISOString(),
-          status: 'ENCERRADO',
+          status: forcedStatus,
+          total_duration_ms: finalDurationMs,
+          total_samples: totalSamplesCount,
+          connection_state: telemetry.connectionState,
+          dtcs_summary: telemetry.dtcList,
         })
       } catch (e) {
         console.warn('Erro ao atualizar encerramento no PocketBase:', e)
@@ -710,8 +800,9 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }))
 
     toast({
-      title: 'TESTE ENCERRADO',
-      description: 'Sessão finalizada. Telemetria bruta preservada intacta (append-only).',
+      title: forcedStatus === 'INTERROMPIDO' ? 'TESTE INTERROMPIDO' : 'TESTE ENCERRADO',
+      description: `Sessão finalizada (${totalSamplesCount} amostras, ${(finalDurationMs / 1000).toFixed(1)}s). Telemetria bruta preservada intacta (append-only).`,
+      variant: forcedStatus === 'INTERROMPIDO' ? 'destructive' : 'default',
     })
   }
 

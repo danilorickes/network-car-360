@@ -159,15 +159,29 @@ export default function Sessoes() {
                       <span className="font-semibold text-xs text-white truncate max-w-[180px]">
                         {s.vehicle_name || 'Veículo Não Informado'}
                       </span>
-                      <span
-                        className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
-                          s.status === 'ATIVO'
-                            ? 'bg-emerald-950 text-[#2ECC71] border border-emerald-800'
-                            : 'bg-gray-800 text-gray-300'
-                        }`}
-                      >
-                        {s.status}
-                      </span>
+                      <div className="flex items-center space-x-1.5">
+                        {/* Badge de Origem: HARDWARE_REAL vs SIMULADOR */}
+                        {s.origin === 'HARDWARE_REAL' || s.adapter_type !== 'SIMULADOR' ? (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-emerald-950 text-emerald-300 border border-emerald-700 uppercase tracking-wider">
+                            HARDWARE_REAL
+                          </span>
+                        ) : (
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-blue-950 text-blue-300 border border-blue-800 uppercase tracking-wider">
+                            SIMULADOR
+                          </span>
+                        )}
+                        <span
+                          className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                            s.status === 'ATIVO'
+                              ? 'bg-emerald-950 text-[#2ECC71] border border-emerald-800'
+                              : s.status === 'INTERROMPIDO'
+                                ? 'bg-red-950 text-red-300 border border-red-800'
+                                : 'bg-gray-800 text-gray-300'
+                          }`}
+                        >
+                          {s.status}
+                        </span>
+                      </div>
                     </div>
 
                     <div className="text-[11px] font-mono text-[#9AA7B4] truncate">
@@ -268,9 +282,26 @@ export default function Sessoes() {
                 </div>
                 <div className="bg-[#0B0F14] p-2.5 rounded border border-[#263340]">
                   <span className="text-[#9AA7B4] block text-[10px] uppercase font-bold">
-                    Transporte:
+                    Origem / Transporte:
                   </span>
-                  <span className="font-mono text-blue-400">{selectedSession.adapter_type}</span>
+                  <div className="flex items-center space-x-1">
+                    <span
+                      className={`text-[9px] font-bold px-1.5 py-0.2 rounded ${
+                        selectedSession.origin === 'HARDWARE_REAL' ||
+                        selectedSession.adapter_type !== 'SIMULADOR'
+                          ? 'bg-emerald-950 text-emerald-300 border border-emerald-700'
+                          : 'bg-blue-950 text-blue-300 border border-blue-800'
+                      }`}
+                    >
+                      {selectedSession.origin === 'HARDWARE_REAL' ||
+                      selectedSession.adapter_type !== 'SIMULADOR'
+                        ? 'HARDWARE_REAL'
+                        : 'SIMULADOR'}
+                    </span>
+                    <span className="font-mono text-blue-400 truncate text-[11px]">
+                      {selectedSession.adapter_type}
+                    </span>
+                  </div>
                 </div>
               </div>
 

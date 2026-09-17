@@ -25,6 +25,12 @@ export class RawRecorder {
   private sampleSeq = 0
   private isOnline = true
 
+  // Política de Buffer/Batch Periódico: ~35 amostras ou 2,5 segundos (adendo E6.6.1)
+  private readonly BATCH_THRESHOLD_SAMPLES = 35
+  private readonly BATCH_MAX_INTERVAL_MS = 2500
+  private flushTimer: any = null
+  private lastFlushTimestamp = Date.now()
+
   // Set de IDs já persistidos para proteção contra duplicidade
   private persistedIds = new Set<string>()
 
@@ -38,6 +44,19 @@ export class RawRecorder {
       window.addEventListener('online', this.handleOnline)
       window.addEventListener('offline', this.handleOffline)
     }
+
+    this.startPeriodicFlushTimer()
+  }
+
+  private startPeriodicFlushTimer(): void {
+    if (typeof window === 'undefined') return
+    if (this.flushTimer) clearInterval(this.flushTimer)
+    this.flushTimer = setInterval(() => {
+      const elapsed = Date.now() - this.lastFlushTimestamp
+      if (this.pendingQueue.length > 0 && elapsed >= this.BATCH_MAX_INTERVAL_MS) {
+        this.flushOpportunistic().catch(() => {})
+      }
+    }, 500)
   }
 
   private handleOnline = () => {
@@ -50,6 +69,10 @@ export class RawRecorder {
   }
 
   destroy(): void {
+    if (this.flushTimer) {
+      clearInterval(this.flushTimer)
+      this.flushTimer = null
+    }
     if (typeof window !== 'undefined') {
       window.removeEventListener('online', this.handleOnline)
       window.removeEventListener('offline', this.handleOffline)
@@ -103,8 +126,15 @@ export class RawRecorder {
         console.warn('Erro ao salvar no IndexedDB:', err)
       })
 
-    // Dispara envio ao PocketBase se possível
-    this.flushOpportunistic()
+    // Política de flush incremental (adendo E6.6.1):
+    // Se atingir ~35 amostras ou se tiver tempo acumulado >= 2,5s, dispara flush imediato
+    const elapsedSinceLastFlush = Date.now() - this.lastFlushTimestamp
+    if (
+      this.pendingQueue.length >= this.BATCH_THRESHOLD_SAMPLES ||
+      elapsedSinceLastFlush >= this.BATCH_MAX_INTERVAL_MS
+    ) {
+      this.flushOpportunistic()
+    }
 
     return fullSample
   }
@@ -186,9 +216,11 @@ export class RawRecorder {
 
     this.isFlushing = true
 
+    this.lastFlushTimestamp = Date.now()
+
     try {
-      // Processa em lotes de até 25 amostras por ciclo de flush
-      const BATCH_SIZE = 25
+      // Processa em lotes de até 35 amostras por ciclo de flush (adendo E6.6.1)
+      const BATCH_SIZE = 35
       while (this.pendingQueue.length > 0 && this.dbSessionRecordId) {
         const batch = this.pendingQueue.slice(0, BATCH_SIZE)
         const successfullyPersistedIds: string[] = []
@@ -204,7 +236,7 @@ export class RawRecorder {
           if (!targetSession) break
 
           try {
-            const created = await pb.collection('raw_samples').create({
+            const payload: Record<string, any> = {
               session: targetSession,
               sample_id: item.sample_id,
               ts_utc: item.ts_utc,
@@ -214,7 +246,12 @@ export class RawRecorder {
               decoded_value: item.decoded_value ?? null,
               unit: item.unit ?? null,
               quality: item.quality,
-            })
+            }
+            if (item.ecu) payload.ecu = item.ecu
+            if (item.raw_frame) payload.raw_frame = item.raw_frame
+            if (item.status) payload.status = item.status
+
+            const created = await pb.collection('raw_samples').create(payload)
 
             item.id = created.id
             this.persistedIds.add(item.sample_id)
@@ -248,5 +285,12 @@ export class RawRecorder {
     } finally {
       this.isFlushing = false
     }
+  }
+
+  /**
+   * Força flush imediato de todo buffer pendente (usado no ENCERRAR TESTE)
+   */
+  async flushAllSync(): Promise<void> {
+    await this.flushOpportunistic()
   }
 }

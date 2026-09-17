@@ -15,6 +15,10 @@ export interface StoredPendingSample {
   decoded_value?: number
   unit?: string
   quality: any
+  origin?: string
+  ecu?: string
+  raw_frame?: string
+  status?: string
   queued_at: number
   retry_count: number
 }
@@ -86,6 +90,10 @@ class OfflineStorageService {
             decoded_value: sample.decoded_value,
             unit: sample.unit,
             quality: sample.quality,
+            origin: sample.origin,
+            ecu: sample.ecu,
+            raw_frame: sample.raw_frame,
+            status: sample.status,
             queued_at: Date.now(),
             retry_count: 0,
           }
