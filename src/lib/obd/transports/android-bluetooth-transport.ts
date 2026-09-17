@@ -134,14 +134,14 @@ export class AndroidBluetoothTransport implements OBDTransport {
     const isSupported = canUseWebSerialRfcomm || hasNativeBridge
 
     let diagnosticMessage = ''
-    if (canUseWebSerialRfcomm) {
-      diagnosticMessage = isAndroid
-        ? `Chrome Android ${chromeVersion} detectado: suporte nativo a Web Serial RFCOMM sobre Bluetooth Classic (SPP 00001101).`
-        : `Desktop Chromium ${chromeVersion || ''} detectado: suporte a Web Serial RFCOMM sobre Bluetooth Classic.`
-    } else if (hasNativeBridge) {
+    if (hasNativeBridge) {
       diagnosticMessage = 'Ponte nativa Android detectada (window.AndroidOBD / Capacitor).'
+    } else if (canUseWebSerialRfcomm) {
+      diagnosticMessage = isAndroid
+        ? `Chrome Android ${chromeVersion} detectado: Web Serial ativa. Se o seletor informar "Nenhum dispositivo compatível encontrado", veja a ferramenta "Diag BT OBD" (/diagnostico-bluetooth).`
+        : `Desktop Chromium ${chromeVersion || ''} detectado: suporte a Web Serial RFCOMM sobre Bluetooth Classic.`
     } else if (isAndroid) {
-      diagnosticMessage = `Chrome Android ${chromeVersion || 'detectado'}: O seletor Web Serial para adaptadores Bluetooth Classic SPP ("OBDII") requer Chrome 138+ (flag BluetoothRfcommAndroid) ou APK wrapper nativo (window.AndroidOBD). Se o seletor informar "Nenhum dispositivo compatível encontrado", atualize o Chrome no Xiaomi para 138+ ou instale o APK nativo.`
+      diagnosticMessage = `Chrome Android ${chromeVersion || 'detectado'}: Web Serial RFCOMM não suportada ou navegador desatualizado. Recomenda-se Chrome 138+ ou ponte nativa Android.`
     } else {
       diagnosticMessage = 'Navegador sem suporte a Web Serial RFCOMM ou Bluetooth Classic SPP.'
     }
@@ -321,10 +321,14 @@ export class AndroidBluetoothTransport implements OBDTransport {
         techLogStore.addEntry({
           direction: 'ERR',
           stage: 'REQUEST_PORT_FILTER_ERR',
-          details: `Filtro SPP recusado pelo navegador: ${filterErr?.message || filterErr}. Tentando requestPort sem opções...`,
+          details: `Filtro SPP recusado ou seletor rejeitado: ${filterErr?.message || filterErr}. Tentando requestPort sem opções...`,
         })
-        // Fallback: se o navegador recusar allowedBluetoothServiceClassIds, tenta requestPort() comum
-        this.port = await serial.requestPort()
+        // Fallback: se o navegador rejeitou com erro de opções (TypeError) tenta requestPort() comum
+        if (filterErr?.name === 'TypeError') {
+          this.port = await serial.requestPort()
+        } else {
+          throw filterErr
+        }
       }
 
       if (!this.port) {
@@ -378,14 +382,17 @@ export class AndroidBluetoothTransport implements OBDTransport {
       this.connected = false
       this.port = null
       const msg = err?.message || 'Falha na conexão Bluetooth SPP'
+      const errName = err?.name || ''
       if (
+        errName === 'NotFoundError' ||
+        msg.includes('No port selected') ||
         msg.includes('No device selected') ||
         msg.includes('cancelled') ||
         msg.includes('AbortError')
       ) {
         this.setDetailedStatus(
           'DISPOSITIVO_NAO_PAREADO',
-          'Seleção cancelada pelo usuário ou nenhum dispositivo pareado encontrado.',
+          'Nenhum dispositivo selecionado no seletor nativo do sistema ou seletor cancelado.',
         )
       } else {
         this.setDetailedStatus('FALHA', msg)

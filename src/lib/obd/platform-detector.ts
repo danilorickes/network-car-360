@@ -59,12 +59,12 @@ export function detectPlatformCapabilities(): PlatformCapabilities {
     // No Android, Bluetooth Classic é a opção PRINCIPAL
     recommendedTransport = 'OBD REAL BLUETOOTH CLASSIC'
     if (canUseWebSerialRfcomm) {
-      guidanceText = `Chrome Android ${chromeVersion} detectado: Suporte nativo a ELM327 Bluetooth Classic via Web Serial RFCOMM (SPP 00001101). Dispositivo "OBDII" pareado no Android será listado no seletor.`
+      guidanceText = `Chrome Android ${chromeVersion} detectado: Web Serial ativa. Se o seletor nativo informar "Nenhum dispositivo compatível encontrado", consulte a ferramenta "Diag BT OBD" (/diagnostico-bluetooth). Pareamento no Android não garante elegibilidade no seletor Web Serial.`
     } else if (hasWebSerial) {
-      guidanceText = `Chrome Android ${chromeVersion || 'atual'} detectado. No Android, o seletor Web Serial para dispositivos Bluetooth Classic SPP ("OBDII") exige Chrome 138+ (flag BluetoothRfcommAndroid) ou APK wrapper nativo (window.AndroidOBD). Se o seletor informar "Nenhum dispositivo compatível encontrado", atualize o Chrome para v138+ ou instale o APK.`
+      guidanceText = `Chrome Android ${chromeVersion || 'atual'} detectado. Web Serial disponível. Se o adaptador Bluetooth Classic "OBDII" não aparecer no seletor nativo, utilize a ferramenta "Diag BT OBD" ou a ponte nativa Android.`
     } else {
       guidanceText =
-        'Ambiente Android detectado. Para Bluetooth Classic ELM327 ("OBDII"), utilize Google Chrome 138+ no Android ou o APK wrapper com ponte nativa.'
+        'Ambiente Android detectado. Para Bluetooth Classic ELM327 ("OBDII"), utilize Google Chrome com Web Serial ativa ou o APK wrapper com ponte nativa (Plano B).'
     }
   } else if (hasWebSerial) {
     recommendedTransport = 'OBD REAL SERIAL'

@@ -82,7 +82,7 @@ export const HomologacaoHardware: React.FC = () => {
       overallConclusion:
         approvedCount === profile.steps.length
           ? 'HOMOLOGADO EM CAMPO — COMPATIBILIDADE CONFIRMADA'
-          : 'HARDWARE REAL — AGUARDANDO VALIDAÇÃO DE CAMPO COMPLETA',
+          : 'E6.6 — NÃO HOMOLOGADA EM HARDWARE REAL',
       hardwareNotice:
         'Nenhum hardware ou veículo é homologado pelo software sem teste físico completo com motor em funcionamento.',
     }
@@ -102,8 +102,8 @@ export const HomologacaoHardware: React.FC = () => {
             <h1 className="text-2xl font-bold tracking-tight text-white">
               Homologação de Hardware OBD Real
             </h1>
-            <span className="text-xs bg-amber-500/20 text-[#FFB300] border border-amber-500/40 px-2 py-0.5 rounded font-mono font-bold">
-              HARDWARE REAL — AGUARDANDO VALIDAÇÃO
+            <span className="text-xs bg-red-950/60 text-red-300 border border-red-800 px-2 py-0.5 rounded font-mono font-bold">
+              E6.6 — NÃO HOMOLOGADA EM HARDWARE REAL
             </span>
           </div>
           <p className="text-xs text-[#9AA7B4] mt-1">

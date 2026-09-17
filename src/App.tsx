@@ -27,6 +27,7 @@ import Layout from './components/Layout'
 import { NetworkCarDrive } from './pages/NetworkCarDrive'
 import { HomologacaoHardware } from './pages/HomologacaoHardware'
 import { SimuladorDrive } from './pages/SimuladorDrive'
+import { DiagnosticoBluetooth } from './pages/DiagnosticoBluetooth'
 import { getDriveStartupPreference } from './lib/drive-startup-pref'
 
 // Rota protegida em conformidade com auditoria NC-E4-SEC-01:
@@ -138,6 +139,14 @@ const App = () => (
                 element={
                   <ProtectedRoute>
                     <HomologacaoHardware />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/diagnostico-bluetooth"
+                element={
+                  <ProtectedRoute>
+                    <DiagnosticoBluetooth />
                   </ProtectedRoute>
                 }
               />

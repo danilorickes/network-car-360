@@ -14,6 +14,7 @@ import {
   Package,
   LayoutDashboard,
   PlaySquare,
+  Terminal,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -158,6 +159,17 @@ export const NAV_ITEMS: NavItemConfig[] = [
     iconColorClass: 'text-cyan-400',
   },
   {
+    to: '/diagnostico-bluetooth',
+    label: 'Diag BT OBD',
+    shortLabel: 'Diag BT',
+    description: 'Ferramenta mínima de isolamento e diagnóstico da Web Serial RFCOMM',
+    icon: Terminal,
+    badge: 'E6.6',
+    primaryMobile: false,
+    category: 'diagnostic',
+    iconColorClass: 'text-[#FFB300]',
+  },
+  {
     to: '/simulador-drive',
     label: 'Simulador Drive',
     shortLabel: 'Sim Drive',
@@ -217,6 +229,7 @@ export const DESKTOP_NAV_ITEMS: NavItemConfig[] = [
   NAV_ITEMS.find((i) => i.to === '/simulador-operacional')!,
   NAV_ITEMS.find((i) => i.to === '/drive')!,
   NAV_ITEMS.find((i) => i.to === '/homologacao-hardware')!,
+  NAV_ITEMS.find((i) => i.to === '/diagnostico-bluetooth')!,
   NAV_ITEMS.find((i) => i.to === '/simulador-drive')!,
   NAV_ITEMS.find((i) => i.to === '/')!,
   NAV_ITEMS.find((i) => i.to === '/replay')!,

@@ -137,8 +137,8 @@ export const ConnectionControlPanel: React.FC = () => {
           )}
 
           {!isSimulator && (
-            <span className="text-xs text-[#9AA7B4] bg-[#1A232E] px-2 py-0.5 rounded border border-[#263340]">
-              Status: <strong>IMPLEMENTADA — AGUARDANDO VALIDAÇÃO EM HARDWARE REAL</strong>
+            <span className="text-xs text-red-300 bg-red-950/40 px-2 py-0.5 rounded border border-red-800">
+              Status: <strong>E6.6 — NÃO HOMOLOGADA EM HARDWARE REAL</strong>
             </span>
           )}
         </div>

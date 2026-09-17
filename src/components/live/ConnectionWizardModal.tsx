@@ -69,7 +69,7 @@ export const ConnectionWizardModal: React.FC<ConnectionWizardModalProps> = ({
     if (selectedTransport === 'SIMULADOR') {
       transportInstance = new SimulatedTransport('NORMAL')
     } else if (selectedTransport === 'BLUETOOTH_CLASSIC') {
-      transportInstance = new AndroidBluetoothTransport()
+      transportInstance = new AndroidBluetoothTransport(38400, 3)
     } else if (selectedTransport === 'BLE') {
       transportInstance = new BluetoothTransport()
     } else if (selectedTransport === 'USB_SERIAL') {

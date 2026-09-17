@@ -389,9 +389,12 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           detailedConnectionStatus: detailedSt,
           milOn: milState,
           dtcList: dtcCodes.map((code) => ({
+            session_id: p.activeSessionId || 'init',
             dtc_code: code,
             description: `Código detectado no handshake OBD`,
             status: 'CONFIRMADO' as any,
+            mil_on: milState,
+            read_at_utc: new Date().toISOString(),
           })),
         }))
 
