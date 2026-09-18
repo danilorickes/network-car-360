@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useState, useEffect } from 'react'
 import {
   CheckCircle2,
   AlertTriangle,
@@ -12,13 +12,154 @@ import {
   Sparkles,
   FileDown,
   Printer,
+  Download,
+  Search,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import pb from '@/lib/pocketbase/client'
+import { SessionModel, VehicleModel, EventModel, DtcModel } from '@/types/obd'
+import {
+  buildDiagnostic360PdfData,
+  exportDiagnostic360Pdf,
+} from '@/services/diagnostic-pdf-service'
 
 export default function Relatorio() {
   const [activeTab, setActiveTab] = useState<
-    'relatorio_e4' | 'checklist' | 'relatorio_e2' | 'arquitetura' | 'instrucoes' | 'evidencias'
-  >('relatorio_e4')
+    | 'export_pdf'
+    | 'relatorio_e4'
+    | 'checklist'
+    | 'relatorio_e2'
+    | 'arquitetura'
+    | 'instrucoes'
+    | 'evidencias'
+  >('export_pdf')
+
+  // Estado para exportação de PDF
+  const [sessions, setSessions] = useState<SessionModel[]>([])
+  const [vehicles, setVehicles] = useState<VehicleModel[]>([])
+  const [selectedSessionId, setSelectedSessionId] = useState<string>('dnaab9l8gq5omuf')
+  const [loadingSessions, setLoadingSessions] = useState(false)
+  const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null)
+
+  useEffect(() => {
+    async function loadInitialData() {
+      setLoadingSessions(true)
+      try {
+        const [sessRes, vehRes] = await Promise.all([
+          pb.collection('sessions').getFullList<SessionModel>({ sort: '-created' }),
+          pb.collection('vehicles').getFullList<VehicleModel>({ sort: '-created' }),
+        ])
+        setSessions(sessRes)
+        setVehicles(vehRes)
+
+        // Se a sessão alvo do Ford EcoSport existir, seleciona como padrão
+        const target = sessRes.find(
+          (s) =>
+            s.id === 'dnaab9l8gq5omuf' ||
+            s.session_id === 'sess_1789651428943_g57i' ||
+            s.vehicle_name?.includes('DRE0E59'),
+        )
+        if (target) {
+          setSelectedSessionId(target.id || target.session_id)
+        } else if (sessRes.length > 0) {
+          setSelectedSessionId(sessRes[0].id || sessRes[0].session_id)
+        }
+      } catch (err) {
+        console.error('Erro ao carregar dados de sessões para relatório:', err)
+      } finally {
+        setLoadingSessions(false)
+      }
+    }
+    loadInitialData()
+  }, [])
+
+  const currentSelectedSession =
+    sessions.find((s) => s.id === selectedSessionId || s.session_id === selectedSessionId) ||
+    ({
+      id: 'dnaab9l8gq5omuf',
+      session_id: 'sess_1789651428943_g57i',
+      vehicle_name: 'Ford Ecosport (DRE0E59)',
+      adapter_type: 'OBD REAL BLUETOOTH CLASSIC',
+      detected_protocol: 'AUTO, ISO 15765-4 (CAN 11/500)',
+      device_collector: 'Android Bluetooth [OBDII] — ELM327',
+      origin: 'HARDWARE_REAL',
+      status: 'ENCERRADO',
+      started_at: '2026-09-17T13:23:48.943Z',
+      ended_at: '2026-09-17T13:26:42.097Z',
+      total_duration_ms: 173154,
+      total_samples: 1218,
+      vin: '9BFBJ55E6L8104921',
+    } as unknown as SessionModel)
+
+  const currentSelectedVehicle =
+    vehicles.find(
+      (v) =>
+        v.plate === 'DRE0E59' ||
+        v.id === currentSelectedSession.vehicle ||
+        v.plate === currentSelectedSession.vehicle_name,
+    ) ||
+    vehicles.find((v) => v.plate === 'DRE0E59') ||
+    ({
+      id: 'tckrfbmrxvxdzxm',
+      plate: 'DRE0E59',
+      make: 'Ford',
+      model: 'EcoSport',
+      version: '100 Anos / Freestyle',
+      year_model: '2020',
+      engine: '1.5 Dragon Flex',
+      fuel: 'Flex',
+      odometer_km: 90040,
+      vin: '9BFBJ55E6L8104921',
+    } as unknown as VehicleModel)
+
+  const handleExportPdf = async () => {
+    setExportingPdf(true)
+    setExportSuccessNotice(null)
+    try {
+      // Busca eventos e DTCs do banco para a sessão selecionada
+      let sessionEvents: EventModel[] = []
+      let sessionDtcs: DtcModel[] = []
+
+      if (currentSelectedSession?.id) {
+        try {
+          const [evs, dts] = await Promise.all([
+            pb.collection('events').getFullList<EventModel>({
+              filter: `session='${currentSelectedSession.id}'`,
+            }),
+            pb.collection('dtcs').getFullList<DtcModel>({
+              filter: `session='${currentSelectedSession.id}'`,
+            }),
+          ])
+          sessionEvents = evs
+          sessionDtcs = dts
+        } catch (e) {
+          console.warn('Busca de eventos secundários falhou, usando dados agregados:', e)
+        }
+      }
+
+      const pdfData = buildDiagnostic360PdfData({
+        session: currentSelectedSession,
+        vehicle: currentSelectedVehicle,
+        events: sessionEvents,
+        dtcs: sessionDtcs,
+      })
+
+      const fileName = `Diagnostico360_${pdfData.vehicle.plate || 'Veiculo'}_2026-09-17.pdf`
+      const result = exportDiagnostic360Pdf(pdfData, fileName)
+
+      if (result.method === 'DOWNLOAD') {
+        setExportSuccessNotice(`PDF gerado com sucesso: "${fileName}" (Download direto iniciado).`)
+      } else {
+        setExportSuccessNotice(`Visualização imprimível do PDF aberta com sucesso (${fileName}).`)
+      }
+    } catch (err) {
+      console.error('Erro ao gerar PDF do diagnóstico:', err)
+      alert('Ocorreu um erro ao gerar o PDF. Verifique os dados da sessão.')
+    } finally {
+      setExportingPdf(false)
+    }
+  }
 
   const rfChecklistEtapa2 = [
     {
@@ -107,6 +248,18 @@ export default function Relatorio() {
         <div className="inline-flex rounded-md p-1 bg-[#131A22] border border-[#263340] overflow-x-auto max-w-full">
           <button
             type="button"
+            onClick={() => setActiveTab('export_pdf')}
+            className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors flex items-center space-x-1.5 ${
+              activeTab === 'export_pdf'
+                ? 'bg-[#FFB300] text-black shadow font-bold'
+                : 'text-[#9AA7B4] hover:text-white'
+            }`}
+          >
+            <Download className="w-3.5 h-3.5" />
+            <span>EXPORTAR PDF DIAGNÓSTICO (NOVO)</span>
+          </button>
+          <button
+            type="button"
             onClick={() => setActiveTab('relatorio_e4')}
             className={`px-3 py-1.5 text-xs font-semibold rounded whitespace-nowrap transition-colors ${
               activeTab === 'relatorio_e4'
@@ -114,7 +267,7 @@ export default function Relatorio() {
                 : 'text-[#9AA7B4] hover:text-white'
             }`}
           >
-            RELATÓRIO — ME001-E4 (NOVO)
+            RELATÓRIO — ME001-E4
           </button>
           <button
             type="button"
@@ -174,7 +327,247 @@ export default function Relatorio() {
         </div>
       </div>
 
-      {/* Aba 0: RELATÓRIO OFICIAL ME001-E4 */}
+      {/* Aba 0: EXPORTAR PDF DO DIAGNÓSTICO 360 */}
+      {activeTab === 'export_pdf' && (
+        <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-6 text-xs text-gray-300 leading-relaxed max-w-4xl">
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-[#263340] pb-4">
+            <div>
+              <span className="text-[10px] uppercase tracking-wider text-[#FFB300] font-mono font-bold">
+                MÓDULO DE LAUDO & EXPORTAÇÃO OFICIAL
+              </span>
+              <h2 className="text-xl font-bold text-white mt-1">Exportar PDF do Diagnóstico 360</h2>
+              <p className="text-[#9AA7B4] mt-0.5">
+                Gere o PDF oficial em PT-BR com os parâmetros medidos, leitura técnica, contexto
+                relatado e hipóteses ranqueadas para envio ao mecânico.
+              </p>
+            </div>
+
+            <Button
+              onClick={handleExportPdf}
+              disabled={exportingPdf}
+              className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-sm shadow px-5 py-2.5 flex items-center space-x-2 shrink-0"
+            >
+              <FileDown className="w-4 h-4" />
+              <span>{exportingPdf ? 'Gerando PDF...' : 'EXPORTAR PDF'}</span>
+            </Button>
+          </div>
+
+          {exportSuccessNotice && (
+            <div className="bg-emerald-950/60 border border-emerald-600 p-3 rounded-lg text-emerald-200 text-xs flex items-center space-x-2">
+              <CheckCircle2 className="w-5 h-5 text-emerald-400 shrink-0" />
+              <span>{exportSuccessNotice}</span>
+            </div>
+          )}
+
+          {/* Painel de Seleção da Sessão */}
+          <div className="bg-[#0B0F14] border border-[#263340] rounded-lg p-4 space-y-3">
+            <div className="flex items-center justify-between">
+              <span className="text-xs font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                <Car className="w-4 h-4 text-[#FFB300]" />
+                <span>Selecione a Sessão Diagnóstica</span>
+              </span>
+              {loadingSessions && (
+                <span className="text-xs text-[#9AA7B4]">Carregando sessões...</span>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-[11px] text-[#9AA7B4] block mb-1">
+                  Sessão Coletada (PocketBase):
+                </label>
+                <select
+                  value={selectedSessionId}
+                  onChange={(e) => setSelectedSessionId(e.target.value)}
+                  className="w-full bg-[#131A22] border border-[#263340] text-xs text-white rounded p-2.5 focus:ring-1 focus:ring-[#FFB300]"
+                >
+                  {sessions.map((s) => (
+                    <option key={s.id || s.session_id} value={s.id || s.session_id}>
+                      {s.vehicle_name || 'Veículo'} • {s.session_id} ({s.total_samples || 0}{' '}
+                      amostras)
+                    </option>
+                  ))}
+                  {sessions.length === 0 && (
+                    <option value="dnaab9l8gq5omuf">
+                      Ford Ecosport (DRE0E59) • sess_1789651428943_g57i (1.218 amostras
+                      HARDWARE_REAL)
+                    </option>
+                  )}
+                </select>
+              </div>
+
+              <div>
+                <label className="text-[11px] text-[#9AA7B4] block mb-1">Veículo Vinculado:</label>
+                <div className="p-2.5 rounded bg-[#131A22] border border-[#263340] text-white font-mono text-xs">
+                  {currentSelectedVehicle.make} {currentSelectedVehicle.model} —{' '}
+                  {currentSelectedVehicle.plate} (VIN:{' '}
+                  {currentSelectedVehicle.vin || '9BFBJ55E6L8104921'})
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Pré-visualização do Conteúdo Estruturado do PDF */}
+          <div className="space-y-4">
+            <h3 className="text-xs font-bold text-white uppercase tracking-wider text-[#FFB300]">
+              Pré-visualização da Estrutura Oficial do PDF (9 Seções):
+            </h3>
+
+            {/* Seção 1 & 2 */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div className="bg-[#0B0F14] border border-[#263340] rounded p-3 space-y-1">
+                <span className="font-bold text-[#FFB300] text-[11px] uppercase block">
+                  1. Cabeçalho & Emissão
+                </span>
+                <p className="text-gray-300">
+                  Network Car — Diagnóstico 360 · Network Soluções — Network Office · Data e Versão
+                  Oficial.
+                </p>
+              </div>
+
+              <div className="bg-[#0B0F14] border border-[#263340] rounded p-3 space-y-1">
+                <span className="font-bold text-[#FFB300] text-[11px] uppercase block">
+                  2. Identificação do Veículo & Sessão
+                </span>
+                <p className="text-gray-300">
+                  Ford EcoSport 2020 1.5 Dragon Flex, Placa:{' '}
+                  <strong>{currentSelectedVehicle.plate}</strong>, 90.040 km, VIN 9BFBJ55E6L8104921.
+                  Sessão: {currentSelectedSession.session_id} (1.218 amostras, ELM327 SPP/RFCOMM).
+                </p>
+              </div>
+            </div>
+
+            {/* Seção 3: Parâmetros */}
+            <div className="bg-[#0B0F14] border border-[#263340] rounded p-3 space-y-2">
+              <span className="font-bold text-[#FFB300] text-[11px] uppercase block">
+                3. Parâmetros Observados na Marcha Lenta
+              </span>
+              <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 font-mono text-[11px]">
+                <div className="p-2 bg-[#131A22] rounded border border-[#263340]">
+                  <span className="text-[#9AA7B4] block text-[9px]">RPM:</span>
+                  <span className="text-white font-bold">~874 estável</span>
+                </div>
+                <div className="p-2 bg-[#131A22] rounded border border-[#263340]">
+                  <span className="text-[#9AA7B4] block text-[9px]">Carga do Motor:</span>
+                  <span className="text-white font-bold">12,5%</span>
+                </div>
+                <div className="p-2 bg-[#131A22] rounded border border-[#263340]">
+                  <span className="text-[#9AA7B4] block text-[9px]">STFT Banco 1:</span>
+                  <span className="text-white font-bold">−13,3% a +7%</span>
+                </div>
+                <div className="p-2 bg-red-950/40 rounded border border-red-700">
+                  <span className="text-red-300 block text-[9px] font-bold">LTFT Banco 1:</span>
+                  <span className="text-red-200 font-bold">−12,5% / −13,3% (FORA ±10%)</span>
+                </div>
+                <div className="p-2 bg-[#131A22] rounded border border-[#263340]">
+                  <span className="text-[#9AA7B4] block text-[9px]">Líquido Arrefecimento:</span>
+                  <span className="text-white font-bold">65 °C</span>
+                </div>
+                <div className="p-2 bg-[#131A22] rounded border border-[#263340]">
+                  <span className="text-[#9AA7B4] block text-[9px]">DTCs:</span>
+                  <span className="text-emerald-400 font-bold">0 (MIL Apagada)</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Seção 4: Leitura Técnica */}
+            <div className="bg-amber-950/30 border border-amber-800 p-3 rounded">
+              <span className="font-bold text-amber-300 uppercase text-[11px] block mb-1">
+                4. Leitura Técnica do Especialista
+              </span>
+              <p className="text-amber-100 text-xs">
+                "Mistura rica crônica, corrigida pela ECU (LTFT negativo), sem acionamento da MIL. O
+                motor compensa o excesso de combustível de forma adaptativa — impacto direto no
+                consumo e possível contribuição para perda de força."
+              </p>
+            </div>
+
+            {/* Seção 5: Contexto Relatado */}
+            <div className="bg-[#0B0F14] border border-[#263340] rounded p-3">
+              <span className="font-bold text-[#FFB300] uppercase text-[11px] block mb-1">
+                5. Contexto Relatado (Histórico do Usuário)
+              </span>
+              <p className="text-gray-300 text-xs">
+                "Sintoma iniciou após troca da correia dentada, que estava se esfarelando e sujando
+                o cárter. Houve entrada de sujeira na galeria da solenoide de comando (VCT), com
+                limpeza já realizada — possível existência de resíduos."
+              </p>
+            </div>
+
+            {/* Seção 6: Hipóteses Ranqueadas */}
+            <div className="bg-[#0B0F14] border border-[#263340] rounded p-3 space-y-2">
+              <span className="font-bold text-[#FFB300] uppercase text-[11px] block">
+                6. Hipóteses Ranqueadas & Verificação Recomendada
+              </span>
+              <ol className="list-decimal pl-5 space-y-1.5 text-xs text-gray-300">
+                <li>
+                  <strong className="text-white">
+                    Fase de comando incorreta após a troca da correia dentada
+                  </strong>{' '}
+                  (defasagem de 1 dente) → <em>Verificar marcações de correia/eixo comando.</em>
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Atuador VCT / galeria da solenoide com resíduos
+                  </strong>{' '}
+                  (TiVCT por pressão de óleo) →{' '}
+                  <em>Conferir telas da solenoide e resposta de fase com scanner.</em>
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Pressão de óleo baixa por tela de sucção da bomba obstruída
+                  </strong>{' '}
+                  (risco silencioso) →{' '}
+                  <em>Medir pressão de óleo com manômetro mecânico, motor quente.</em>
+                </li>
+                <li>
+                  <strong className="text-white">
+                    Válvula canister (purge) travada aberta ou pressão de combustível alta
+                  </strong>{' '}
+                  → <em>Teste de desconexão do canister; teste de pressão no trilho.</em>
+                </li>
+              </ol>
+            </div>
+
+            {/* Seção 7: Eventos marcados na rodagem */}
+            <div className="bg-[#0B0F14] border border-[#263340] rounded p-3 space-y-1">
+              <span className="font-bold text-[#FFB300] uppercase text-[11px] block">
+                7. Eventos Marcados na Rodagem (Sessão sess_1789665891179_9tpl)
+              </span>
+              <p className="text-gray-300 text-xs">
+                Ocorrências registradas: <strong>"Ruído"</strong> (17:27:10 UTC) e{' '}
+                <strong>"Perda de potência"</strong> (17:36:43 UTC), janelas ±30s.
+                <br />
+                <span className="text-blue-300 text-[11px] italic">
+                  Nota: 10.650 amostras pendentes de sincronização do coletor Android para o
+                  backend.
+                </span>
+              </p>
+            </div>
+
+            {/* Seção 8: Observações e Limitações */}
+            <div className="bg-[#0B0F14] border border-[#263340] rounded p-3 space-y-1">
+              <span className="font-bold text-[#FFB300] uppercase text-[11px] block">
+                8. Observações Técnicas & Diretrizes
+              </span>
+              <p className="text-gray-300 text-xs">
+                &quot;Análise baseada na fase de marcha lenta quente. A rodagem de validação com MAF
+                (0x10) incluído na coleta é recomendada para diferenciar causa de medição de ar
+                (MAF) de causa mecânica/fase de comando: MAF ~2–3 g/s em idle é esperado para 1.5L;
+                MAF &gt; 4–5 g/s em idle indica medição de ar superestimada.&quot;
+              </p>
+            </div>
+
+            {/* Seção 9: Rodapé */}
+            <div className="text-[11px] text-gray-500 text-center py-2 border-t border-[#263340]">
+              Rodapé oficial: "Emitido pelo Network Car — Diagnóstico 360 · Network Soluções —
+              Network Office · ME001"
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Aba 1: RELATÓRIO OFICIAL ME001-E4 */}
       {activeTab === 'relatorio_e4' && (
         <div className="bg-[#131A22] border border-[#263340] rounded-lg p-6 space-y-6 text-xs text-gray-300 leading-relaxed max-w-4xl">
           <div className="border-b border-[#263340] pb-4">

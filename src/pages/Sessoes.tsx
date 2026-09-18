@@ -5,6 +5,10 @@ import { useRealtime } from '@/hooks/use-realtime'
 import { SessionModel, EventModel, DtcModel, VehicleModel } from '@/types/obd'
 import { vehicleService } from '@/services/vehicles'
 import { ExporterService } from '@/lib/obd/exporter-service'
+import {
+  buildDiagnostic360PdfData,
+  exportDiagnostic360Pdf,
+} from '@/services/diagnostic-pdf-service'
 import { Button } from '@/components/ui/button'
 import {
   PlayCircle,
@@ -224,20 +228,20 @@ export default function Sessoes() {
                   <Button
                     size="sm"
                     variant="outline"
-                    onClick={() =>
-                      ExporterService.printDiagnosticReport({
+                    onClick={() => {
+                      const pdfData = buildDiagnostic360PdfData({
                         session: selectedSession,
                         vehicle: vehicleRecord,
                         events: sessionEvents,
                         dtcs: sessionDtcs,
-                        totalSamplesCount: sampleCount,
                       })
-                    }
-                    className="border-[#263340] text-[#9AA7B4] hover:text-white hover:bg-[#1A232E] text-xs"
-                    title="Imprimir ou Salvar Relatório PDF"
+                      exportDiagnostic360Pdf(pdfData)
+                    }}
+                    className="border-[#263340] text-[#FFB300] hover:text-white hover:bg-[#1A232E] text-xs font-bold"
+                    title="Exportar PDF Oficial do Diagnóstico 360"
                   >
-                    <Printer className="w-3.5 h-3.5 mr-1" />
-                    PDF
+                    <FileDown className="w-3.5 h-3.5 mr-1" />
+                    PDF 360
                   </Button>
 
                   <Button

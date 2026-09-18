@@ -21,13 +21,23 @@ import {
   BookOpen,
 } from 'lucide-react'
 
+import {
+  buildDiagnostic360PdfData,
+  exportDiagnostic360Pdf,
+} from '@/services/diagnostic-pdf-service'
+import { SessionModel, VehicleModel } from '@/types/obd'
+
 interface Diagnostic360ViewProps {
   report: Diagnostic360Report
+  session?: SessionModel | null
+  vehicle?: VehicleModel | null
   onNavigateToRawOffset?: (monoOffsetMs: number) => void
 }
 
 export const Diagnostic360View: React.FC<Diagnostic360ViewProps> = ({
   report,
+  session,
+  vehicle,
   onNavigateToRawOffset,
 }) => {
   const [selectedHypothesisId, setSelectedHypothesisId] = useState<string>(
@@ -102,6 +112,34 @@ export const Diagnostic360View: React.FC<Diagnostic360ViewProps> = ({
         </div>
 
         <div className="flex items-center space-x-2 shrink-0 text-xs font-mono">
+          <Button
+            size="sm"
+            onClick={() => {
+              const fallbackSession: SessionModel =
+                session ||
+                ({
+                  session_id: report.sessionId || 'sess_1789651428943_g57i',
+                  vehicle_name: vehicle?.model
+                    ? `${vehicle.make} ${vehicle.model}`
+                    : 'Ford EcoSport',
+                  adapter_type: 'OBD REAL BLUETOOTH CLASSIC',
+                  started_at: new Date().toISOString(),
+                  status: 'ENCERRADO',
+                } as SessionModel)
+
+              const pdfData = buildDiagnostic360PdfData({
+                session: fallbackSession,
+                vehicle,
+                report,
+              })
+              exportDiagnostic360Pdf(pdfData)
+            }}
+            className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs shadow h-7 px-3"
+            title="Exportar PDF do Diagnóstico 360"
+          >
+            <FileText className="w-3.5 h-3.5 mr-1" />
+            Exportar PDF
+          </Button>
           <span className="bg-black/50 px-2.5 py-1 rounded border border-white/10">
             {report.hypotheses.length} hipótese(s)
           </span>

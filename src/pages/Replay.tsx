@@ -16,6 +16,10 @@ import { ReplayEngine } from '@/lib/obd/replay-engine'
 import { BlackBoxBuilder, TemporalComparisonPoint } from '@/lib/obd/blackbox-builder'
 import { ExporterService } from '@/lib/obd/exporter-service'
 import { Diagnostic360Pipeline } from '@/lib/diagnostic/diagnostic-pipeline'
+import {
+  buildDiagnostic360PdfData,
+  exportDiagnostic360Pdf,
+} from '@/services/diagnostic-pdf-service'
 import { diagnosticService } from '@/services/diagnostic'
 import { Diagnostic360View } from '@/components/diagnostic/Diagnostic360View'
 import { Diagnostic360InvestigationView } from '@/components/diagnostic/Diagnostic360InvestigationView'
@@ -438,21 +442,21 @@ export default function Replay() {
 
               <Button
                 size="sm"
-                onClick={() =>
-                  ExporterService.printDiagnosticReport({
+                onClick={() => {
+                  const pdfData = buildDiagnostic360PdfData({
                     session: sessionRecord,
                     vehicle: vehicleRecord,
                     events,
                     dtcs,
-                    packages: selectedBlackBox ? [selectedBlackBox] : [],
-                    totalSamplesCount: samples.length,
+                    report: diagnosticReport,
                   })
-                }
+                  exportDiagnostic360Pdf(pdfData)
+                }}
                 className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs shadow"
-                title="Imprimir ou Salvar PDF Legível para Cliente / Oficina"
+                title="Exportar PDF do Diagnóstico 360 Oficial (jsPDF / Download & Impressão)"
               >
-                <Printer className="w-3.5 h-3.5 mr-1" />
-                PDF
+                <FileDown className="w-3.5 h-3.5 mr-1" />
+                Exportar PDF 360
               </Button>
             </>
           )}
@@ -760,6 +764,8 @@ export default function Replay() {
           {diagnosticReport ? (
             <Diagnostic360View
               report={diagnosticReport}
+              session={sessionRecord}
+              vehicle={vehicleRecord}
               onNavigateToRawOffset={(offset) => {
                 setActiveTab('replay')
                 if (totalDurationMs > 0 && replayEngineRef.current) {
