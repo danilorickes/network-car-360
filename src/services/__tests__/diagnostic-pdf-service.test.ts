@@ -21,7 +21,7 @@ describe('Diagnostic360PdfService — Exportar PDF do Diagnóstico 360', () => {
     total_duration_ms: 173154,
     total_samples: 1218,
     vin: '9BFBJ55E6L8104921',
-    app_version: '0.0.43-homologacao-e6.6.1',
+    app_version: '0.0.44-laudo-telemetria-segura',
   } as unknown as SessionModel
 
   const mockRealVehicle: VehicleModel = {
@@ -168,5 +168,182 @@ describe('Diagnostic360PdfService — Exportar PDF do Diagnóstico 360', () => {
     // @ts-expect-error getNumberOfPages exists on jsPDF
     const pageCount = doc.internal.getNumberOfPages()
     expect(pageCount).toBeGreaterThanOrEqual(1)
+  })
+
+  // =========================================================================
+  // Testes exigidos para a V0.0.44:
+  // (a) laudo com tests_log manual + análise automática sem falha -> seções separadas com rótulos corretos
+  // (b) sessão sem amostras -> parâmetros exibem "Sem amostras sincronizadas", nunca "--"
+  // (c) entrada manual removida -> laudo não cita mais bobinas/P0302
+  // =========================================================================
+  describe('Correções v0.0.44: Separação de fontes manuais e parâmetros reais', () => {
+    it('(a) laudo gerado com tests_log manual + análise automática sem falha deve ter seções separadas com rótulos corretos', () => {
+      const sessionWithSamples: SessionModel = {
+        ...mockRealSession,
+        id: 'sess_generica_xyz',
+        session_id: 'sess_normal_001',
+        total_samples: 500,
+      }
+      const genericVehicle: VehicleModel = {
+        ...mockRealVehicle,
+        plate: 'ABC1D23',
+      }
+
+      const manualTests = [
+        {
+          id: 'test_manual_test_01',
+          executedAtUtc: '2026-09-17T14:26:25.234Z',
+          title: 'Permuta de Bobinas',
+          targetComponent: 'Bobina de Ignição Cil 1 e 2',
+          status: 'INFORMADO',
+          measuredValue: 'P0302 no cil 2',
+          observation: 'Anotação técnica preliminar de oficina',
+        },
+      ]
+
+      const reportWithNoFault = {
+        hypotheses: [
+          {
+            rank: 1,
+            title: 'Sistema em Plena Conformidade Operacional (Nenhuma Falha Detectada)',
+            description: 'Telemetria dentro dos limiares de projeto. Zero DTCs ativos.',
+            confidence: 96,
+            affectedSystem: 'NENHUMA_FALHA_DETECTADA',
+            confirmationProtocol: { steps: [{ action: 'Manter revisões programadas' }] },
+          },
+        ],
+      } as any
+
+      const data = buildDiagnostic360PdfData({
+        session: sessionWithSamples,
+        vehicle: genericVehicle,
+        events: [],
+        dtcs: [],
+        report: reportWithNoFault,
+        manualTests,
+      })
+
+      // Verifica separação de hipótese automática e teste manual
+      expect(data.rankedHypotheses[0].sourceType).toBe('TELEMETRIA_AUTOMATICA')
+      expect(data.rankedHypotheses[0].title).toContain('Nenhuma Falha Detectada')
+      expect(data.manualMechanicTests).toHaveLength(1)
+      expect(data.manualMechanicTests?.[0].title).toBe('Permuta de Bobinas')
+
+      const doc = generateDiagnostic360PdfDocument(data)
+      expect(doc).toBeDefined()
+    })
+
+    it('(b) sessão sem amostras deve exibir "Sem amostras sincronizadas para esta sessão", nunca "--"', () => {
+      const emptySession: SessionModel = {
+        ...mockRealSession,
+        id: 'sess_generica_sem_amostras',
+        session_id: 'sess_sem_amostras_002',
+        total_samples: 0,
+      }
+      const genericVehicle: VehicleModel = {
+        ...mockRealVehicle,
+        plate: 'ABC1D23',
+      }
+
+      const data = buildDiagnostic360PdfData({
+        session: emptySession,
+        vehicle: genericVehicle,
+        events: [],
+        dtcs: [],
+        samplesCount: 0,
+      })
+
+      // Nenhum parâmetro deve exibir "--"
+      for (const param of data.observedParameters) {
+        expect(param.observedValue).not.toContain('--')
+      }
+
+      // Parâmetros principais devem indicar ausência de amostras sincronizadas
+      const rpmParam = data.observedParameters.find((p) => p.pid === '0x0C')
+      expect(rpmParam?.observedValue).toBe('Sem amostras sincronizadas para esta sessão')
+
+      const ectParam = data.observedParameters.find((p) => p.pid === '0x05')
+      expect(ectParam?.observedValue).toBe('Sem amostras sincronizadas para esta sessão')
+
+      const mapParam = data.observedParameters.find((p) => p.pid.includes('0x0B'))
+      expect(mapParam?.observedValue).toBe('Sem amostras sincronizadas para esta sessão')
+
+      const voltParam = data.observedParameters.find((p) => p.pid === '0x42')
+      expect(voltParam?.observedValue).toBe('Sem amostras sincronizadas para esta sessão')
+    })
+
+    it('(c) quando a entrada manual acidental é removida, o laudo não deve conter referências a bobinas ou P0302', () => {
+      // Simulação da investigação 2qwnn2olf4lo6s0 após a limpeza do tests_log
+      const cleanTests: any[] = [] // Sem test_1789655185234
+      const normalReport = {
+        hypotheses: [
+          {
+            rank: 1,
+            title: 'Sistema em Conformidade Operacional',
+            description:
+              'Parâmetros avaliados pela telemetria encontram-se dentro dos limiares de projeto.',
+            confidence: 95,
+            confirmationProtocol: { steps: [{ action: 'Manter revisões programadas' }] },
+          },
+        ],
+      } as any
+
+      const sessionClean: SessionModel = {
+        ...mockRealSession,
+        id: 'sess_clean_inv',
+        session_id: 'sess_clean_003',
+        total_samples: 200,
+      }
+      const vehicleClean: VehicleModel = {
+        ...mockRealVehicle,
+        plate: 'ABC1D23',
+      }
+
+      const data = buildDiagnostic360PdfData({
+        session: sessionClean,
+        vehicle: vehicleClean,
+        events: [],
+        dtcs: [],
+        report: normalReport,
+        manualTests: cleanTests,
+      })
+
+      // Verifica ausência total de P0302 e bobinas
+      const stringified = JSON.stringify(data)
+      expect(stringified).not.toContain('P0302')
+      expect(stringified).not.toContain('test_1789655185234')
+      expect(stringified).not.toContain('bobina')
+      expect(stringified).not.toContain('Bobina')
+
+      expect(data.manualMechanicTests).toHaveLength(0)
+      expect(data.rankedHypotheses[0].title).toContain('Sistema em Conformidade Operacional')
+    })
+
+    it('(d) veredito automático de NENHUMA_FALHA_DETECTADA não deve ter força de evidência de falha se houver anotações manuais', () => {
+      // Caso haja anotações manuais do mecânico, a hipótese de conformidade automática permanece intacta
+      const manualTests = [
+        {
+          id: 'manual_note_01',
+          title: 'Inspeção Visual de Cabos',
+          measuredValue: 'Conectores limpos',
+          observation: 'Suspeita não confirmada por telemetria',
+        },
+      ]
+
+      const data = buildDiagnostic360PdfData({
+        session: {
+          ...mockRealSession,
+          id: 'sess_generic_4',
+          session_id: 'sess_generic_4',
+          total_samples: 300,
+        },
+        vehicle: { ...mockRealVehicle, plate: 'XYZ9K99' },
+        manualTests,
+      })
+
+      expect(data.rankedHypotheses[0].sourceType).toBe('TELEMETRIA_AUTOMATICA')
+      expect(data.manualMechanicTests).toBeDefined()
+      expect(data.manualMechanicTests?.[0].title).toBe('Inspeção Visual de Cabos')
+    })
   })
 })

@@ -236,9 +236,14 @@ export class ExporterService {
         <div class="section">
           <div class="section-title">
             <span>2. Avaliação Preliminar do Mecânico</span>
-            <span class="badge badge-medido">CONSTATAÇÃO TÉCNICA</span>
+            <span class="badge badge-relatado">REGISTRO MANUAL DO MECÂNICO (NÃO CONFIRMADO POR TELEMETRIA)</span>
           </div>
-          <p style="margin: 3px 0;"><strong>Observação:</strong> ${mechEval.freeNotes || 'Sem anotações'}</p>
+          <p style="margin: 3px 0;"><strong>Observação:</strong> ${(
+            mechEval.freeNotes || 'Sem anotações'
+          ).replace(
+            'RPM médio --, Temperatura --°C, MAP -- kPa, MAF -- g/s, Tensão --V',
+            'Sem amostras sincronizadas para esta sessão',
+          )}</p>
           <div style="font-size: 10px; color: #444;">
             Sintomas observados: ${mechEval.roughIdle ? 'Marcha lenta irregular; ' : ''}${mechEval.misfireUnderLoad ? 'Falha sob carga; ' : ''}${mechEval.vibrationFelt ? 'Vibração acentuada; ' : ''}${mechEval.powerLossObserved ? 'Perda de potência;' : ''}
           </div>
@@ -264,36 +269,81 @@ export class ExporterService {
 
         <div class="section">
           <div class="section-title">
-            <span>4. Árvore de Hipóteses & Confiança Recalculada</span>
-            <span class="badge badge-inferido">INFERIDO PELO MOTOR DETERMINÍSTICO</span>
+            <span>4. Análise Automática (Telemetria) — Árvore de Hipóteses Determinística</span>
+            <span class="badge badge-medido">ANÁLISE AUTOMÁTICA (TELEMETRIA)</span>
           </div>
           <table>
             <thead>
               <tr>
-                <th>Hipótese</th>
+                <th>Hipótese Automática</th>
                 <th>Sistema</th>
                 <th>Confiança</th>
                 <th>Status Atual</th>
-                <th>Critério / Teste Executado</th>
+                <th>Base / Evidência Automática</th>
               </tr>
             </thead>
             <tbody>
               ${investigation.hypotheses_tree
-                .map(
-                  (n) => `
-                <tr>
-                  <td><strong>${n.hypothesis.title}</strong></td>
-                  <td>${n.hypothesis.affectedSystem}</td>
-                  <td><strong>${n.currentConfidence}%</strong></td>
-                  <td>${n.status}</td>
-                  <td>${n.confirmationCriteriaRegistered || n.testsAssociated[0]?.observation || 'Pendente de teste'}</td>
-                </tr>
-              `,
-                )
+                .map((n) => {
+                  const isConformity = n.hypothesis.affectedSystem === 'NENHUMA_FALHA_DETECTADA'
+                  return `
+                    <tr>
+                      <td><strong>${n.hypothesis.title}</strong></td>
+                      <td>${n.hypothesis.affectedSystem}</td>
+                      <td><strong>${n.currentConfidence}%</strong></td>
+                      <td>${n.status}</td>
+                      <td>${isConformity ? 'Telemetria dentro dos limiares de projeto. Zero DTCs ativos na ECU.' : n.hypothesis.favorableEvidences?.[0] || 'Parâmetros avaliados por telemetria'}</td>
+                    </tr>
+                  `
+                })
                 .join('')}
             </tbody>
           </table>
         </div>
+
+        ${
+          investigation.tests_log && investigation.tests_log.length > 0
+            ? `
+          <div class="section">
+            <div class="section-title">
+              <span>5. Registros Manuais de Testes do Mecânico</span>
+              <span class="badge badge-relatado">REGISTRO MANUAL DO MECÂNICO (NÃO CONFIRMADO POR TELEMETRIA)</span>
+            </div>
+            <p style="font-size: 9.5px; color: #b45309; margin: 0 0 6px 0; font-style: italic;">
+              Aviso: As entradas abaixo foram registradas manualmente pelo operador e constituem anotações preliminares de oficina, não possuindo força de evidência definitiva nem alterando o veredito automático da telemetria.
+            </p>
+            <table>
+              <thead>
+                <tr>
+                  <th>Data/Hora (UTC)</th>
+                  <th>Teste Registrado</th>
+                  <th>Componente / Alvo</th>
+                  <th>Resultado Informado</th>
+                  <th>Valor / Aferição</th>
+                  <th>Observação Técnica</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${investigation.tests_log
+                  .map(
+                    (t) => `
+                  <tr>
+                    <td>${t.executedAtUtc ? new Date(t.executedAtUtc).toLocaleString('pt-BR') : '-'}</td>
+                    <td><strong>${t.title || 'Teste de Confirmação'}</strong></td>
+                    <td>${t.targetComponent || '-'}</td>
+                    <td><span class="badge badge-relatado">${t.status || 'INFORMADO'}</span></td>
+                    <td>${t.measuredValue || '-'}</td>
+                    <td>${t.observation || '-'}</td>
+                  </tr>
+                `,
+                  )
+                  .join('')}
+              </tbody>
+            </table>
+          </div>
+        `
+            : ''
+        }
 
         ${
           investigation.intervention

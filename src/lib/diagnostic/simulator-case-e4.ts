@@ -295,10 +295,11 @@ export class SimulatorCaseE4 {
       .filter((s) => s.pid === '0x42' && s.decoded_value !== undefined)
       .map((s) => s.decoded_value)
 
+    const hasSamples = samples.length > 0
     const avg = (arr: number[]) =>
-      arr.length > 0 ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : '--'
-    const max = (arr: number[]) => (arr.length > 0 ? Math.max(...arr).toFixed(1) : '--')
-    const min = (arr: number[]) => (arr.length > 0 ? Math.min(...arr).toFixed(1) : '--')
+      arr.length > 0 ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : null
+    const max = (arr: number[]) => (arr.length > 0 ? Math.max(...arr).toFixed(1) : null)
+    const min = (arr: number[]) => (arr.length > 0 ? Math.min(...arr).toFixed(1) : null)
 
     const dtcCodes = dtcs.map((d) => d.dtc_code || d)
     const hasDtcs = dtcCodes.length > 0
@@ -365,9 +366,15 @@ export class SimulatorCaseE4 {
           affectedSystem: 'NENHUMA_FALHA_DETECTADA',
           possibleCauses: ['Veículo em condições normais de funcionamento'],
           favorableEvidences: [
-            `RPM médio: ${avg(rpms)} (min ${min(rpms)}, max ${max(rpms)})`,
-            `Temperatura média do motor: ${avg(temps)} °C`,
-            `Tensão média do sistema elétrico: ${avg(voltages)} V`,
+            hasSamples && avg(rpms)
+              ? `RPM médio: ${avg(rpms)} (min ${min(rpms)}, max ${max(rpms)})`
+              : 'Sem amostras sincronizadas para medição de RPM',
+            hasSamples && avg(temps)
+              ? `Temperatura média do motor: ${avg(temps)} °C`
+              : 'Sem amostras sincronizadas para temperatura',
+            hasSamples && avg(voltages)
+              ? `Tensão média do sistema elétrico: ${avg(voltages)} V`
+              : 'Sem amostras sincronizadas para tensão',
             'Zero DTCs de anomalia registrados na ECU',
           ],
           contraryEvidences: [],
@@ -453,7 +460,9 @@ export class SimulatorCaseE4 {
         registeredAtUtc: t0,
       },
       mechanic_evaluation: {
-        freeNotes: `Parâmetros objetivos medidos na sessão real: RPM médio ${avg(rpms)}, Temperatura ${avg(temps)}°C, MAP ${avg(maps)} kPa, MAF ${avg(mafs)} g/s, Tensão ${avg(voltages)}V. ${hasDtcs ? `DTCs ativos: ${dtcCodes.join(', ')}` : 'Nenhum DTC ativo.'}`,
+        freeNotes: hasSamples
+          ? `Parâmetros objetivos medidos na sessão real: RPM médio ${avg(rpms) ?? 'N/D'}, Temperatura ${avg(temps) ?? 'N/D'}°C, MAP ${avg(maps) ?? 'N/D'} kPa, MAF ${avg(mafs) ?? 'N/D'} g/s, Tensão ${avg(voltages) ?? 'N/D'}V. ${hasDtcs ? `DTCs ativos: ${dtcCodes.join(', ')}` : 'Nenhum DTC ativo.'}`
+          : `Parâmetros objetivos: Sem amostras sincronizadas para esta sessão. ${hasDtcs ? `DTCs ativos: ${dtcCodes.join(', ')}` : 'Nenhum DTC ativo.'}`,
         roughIdle: false,
         misfireUnderLoad: false,
         noiseAbnormal: false,

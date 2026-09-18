@@ -21,6 +21,17 @@ export interface DiagnosticHypothesisItem {
   description?: string
   confidence?: number
   verificationRecommendation: string
+  sourceType?: 'TELEMETRIA_AUTOMATICA' | 'REGISTRO_MANUAL_MECANICO'
+}
+
+export interface ManualMechanicTestEntryItem {
+  id?: string
+  executedAtUtc?: string
+  title: string
+  targetComponent?: string
+  status?: string
+  measuredValue?: string
+  observation?: string
 }
 
 // Interface para eventos de rodagem
@@ -76,8 +87,11 @@ export interface Diagnostic360PdfData {
   // Contexto relatado (histórico do usuário)
   reportedContext?: string
 
-  // Hipóteses ranqueadas
+  // Hipóteses ranqueadas (Análise Automática / Telemetria)
   rankedHypotheses: DiagnosticHypothesisItem[]
+
+  // Registros manuais do mecânico (testes informados manualmente pela oficina)
+  manualMechanicTests?: ManualMechanicTestEntryItem[]
 
   // Eventos marcados na rodagem
   markedEvents: MarkedRunEventItem[]
@@ -108,8 +122,10 @@ export function buildDiagnostic360PdfData(options: {
   report?: Diagnostic360Report | null
   customReportedContext?: string
   customTechnicalReading?: string
+  manualTests?: ManualMechanicTestEntryItem[]
+  samplesCount?: number
 }): Diagnostic360PdfData {
-  const { session, vehicle, events = [], dtcs = [] } = options
+  const { session, vehicle, events = [], dtcs = [], manualTests = [] } = options
 
   const isDRE0E59 =
     session.id === 'dnaab9l8gq5omuf' ||
@@ -141,7 +157,63 @@ export function buildDiagnostic360PdfData(options: {
   // Parâmetros observados
   let observedParameters: ObservedParameterItem[] = []
 
-  if (isDRE0E59 || session.id === 'dnaab9l8gq5omuf') {
+  const totalSamples =
+    options.samplesCount !== undefined ? options.samplesCount : session.total_samples || 0
+  const hasSynchronizedSamples = totalSamples > 0
+
+  if (!hasSynchronizedSamples) {
+    // Sessão sem amostras sincronizadas reais: NUNCA exibir valores fictícios ou "--"
+    observedParameters = [
+      {
+        name: 'Rotação do Motor (RPM)',
+        pid: '0x0C',
+        observedValue: 'Sem amostras sincronizadas para esta sessão',
+        normalRange: '750 — 900 RPM',
+        status: 'INFORMATIVO',
+        highlight: false,
+        notes: 'Aguardando sincronização de pacotes de telemetria do coletor.',
+      },
+      {
+        name: 'Temperatura do Motor (ECT)',
+        pid: '0x05',
+        observedValue: 'Sem amostras sincronizadas para esta sessão',
+        normalRange: '85 °C — 105 °C',
+        status: 'INFORMATIVO',
+        highlight: false,
+        notes: 'Sem dados brutos no backend para cálculo de média térmica.',
+      },
+      {
+        name: 'Pressão / Fluxo (MAP / MAF)',
+        pid: '0x0B / 0x10',
+        observedValue: 'Sem amostras sincronizadas para esta sessão',
+        normalRange: 'Conforme carga',
+        status: 'INFORMATIVO',
+        highlight: false,
+        notes: 'Sem amostras sincronizadas.',
+      },
+      {
+        name: 'Tensão do Módulo (ECU)',
+        pid: '0x42',
+        observedValue: 'Sem amostras sincronizadas para esta sessão',
+        normalRange: '13.5 — 14.8 V',
+        status: 'INFORMATIVO',
+        highlight: false,
+        notes: 'Sem amostras sincronizadas.',
+      },
+      {
+        name: 'Códigos de Falha DTCs',
+        pid: 'Modo 03/07',
+        observedValue: `${dtcs.length} DTC(s) gravados`,
+        normalRange: '0 DTCs',
+        status: dtcs.length > 0 ? 'ALERTA' : 'NORMAL',
+        highlight: dtcs.length > 0,
+        notes:
+          dtcs.length > 0
+            ? dtcs.map((d) => d.dtc_code).join(', ')
+            : 'Nenhum DTC reportado no barramento.',
+      },
+    ]
+  } else if (isDRE0E59 || session.id === 'dnaab9l8gq5omuf') {
     observedParameters = [
       {
         name: 'Rotação do Motor (RPM)',
@@ -199,7 +271,7 @@ export function buildDiagnostic360PdfData(options: {
       },
     ]
   } else {
-    // Parâmetros genéricos
+    // Parâmetros genéricos com amostras reais
     observedParameters = [
       {
         name: 'Rotação do Motor (RPM)',
@@ -240,16 +312,28 @@ export function buildDiagnostic360PdfData(options: {
       ? 'Sintoma iniciou após troca da correia dentada, que estava se esfarelando e sujando o cárter. Houve entrada de sujeira na galeria da solenoide de comando (VCT), com limpeza já realizada — possível existência de resíduos.'
       : undefined)
 
-  // Hipóteses Ranqueadas
+  // Hipóteses Ranqueadas (Análise Automática / Telemetria)
   let rankedHypotheses: DiagnosticHypothesisItem[] = []
 
-  if (isDRE0E59) {
+  if (options.report && options.report.hypotheses.length > 0) {
+    rankedHypotheses = options.report.hypotheses.map((h) => ({
+      rank: h.rank,
+      title: h.title,
+      description: h.description,
+      confidence: h.confidence,
+      sourceType: 'TELEMETRIA_AUTOMATICA',
+      verificationRecommendation:
+        h.confirmationProtocol?.steps?.[0]?.action ||
+        'Executar inspeção visual e medição de sinais com scanner/multímetro.',
+    }))
+  } else if (isDRE0E59) {
     rankedHypotheses = [
       {
         rank: 1,
         title: 'Fase de comando incorreta após a troca da correia dentada',
         description: 'Possível defasagem de 1 dente — causa clássica e frequente pós-troca.',
         confidence: 88,
+        sourceType: 'TELEMETRIA_AUTOMATICA',
         verificationRecommendation:
           'Verificar marcações de correia/eixo comando com ferramentas de fasagem do motor Dragon.',
       },
@@ -259,6 +343,7 @@ export function buildDiagnostic360PdfData(options: {
         description:
           'Motor 1.5 Dragon utiliza comando variável Ti-VCT atuado por pressão hidráulica de óleo.',
         confidence: 82,
+        sourceType: 'TELEMETRIA_AUTOMATICA',
         verificationRecommendation:
           'Conferir telas da solenoide e checar a resposta de fase com scanner (parâmetro de desvio de comando VCT).',
       },
@@ -268,6 +353,7 @@ export function buildDiagnostic360PdfData(options: {
         description:
           'Partículas da correia desfeita no cárter podem restringir o pescador da bomba (risco silencioso, prioridade máxima de checagem).',
         confidence: 79,
+        sourceType: 'TELEMETRIA_AUTOMATICA',
         verificationRecommendation:
           'Medir pressão de óleo com manômetro mecânico acoplado, com motor em temperatura operacional quente.',
       },
@@ -277,27 +363,20 @@ export function buildDiagnostic360PdfData(options: {
         description:
           'Hipóteses secundárias menos prováveis no contexto específico pós-troca de correia.',
         confidence: 45,
+        sourceType: 'TELEMETRIA_AUTOMATICA',
         verificationRecommendation:
           'Realizar teste de vedação/desconexão do canister; teste de pressão da linha no trilho de injeção.',
       },
     ]
-  } else if (options.report && options.report.hypotheses.length > 0) {
-    rankedHypotheses = options.report.hypotheses.map((h) => ({
-      rank: h.rank,
-      title: h.title,
-      description: h.description,
-      confidence: h.confidence,
-      verificationRecommendation:
-        h.confirmationProtocol?.steps?.[0]?.action ||
-        'Executar inspeção visual e medição de sinais com scanner/multímetro.',
-    }))
   } else {
     rankedHypotheses = [
       {
         rank: 1,
-        title: 'Sistema em Conformidade Operacional',
-        description: 'Parâmetros avaliados encontram-se dentro dos limiares de projeto.',
+        title: 'Sistema em Conformidade Operacional (Nenhuma Falha Detectada)',
+        description:
+          'Parâmetros avaliados pela telemetria encontram-se dentro dos limiares de projeto.',
         confidence: 95,
+        sourceType: 'TELEMETRIA_AUTOMATICA',
         verificationRecommendation: 'Manter plano de revisões periódicas do veículo.',
       },
     ]
@@ -358,7 +437,7 @@ export function buildDiagnostic360PdfData(options: {
     : 'Análise diagnóstica obtida por telemetria OBD-II padronizada. Recomenda-se confirmação física dos sistemas antes de substituição de peças.'
 
   return {
-    appVersion: session.app_version || '0.0.43-homologacao-e6.6.1',
+    appVersion: session.app_version || '0.0.44-laudo-telemetria-segura',
     emissionDate: new Date().toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -396,6 +475,7 @@ export function buildDiagnostic360PdfData(options: {
     technicalReading,
     reportedContext,
     rankedHypotheses,
+    manualMechanicTests: manualTests,
     markedEvents,
     eventsSyncPendingNotice,
     deterministicAnalysisNotice,
@@ -503,7 +583,7 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
     currentY + 9,
     { align: 'right' },
   )
-  doc.text(`Versão App: ${data.appVersion || '0.0.43'}`, pageWidth - margin - 6, currentY + 16, {
+  doc.text(`Versão App: ${data.appVersion || '0.0.44'}`, pageWidth - margin - 6, currentY + 16, {
     align: 'right',
   })
 
@@ -724,14 +804,14 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
   }
 
   // ==========================================
-  // 6. HIPÓTESES RANQUEADAS & VERIFICAÇÕES
+  // 6. HIPÓTESES RANQUEADAS (ANÁLISE AUTOMÁTICA - TELEMETRIA)
   // ==========================================
   ensureSpace(40)
 
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
-  doc.text('5. HIPÓTESES DIAGNÓSTICAS RANQUEADAS & VERIFICAÇÕES RECOMENDADAS', margin, currentY)
+  doc.text('5. ANÁLISE AUTOMÁTICA (TELEMETRIA) — HIPÓTESES DETERMINÍSTICAS', margin, currentY)
   currentY += 4
 
   const hypTableBody = data.rankedHypotheses.map((h) => [
@@ -746,7 +826,7 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
     head: [
       [
         '#',
-        'Hipótese Mecânica / Causa Provável',
+        'Hipótese Automática (Telemetria)',
         'Confiança',
         'Verificação Recomendada (Testar antes de trocar)',
       ],
@@ -779,6 +859,75 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
   currentY = doc.lastAutoTable.finalY + 6
 
   // ==========================================
+  // 6.1 REGISTRO MANUAL DO MECÂNICO (SE HOUVER)
+  // ==========================================
+  if (data.manualMechanicTests && data.manualMechanicTests.length > 0) {
+    ensureSpace(35)
+
+    doc.setFont('helvetica', 'bold')
+    doc.setFontSize(10)
+    doc.setTextColor(180, 83, 9) // Amber-700
+    doc.text('6. REGISTRO MANUAL DO MECÂNICO (NÃO CONFIRMADO POR TELEMETRIA)', margin, currentY)
+    currentY += 4
+
+    // Aviso de separação de fonte
+    const manualNotice =
+      'AVISO: As entradas abaixo foram registradas manualmente pelo operador e constituem anotações preliminares de oficina, não possuindo força de evidência definitiva nem alterando o veredito automático da telemetria.'
+    const splitManualNotice = doc.splitTextToSize(manualNotice, contentWidth - 10)
+    const manualNoticeHeight = splitManualNotice.length * 3.8 + 4
+
+    doc.setFillColor(254, 243, 199) // Amber-50
+    doc.setDrawColor(245, 158, 11) // Amber-500
+    doc.setLineWidth(0.3)
+    doc.roundedRect(margin, currentY, contentWidth, manualNoticeHeight, 1.5, 1.5, 'FD')
+
+    doc.setFont('helvetica', 'italic')
+    doc.setFontSize(7)
+    doc.setTextColor(146, 64, 14) // Amber-800
+    doc.text(splitManualNotice, margin + 4, currentY + 3.5)
+
+    currentY += manualNoticeHeight + 4
+
+    const manualTableBody = data.manualMechanicTests.map((t) => [
+      t.executedAtUtc ? new Date(t.executedAtUtc).toLocaleDateString('pt-BR') : '-',
+      t.title || 'Teste de Confirmação',
+      t.targetComponent || '-',
+      t.measuredValue || '-',
+      t.observation || '-',
+    ])
+
+    runAutoTable(doc, {
+      startY: currentY,
+      head: [['Data', 'Teste Informado', 'Alvo', 'Valor / Medição', 'Observações do Mecânico']],
+      body: manualTableBody,
+      theme: 'grid',
+      styles: {
+        fontSize: 7.5,
+        cellPadding: 2,
+        textColor: [30, 40, 50],
+        lineColor: [230, 215, 180],
+      },
+      headStyles: {
+        fillColor: [180, 83, 9], // Tom âmbar/marrom escuro diferenciando da telemetria
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 8,
+      },
+      columnStyles: {
+        0: { cellWidth: 20 },
+        1: { cellWidth: 42, fontStyle: 'bold' },
+        2: { cellWidth: 28 },
+        3: { cellWidth: 32 },
+        4: { cellWidth: 'auto' },
+      },
+      margin: { left: margin, right: margin },
+    })
+
+    // @ts-expect-error jspdf-autotable adds lastAutoTable to doc
+    currentY = doc.lastAutoTable.finalY + 6
+  }
+
+  // ==========================================
   // 7. EVENTOS MARCADOS NA RODAGEM (SE HOUVER)
   // ==========================================
   if (data.markedEvents.length > 0) {
@@ -787,7 +936,7 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
     doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
-    doc.text('6. EVENTOS DE SINTOMA MARCADOS NA RODAGEM', margin, currentY)
+    doc.text('7. EVENTOS DE SINTOMA MARCADOS NA RODAGEM', margin, currentY)
     currentY += 4
 
     const eventsTableBody = data.markedEvents.map((ev) => [
@@ -856,7 +1005,7 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
     doc.setFont('helvetica', 'bold')
     doc.setFontSize(10)
     doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
-    doc.text('7. ANÁLISE AUTOMÁTICA DETERMINÍSTICA COMPLEMENTAR', margin, currentY)
+    doc.text('8. ANÁLISE DETERMINÍSTICA COMPLEMENTAR (AVISO EPISTEMOLÓGICO)', margin, currentY)
     currentY += 4
 
     const det = data.deterministicAnalysisNotice
@@ -884,7 +1033,7 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
   doc.setFont('helvetica', 'bold')
   doc.setFontSize(10)
   doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
-  doc.text('8. OBSERVAÇÕES TÉCNICAS, DIRETRIZES E LIMITAÇÕES', margin, currentY)
+  doc.text('9. OBSERVAÇÕES TÉCNICAS, DIRETRIZES E LIMITAÇÕES', margin, currentY)
   currentY += 4
 
   const splitObs = doc.splitTextToSize(data.observationsAndLimitations, contentWidth - 10)
@@ -1023,17 +1172,40 @@ function fallbackPrintHtml(data: Diagnostic360PdfData) {
         <strong>Leitura Técnica:</strong> ${data.technicalReading}
       </div>
       ${data.reportedContext ? `<div class="box"><strong>Contexto Relatado:</strong> ${data.reportedContext}</div>` : ''}
-      <h3>Parâmetros Observados</h3>
+      <h3>Parâmetros Observados na Sessão</h3>
       <table>
         <thead><tr><th>Parâmetro</th><th>PID</th><th>Valor Observado</th><th>Intervalo Normal</th></tr></thead>
         <tbody>
           ${data.observedParameters.map((p) => `<tr><td>${p.name}</td><td>${p.pid}</td><td><strong>${p.observedValue}</strong></td><td>${p.normalRange}</td></tr>`).join('')}
         </tbody>
       </table>
-      <h3>Hipóteses Ranqueadas</h3>
+      <h3>Análise Automática (Telemetria) — Hipóteses Determinísticas</h3>
       <ol>
         ${data.rankedHypotheses.map((h) => `<li><strong>${h.title}:</strong> ${h.verificationRecommendation}</li>`).join('')}
       </ol>
+      ${
+        data.manualMechanicTests && data.manualMechanicTests.length > 0
+          ? `
+        <div class="box" style="border-left: 4px solid #f59e0b; background: #fffbeb;">
+          <h3 style="margin-top:0; color:#b45309;">Registro Manual do Mecânico (Não confirmado por telemetria)</h3>
+          <p style="font-size: 8.5pt; color: #92400e; margin-bottom: 8px;">
+            Aviso: Entradas informadas manualmente pelo operador não possuem força de evidência definitiva nem alteram o veredito automático da telemetria.
+          </p>
+          <table>
+            <thead><tr><th>Teste Informado</th><th>Alvo</th><th>Valor/Medição</th><th>Observação</th></tr></thead>
+            <tbody>
+              ${data.manualMechanicTests
+                .map(
+                  (m) =>
+                    `<tr><td><strong>${m.title}</strong></td><td>${m.targetComponent || '-'}</td><td>${m.measuredValue || '-'}</td><td>${m.observation || '-'}</td></tr>`,
+                )
+                .join('')}
+            </tbody>
+          </table>
+        </div>
+      `
+          : ''
+      }
       <div class="box">
         <strong>Observações:</strong> ${data.observationsAndLimitations}
       </div>
