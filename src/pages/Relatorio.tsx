@@ -14,6 +14,7 @@ import {
   Printer,
   Download,
   Search,
+  Wrench,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import pb from '@/lib/pocketbase/client'
@@ -21,6 +22,8 @@ import { SessionModel, VehicleModel, EventModel, DtcModel } from '@/types/obd'
 import {
   buildDiagnostic360PdfData,
   exportDiagnostic360Pdf,
+  buildMechanicSummaryPdfData,
+  exportMechanicSummaryPdf,
 } from '@/services/diagnostic-pdf-service'
 
 export default function Relatorio() {
@@ -40,6 +43,7 @@ export default function Relatorio() {
   const [selectedSessionId, setSelectedSessionId] = useState<string>('dnaab9l8gq5omuf')
   const [loadingSessions, setLoadingSessions] = useState(false)
   const [exportingPdf, setExportingPdf] = useState(false)
+  const [exportingMechanicPdf, setExportingMechanicPdf] = useState(false)
   const [exportSuccessNotice, setExportSuccessNotice] = useState<string | null>(null)
 
   useEffect(() => {
@@ -158,6 +162,37 @@ export default function Relatorio() {
       alert('Ocorreu um erro ao gerar o PDF. Verifique os dados da sessão.')
     } finally {
       setExportingPdf(false)
+    }
+  }
+
+  const handleExportMechanicSummary = () => {
+    setExportingMechanicPdf(true)
+    setExportSuccessNotice(null)
+    try {
+      const mechanicData = buildMechanicSummaryPdfData({
+        session: currentSelectedSession,
+        vehicle: currentSelectedVehicle,
+        appVersion: '0.0.45',
+      })
+
+      const dateStr = new Date().toISOString().split('T')[0]
+      const fileName = `ResumoMecanico_${mechanicData.vehicle.plate || 'DRE0E59'}_${dateStr}.pdf`
+      const result = exportMechanicSummaryPdf(mechanicData, fileName)
+
+      if (result.method === 'DOWNLOAD') {
+        setExportSuccessNotice(
+          `Resumo Técnico para o Mecânico gerado com sucesso: "${fileName}" (Download direto iniciado).`,
+        )
+      } else {
+        setExportSuccessNotice(
+          `Visualização imprimível do Resumo Técnico aberta com sucesso (${fileName}).`,
+        )
+      }
+    } catch (err) {
+      console.error('Erro ao gerar Resumo para o Mecânico:', err)
+      alert('Ocorreu um erro ao gerar o Resumo Técnico. Tente novamente.')
+    } finally {
+      setExportingMechanicPdf(false)
     }
   }
 
@@ -342,14 +377,26 @@ export default function Relatorio() {
               </p>
             </div>
 
-            <Button
-              onClick={handleExportPdf}
-              disabled={exportingPdf}
-              className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-sm shadow px-5 py-2.5 flex items-center space-x-2 shrink-0"
-            >
-              <FileDown className="w-4 h-4" />
-              <span>{exportingPdf ? 'Gerando PDF...' : 'EXPORTAR PDF'}</span>
-            </Button>
+            <div className="flex flex-wrap items-center gap-2 shrink-0">
+              <Button
+                onClick={handleExportMechanicSummary}
+                disabled={exportingMechanicPdf || exportingPdf}
+                className="bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs sm:text-sm shadow px-4 py-2.5 flex items-center space-x-2 shrink-0 border border-emerald-400"
+                title="Exportar Resumo Técnico para o Mecânico + Plano de Serviço (Troca da Solenoide VCT)"
+              >
+                <Wrench className="w-4 h-4 text-white" />
+                <span>{exportingMechanicPdf ? 'Gerando Resumo...' : 'RESUMO PARA O MECÂNICO'}</span>
+              </Button>
+              <Button
+                onClick={handleExportPdf}
+                disabled={exportingPdf || exportingMechanicPdf}
+                className="bg-[#FFB300] hover:bg-[#e5a000] text-black font-bold text-xs sm:text-sm shadow px-4 py-2.5 flex items-center space-x-2 shrink-0"
+                title="Exportar Laudo Oficial do Diagnóstico 360"
+              >
+                <FileDown className="w-4 h-4" />
+                <span>{exportingPdf ? 'Gerando PDF...' : 'EXPORTAR PDF'}</span>
+              </Button>
+            </div>
           </div>
 
           {exportSuccessNotice && (
@@ -562,6 +609,31 @@ export default function Relatorio() {
             <div className="text-[11px] text-gray-500 text-center py-2 border-t border-[#263340]">
               Rodapé oficial: "Emitido pelo Network Car — Diagnóstico 360 · Network Soluções —
               Network Office · ME001"
+            </div>
+
+            {/* Banner de Destaque: Resumo Técnico para o Mecânico */}
+            <div className="bg-gradient-to-r from-emerald-950/70 to-[#131A22] border border-emerald-500/50 rounded-lg p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+              <div className="space-y-1">
+                <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider flex items-center space-x-1.5">
+                  <Wrench className="w-3.5 h-3.5" />
+                  <span>Novo Documento Técnico (v0.0.45)</span>
+                </span>
+                <h4 className="text-sm font-bold text-white">
+                  Resumo Técnico para o Mecânico + Plano de Serviço (Solenoide VCT)
+                </h4>
+                <p className="text-xs text-gray-300">
+                  Documento pronto para envio ao mecânico contendo histórico da correia, LTFT −13%
+                  crônico, checklist operacional de montagem com manômetro e validação pós-troca.
+                </p>
+              </div>
+              <Button
+                onClick={handleExportMechanicSummary}
+                disabled={exportingMechanicPdf}
+                className="bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs shadow px-4 py-2 shrink-0 border border-emerald-400 flex items-center space-x-1.5"
+              >
+                <FileDown className="w-4 h-4" />
+                <span>{exportingMechanicPdf ? 'Gerando...' : 'BAIXAR RESUMO DO MECÂNICO'}</span>
+              </Button>
             </div>
           </div>
         </div>

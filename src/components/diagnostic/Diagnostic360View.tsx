@@ -24,6 +24,8 @@ import {
 import {
   buildDiagnostic360PdfData,
   exportDiagnostic360Pdf,
+  buildMechanicSummaryPdfData,
+  exportMechanicSummaryPdf,
 } from '@/services/diagnostic-pdf-service'
 import { SessionModel, VehicleModel } from '@/types/obd'
 
@@ -111,7 +113,35 @@ export const Diagnostic360View: React.FC<Diagnostic360ViewProps> = ({
           </div>
         </div>
 
-        <div className="flex items-center space-x-2 shrink-0 text-xs font-mono">
+        <div className="flex flex-wrap items-center gap-1.5 shrink-0 text-xs font-mono">
+          <Button
+            size="sm"
+            onClick={() => {
+              const fallbackSession: SessionModel =
+                session ||
+                ({
+                  session_id: report.sessionId || 'sess_1789651428943_g57i',
+                  vehicle_name: vehicle?.model
+                    ? `${vehicle.make} ${vehicle.model}`
+                    : 'Ford EcoSport',
+                  adapter_type: 'OBD REAL BLUETOOTH CLASSIC',
+                  started_at: new Date().toISOString(),
+                  status: 'ENCERRADO',
+                } as SessionModel)
+
+              const mechanicData = buildMechanicSummaryPdfData({
+                session: fallbackSession,
+                vehicle,
+                appVersion: '0.0.45',
+              })
+              exportMechanicSummaryPdf(mechanicData)
+            }}
+            className="bg-[#10B981] hover:bg-[#059669] text-white font-bold text-xs shadow h-7 px-2.5 border border-emerald-400"
+            title="Exportar Resumo Técnico para o Mecânico + Plano de Serviço"
+          >
+            <Wrench className="w-3.5 h-3.5 mr-1 text-white" />
+            Resumo Mecânico
+          </Button>
           <Button
             size="sm"
             onClick={() => {
@@ -140,11 +170,11 @@ export const Diagnostic360View: React.FC<Diagnostic360ViewProps> = ({
             <FileText className="w-3.5 h-3.5 mr-1" />
             Exportar PDF
           </Button>
-          <span className="bg-black/50 px-2.5 py-1 rounded border border-white/10">
-            {report.hypotheses.length} hipótese(s)
+          <span className="bg-black/50 px-2 py-1 rounded border border-white/10 hidden sm:inline">
+            {report.hypotheses.length} hip.
           </span>
-          <span className="bg-black/50 px-2.5 py-1 rounded border border-white/10">
-            {report.anomalies.length} anomalia(s)
+          <span className="bg-black/50 px-2 py-1 rounded border border-white/10 hidden sm:inline">
+            {report.anomalies.length} anom.
           </span>
         </div>
       </div>

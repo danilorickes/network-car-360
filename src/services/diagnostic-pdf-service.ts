@@ -1082,6 +1082,746 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
 /**
  * Dispara o download ou fallback gracioso (window.print / preview) para WebView / APK
  */
+// ============================================================================
+// RESUMO TÉCNICO PARA O MECÂNICO + PLANO DE SERVIÇO (V0.0.45)
+// ============================================================================
+
+export interface ServicePlanChecklistItem {
+  step: number
+  title: string
+  detail: string
+  crucial?: boolean
+}
+
+export interface MechanicSummaryPdfData {
+  appVersion?: string
+  emissionDate?: string
+  vehicle: {
+    plate: string
+    make: string
+    model: string
+    yearModel: string
+    engine: string
+    odometerKm: number
+    vin: string
+  }
+  symptoms: string[]
+  history: string
+  telemetryEvidence: {
+    sessionLabel: string
+    sampleCount: number
+    device: string
+    protocol: string
+    ltftRange: string
+    stftRange: string
+    idleRpm: string
+    engineLoad: string
+    coolantTemp: string
+    dtcsSummary: string
+    coldStartNote: string
+  }
+  technicalAnalysis: {
+    ignitionDiscarded: string
+    ltftDiagnosis: string
+    mainHypothesis: string
+    flexFuelNote: string
+  }
+  servicePlanChecklist: ServicePlanChecklistItem[]
+  postRepairValidation: string
+}
+
+/**
+ * Constrói o dataset do Resumo Técnico para o Mecânico + Plano de Serviço
+ * com os dados obrigatórios e integração com sessão/veículo quando disponíveis.
+ */
+export function buildMechanicSummaryPdfData(options?: {
+  session?: SessionModel | null
+  vehicle?: VehicleModel | null
+  appVersion?: string
+}): MechanicSummaryPdfData {
+  const session = options?.session
+  const vehicle = options?.vehicle
+
+  const plate = vehicle?.plate || 'DRE0E59'
+  const make = vehicle?.make || 'Ford'
+  const model = vehicle?.model || 'EcoSport'
+  const yearModel = vehicle?.year_model || '2020'
+  const engine = vehicle?.engine || '1.5 Dragon Flex (TiVCT)'
+  const odometerKm = vehicle?.odometer_km || 90040
+  const vin = vehicle?.vin || session?.vin || '9BFBJ55E6L8104921'
+
+  // Parâmetros dinâmicos se disponíveis na sessão real, mantendo valores padrão validados
+  const sessionLabel =
+    session?.session_id === 'sess_1789651428943_g57i' || !session
+      ? 'HARDWARE_REAL de 17/09/2026'
+      : `${session.origin || 'HARDWARE_REAL'} (${session.session_id})`
+
+  const sampleCount =
+    session?.total_samples && session.total_samples > 0 ? session.total_samples : 1218
+
+  const device = session?.device_collector || 'ELM327'
+  const protocol = session?.detected_protocol || session?.protocol || 'ISO 15765-4 CAN 11/500'
+
+  return {
+    appVersion: options?.appVersion || session?.app_version || '0.0.45',
+    emissionDate: new Date().toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    }),
+    vehicle: {
+      plate,
+      make,
+      model,
+      yearModel,
+      engine,
+      odometerKm,
+      vin,
+    },
+    symptoms: [
+      '(a) Quase apagar no 1º minuto após ligar a frio',
+      '(b) Falta de força',
+      '(c) Consumo alto de combustível',
+    ],
+    history:
+      'Correia dentada anterior estava se esfarelando, contaminando o cárter com detritos de borracha. Correia, velas e óleo/filtro foram trocados após limpeza das peças. Mecânico encontrou detritos de borracha na galeria da solenoide VCT e a limpou — detritos ainda presentes (peça será substituída).',
+    telemetryEvidence: {
+      sessionLabel,
+      sampleCount,
+      device,
+      protocol,
+      ltftRange: '−12,5% a −13,3%',
+      stftRange: 'Oscilando −13,3% a +7,0%',
+      idleRpm: '~874 RPM (estável)',
+      engineLoad: '12,5%',
+      coolantTemp: '65 °C (em aquecimento)',
+      dtcsSummary:
+        'ZERO — MIL apagada em TODAS as sessões reais (incluindo rodagem com evento de perda de potência marcado). Nenhum P030x.',
+      coldStartNote:
+        'Sintoma de quase-apagar ocorre nos primeiros ~60 s após partida a frio — pior momento para pressão de óleo (óleo frio/grosso).',
+    },
+    technicalAnalysis: {
+      ignitionDiscarded:
+        'A ignição está DESCARTADA: velas trocadas recentemente + zero DTCs de misfire + MIL apagada.',
+      ltftDiagnosis: 'O LTFT −13% indica mistura rica crônica → explica consumo alto.',
+      mainHypothesis:
+        'A hipótese principal integrada: contaminação do circuito de óleo por detritos da correia → pressão/fluxo de óleo insuficiente para o atuador TiVCT (pior a frio) → comando sem fase → perda de força e quase-apagar no 1º minuto; a adaptação rica (LTFT) é consequência/comorbidade.',
+      flexFuelNote:
+        'Nota: o carro é flex (etanol/gasolina) — parte do enriquecimento pode ter origem em combustível/calibração, mas a defasagem de comando é a linha principal a validar.',
+    },
+    servicePlanChecklist: [
+      {
+        step: 1,
+        title: 'ANTES de instalar a solenoide nova: trocar óleo + filtro novamente',
+        detail:
+          'O óleo atual banhou a solenoide contaminada; resíduo residual permanece nos canais/galeria/tela da bomba. Cortar o filtro velho para inspeção: se sair muita borracha, checar tela de sucção da bomba de óleo no cárter.',
+        crucial: true,
+      },
+      {
+        step: 2,
+        title: 'Substituir a solenoide VCT (válvula de comando) — peça nova',
+        detail:
+          'Instalar a nova válvula solenoide do atuador VCT com vedações novas e assento perfeitamente limpo.',
+      },
+      {
+        step: 3,
+        title: 'Como estará no comando: CONFERIR FASE DA CORREIA DENTADA',
+        detail:
+          'Marcações de comando/virabrequim (crig) com ferramentas de fasagem do Dragon — 1 dente de erro reproduz exatamente os mesmos sintomas.',
+        crucial: true,
+      },
+      {
+        step: 4,
+        title: 'Se houver manômetro: medir pressão de óleo na PARTIDA A FRIO',
+        detail:
+          'Referência ≥ ~1,5 bar em idle frio; demora para subir ou valor baixo → tela de sucção da bomba obstruída por borracha.',
+      },
+      {
+        step: 5,
+        title: 'Após a montagem: partida a frio e avaliar o 1º minuto',
+        detail:
+          'Verificar se o sintoma de quase apagar desaparece completamente e monitorar a estabilidade da marcha lenta.',
+      },
+    ],
+    postRepairValidation:
+      'Será feita uma sessão de telemetria de partida a frio (5 min) com o app e comparada amostra a amostra com a sessão pré-troca de 20/09 (sess_1789904984520_ilu9, 2.076 amostras) — o relatório de comparação "antes × depois" será anexado ao laudo do veículo.',
+  }
+}
+
+/**
+ * Gera o documento jsPDF para o Resumo Técnico do Mecânico + Plano de Serviço
+ * com formatação profissional, tabela de checklist com caixas de marcação e rodapé padrão.
+ */
+export function generateMechanicSummaryPdfDocument(data: MechanicSummaryPdfData): jsPDF {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  })
+
+  const pageWidth = doc.internal.pageSize.getWidth()
+  const pageHeight = doc.internal.pageSize.getHeight()
+  const margin = 14
+  const contentWidth = pageWidth - margin * 2
+
+  const colorPrimary: [number, number, number] = [11, 15, 20] // #0B0F14
+  const colorAccent: [number, number, number] = [255, 179, 0] // #FFB300
+  const colorGrayBg: [number, number, number] = [245, 247, 250]
+  const colorBorder: [number, number, number] = [200, 205, 215]
+  const colorText: [number, number, number] = [30, 40, 50]
+  const colorAlertRed: [number, number, number] = [198, 40, 40]
+  const colorEmerald: [number, number, number] = [22, 101, 52]
+
+  let currentY = margin
+
+  const renderMiniHeader = () => {
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(8)
+    doc.setTextColor(100, 110, 120)
+    doc.text(
+      `Network Car — Resumo Técnico & Plano de Serviço · ${data.vehicle.plate} (${data.vehicle.make} ${data.vehicle.model})`,
+      margin,
+      currentY,
+    )
+    doc.text(`Versão: ${data.appVersion || '0.0.45'}`, pageWidth - margin, currentY, {
+      align: 'right',
+    })
+    currentY += 3
+    doc.setDrawColor(colorBorder[0], colorBorder[1], colorBorder[2])
+    doc.setLineWidth(0.3)
+    doc.line(margin, currentY, pageWidth - margin, currentY)
+    currentY += 6
+  }
+
+  const ensureSpace = (neededHeight: number) => {
+    if (currentY + neededHeight > pageHeight - 20) {
+      doc.addPage()
+      currentY = margin
+      renderMiniHeader()
+    }
+  }
+
+  // ==========================================
+  // 1. CABEÇALHO PRINCIPAL
+  // ==========================================
+  doc.setFillColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.roundedRect(margin, currentY, contentWidth, 26, 2, 2, 'F')
+
+  // Marca Network Car
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(13)
+  doc.setTextColor(255, 255, 255)
+  doc.text('NETWORK CAR', margin + 6, currentY + 8.5)
+
+  // Badge Resumo Técnico
+  doc.setFillColor(colorAccent[0], colorAccent[1], colorAccent[2])
+  doc.roundedRect(margin + 48, currentY + 3.5, 68, 7, 1.5, 1.5, 'F')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(0, 0, 0)
+  doc.text('RESUMO TÉCNICO & PLANO DE SERVIÇO', margin + 50, currentY + 8.2)
+
+  // Título e Subtítulo
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(255, 255, 255)
+  doc.text(
+    'Network Car — Diagnóstico 360 · Resumo Técnico e Plano de Serviço',
+    margin + 6,
+    currentY + 16,
+  )
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(200, 210, 225)
+  doc.text(
+    'Orientação Técnica para Troca da Solenoide VCT e Validação do Circuito de Óleo / Fasagem',
+    margin + 6,
+    currentY + 21,
+  )
+
+  // Metadados à direita
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(240, 240, 240)
+  doc.text(
+    `Emissão: ${data.emissionDate || new Date().toLocaleDateString('pt-BR')}`,
+    pageWidth - margin - 6,
+    currentY + 8.5,
+    { align: 'right' },
+  )
+  doc.text(`Versão App: ${data.appVersion || '0.0.45'}`, pageWidth - margin - 6, currentY + 16, {
+    align: 'right',
+  })
+
+  currentY += 30
+
+  // ==========================================
+  // SEÇÃO 1: VEÍCULO E CONTEXTO
+  // ==========================================
+  ensureSpace(42)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('1. VEÍCULO E CONTEXTO', margin, currentY)
+  currentY += 3.5
+
+  doc.setFillColor(colorGrayBg[0], colorGrayBg[1], colorGrayBg[2])
+  doc.setDrawColor(colorBorder[0], colorBorder[1], colorBorder[2])
+  doc.setLineWidth(0.3)
+
+  // Card Veículo + Sintomas + Histórico
+  const vehicleText = `Veículo: ${data.vehicle.make} ${data.vehicle.model} ${data.vehicle.yearModel} ${data.vehicle.engine} | Placa: ${data.vehicle.plate} | VIN: ${data.vehicle.vin} | Km: ${(data.vehicle.odometerKm || 0).toLocaleString('pt-BR')} km`
+
+  const splitVeh = doc.splitTextToSize(vehicleText, contentWidth - 10)
+  const splitHist = doc.splitTextToSize(data.history, contentWidth - 10)
+  const sec1Height = splitVeh.length * 4 + splitHist.length * 3.8 + 26
+
+  doc.roundedRect(margin, currentY, contentWidth, sec1Height, 1.5, 1.5, 'FD')
+
+  let sec1Y = currentY + 5
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(8)
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('Identificação do Veículo:', margin + 4, sec1Y)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(colorText[0], colorText[1], colorText[2])
+  doc.text(splitVeh, margin + 4, sec1Y + 4)
+
+  sec1Y += splitVeh.length * 4 + 6
+
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('Sintomas Relatados:', margin + 4, sec1Y)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(colorAlertRed[0], colorAlertRed[1], colorAlertRed[2])
+  data.symptoms.forEach((symptom, idx) => {
+    doc.text(`• ${symptom}`, margin + 6, sec1Y + 4 + idx * 3.8)
+  })
+
+  sec1Y += data.symptoms.length * 3.8 + 6
+
+  doc.setFont('helvetica', 'bold')
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('Histórico Mecânico Anterior:', margin + 4, sec1Y)
+  doc.setFont('helvetica', 'normal')
+  doc.setTextColor(colorText[0], colorText[1], colorText[2])
+  doc.text(splitHist, margin + 4, sec1Y + 4)
+
+  currentY += sec1Height + 5
+
+  // ==========================================
+  // SEÇÃO 2: EVIDÊNCIA DE TELEMETRIA (TABELA)
+  // ==========================================
+  ensureSpace(48)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('2. EVIDÊNCIA DE TELEMETRIA (DADOS REAIS DA SESSÃO)', margin, currentY)
+  currentY += 2
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.5)
+  doc.setTextColor(90, 100, 110)
+  doc.text(
+    `Sessão: ${data.telemetryEvidence.sessionLabel} · ${data.telemetryEvidence.sampleCount} amostras · Coletor: ${data.telemetryEvidence.device} · Protocolo: ${data.telemetryEvidence.protocol}`,
+    margin,
+    currentY + 2.5,
+  )
+  currentY += 5
+
+  const telemTableBody = [
+    [
+      'LTFT Banco 1 (Ajuste Longo Prazo)',
+      '0x07',
+      data.telemetryEvidence.ltftRange,
+      '−10% a +10%',
+      'FORA DO INTERVALO NORMAL (MISTURA RICA CRÔNICA corrigida pela ECU)',
+    ],
+    [
+      'STFT Banco 1 (Ajuste Curto Prazo)',
+      '0x06',
+      data.telemetryEvidence.stftRange,
+      '−10% a +10%',
+      'Oscilação dinâmica compatível com tentativa de compensação',
+    ],
+    [
+      'Rotação em Marcha Lenta (Idle)',
+      '0x0C',
+      data.telemetryEvidence.idleRpm,
+      '750 — 900 RPM',
+      'Rotação estável em idle quente',
+    ],
+    [
+      'Carga Calculada do Motor',
+      '0x04',
+      data.telemetryEvidence.engineLoad,
+      '10% — 25%',
+      'Dentro do padrão para marcha lenta',
+    ],
+    [
+      'Temperatura Arrefecimento (ECT)',
+      '0x05',
+      data.telemetryEvidence.coolantTemp,
+      '85 — 105 °C',
+      'Motor em fase de aquecimento durante a coleta',
+    ],
+    [
+      'Códigos de Falha DTCs / MIL',
+      'Modo 03/07',
+      '0 DTCs (MIL Apagada)',
+      '0 DTCs',
+      data.telemetryEvidence.dtcsSummary,
+    ],
+  ]
+
+  runAutoTable(doc, {
+    startY: currentY,
+    head: [['Parâmetro', 'PID', 'Valor Telemetria', 'Faixa Normal', 'Diagnóstico / Destaque']],
+    body: telemTableBody,
+    theme: 'grid',
+    styles: {
+      fontSize: 7.2,
+      cellPadding: 2,
+      textColor: [30, 40, 50],
+      lineColor: [210, 215, 225],
+      lineWidth: 0.2,
+    },
+    headStyles: {
+      fillColor: [11, 15, 20],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 7.5,
+    },
+    columnStyles: {
+      0: { cellWidth: 44, fontStyle: 'bold' },
+      1: { cellWidth: 16, fontStyle: 'normal' },
+      2: { cellWidth: 36, fontStyle: 'bold' },
+      3: { cellWidth: 26 },
+      4: { cellWidth: 'auto' },
+    },
+    didParseCell: (hookData) => {
+      if (hookData.section === 'body') {
+        if (hookData.row.index === 0) {
+          // LTFT Fora de faixa: destaque em vermelho
+          hookData.cell.styles.fillColor = [255, 235, 238]
+          if (hookData.column.index === 2 || hookData.column.index === 4) {
+            hookData.cell.styles.textColor = colorAlertRed
+            hookData.cell.styles.fontStyle = 'bold'
+          }
+        }
+      }
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  // @ts-expect-error jspdf-autotable adds lastAutoTable to doc
+  currentY = doc.lastAutoTable.finalY + 3
+
+  // Destaque do sintoma a frio
+  const coldNoteSplit = doc.splitTextToSize(data.telemetryEvidence.coldStartNote, contentWidth - 10)
+  const coldBoxHeight = coldNoteSplit.length * 3.8 + 5
+  doc.setFillColor(254, 242, 242)
+  doc.setDrawColor(252, 165, 165)
+  doc.roundedRect(margin, currentY, contentWidth, coldBoxHeight, 1.2, 1.2, 'FD')
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.5)
+  doc.setTextColor(153, 27, 27)
+  doc.text(coldNoteSplit, margin + 4, currentY + 3.8)
+
+  currentY += coldBoxHeight + 5
+
+  // ==========================================
+  // SEÇÃO 3: ANÁLISE TÉCNICA (CONCLUSÃO)
+  // ==========================================
+  ensureSpace(42)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('3. ANÁLISE TÉCNICA (CONCLUSÃO)', margin, currentY)
+  currentY += 3.5
+
+  const an1Split = doc.splitTextToSize(data.technicalAnalysis.ignitionDiscarded, contentWidth - 12)
+  const an2Split = doc.splitTextToSize(data.technicalAnalysis.ltftDiagnosis, contentWidth - 12)
+  const an3Split = doc.splitTextToSize(data.technicalAnalysis.mainHypothesis, contentWidth - 12)
+  const an4Split = doc.splitTextToSize(data.technicalAnalysis.flexFuelNote, contentWidth - 12)
+
+  const anBoxHeight =
+    an1Split.length * 3.8 +
+    an2Split.length * 3.8 +
+    an3Split.length * 3.8 +
+    an4Split.length * 3.8 +
+    18
+
+  doc.setFillColor(254, 243, 199) // Âmbar suave
+  doc.setDrawColor(245, 158, 11)
+  doc.setLineWidth(0.4)
+  doc.roundedRect(margin, currentY, contentWidth, anBoxHeight, 1.5, 1.5, 'FD')
+
+  let anY = currentY + 4.5
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(7.8)
+  doc.setTextColor(146, 64, 14) // Âmbar 800
+
+  doc.text('• Descarte de Ignição: ', margin + 4, anY)
+  doc.setFont('helvetica', 'normal')
+  doc.text(an1Split, margin + 4, anY + 3.5)
+  anY += an1Split.length * 3.8 + 3
+
+  doc.setFont('helvetica', 'bold')
+  doc.text('• Comportamento LTFT: ', margin + 4, anY)
+  doc.setFont('helvetica', 'normal')
+  doc.text(an2Split, margin + 4, anY + 3.5)
+  anY += an2Split.length * 3.8 + 3
+
+  doc.setFont('helvetica', 'bold')
+  doc.text('• Hipótese Principal Integrada: ', margin + 4, anY)
+  doc.setFont('helvetica', 'normal')
+  doc.text(an3Split, margin + 4, anY + 3.5)
+  anY += an3Split.length * 3.8 + 3
+
+  doc.setFont('helvetica', 'italic')
+  doc.setFontSize(7.2)
+  doc.setTextColor(120, 53, 15)
+  doc.text(an4Split, margin + 4, anY + 2)
+
+  currentY += anBoxHeight + 5
+
+  // ==========================================
+  // SEÇÃO 4: PLANO DE SERVIÇO — AMANHÃ (CHECKLIST)
+  // ==========================================
+  ensureSpace(55)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('4. PLANO DE SERVIÇO — AMANHÃ (CHECKLIST OPERACIONAL DO MECÂNICO)', margin, currentY)
+  currentY += 2.5
+
+  const checklistBody = data.servicePlanChecklist.map((item) => [
+    '[   ]',
+    `${item.step}`,
+    item.title,
+    item.detail,
+  ])
+
+  runAutoTable(doc, {
+    startY: currentY,
+    head: [['Status', '#', 'Etapa Operacional Obrigatória', 'Instruções Técnicas de Execução']],
+    body: checklistBody,
+    theme: 'grid',
+    styles: {
+      fontSize: 7.4,
+      cellPadding: 2.5,
+      textColor: [30, 40, 50],
+      lineColor: [200, 205, 215],
+      lineWidth: 0.25,
+    },
+    headStyles: {
+      fillColor: [11, 15, 20],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      fontSize: 7.6,
+    },
+    columnStyles: {
+      0: { cellWidth: 14, halign: 'center', fontStyle: 'bold' },
+      1: { cellWidth: 8, halign: 'center', fontStyle: 'bold' },
+      2: { cellWidth: 62, fontStyle: 'bold' },
+      3: { cellWidth: 'auto' },
+    },
+    didParseCell: (hookData) => {
+      if (hookData.section === 'body') {
+        const item = data.servicePlanChecklist[hookData.row.index]
+        if (item?.crucial) {
+          hookData.cell.styles.fillColor = [255, 251, 235] // amber-50
+          if (hookData.column.index === 2) {
+            hookData.cell.styles.textColor = [180, 83, 9] // amber-700
+          }
+        }
+      }
+    },
+    margin: { left: margin, right: margin },
+  })
+
+  // @ts-expect-error jspdf-autotable adds lastAutoTable to doc
+  currentY = doc.lastAutoTable.finalY + 5
+
+  // ==========================================
+  // SEÇÃO 5: VALIDAÇÃO PELO NETWORK CAR (PÓS-TROCA)
+  // ==========================================
+  ensureSpace(28)
+
+  doc.setFont('helvetica', 'bold')
+  doc.setFontSize(9.5)
+  doc.setTextColor(colorPrimary[0], colorPrimary[1], colorPrimary[2])
+  doc.text('5. VALIDAÇÃO PELO NETWORK CAR (PÓS-TROCA)', margin, currentY)
+  currentY += 3.5
+
+  const valSplit = doc.splitTextToSize(data.postRepairValidation, contentWidth - 10)
+  const valBoxHeight = valSplit.length * 3.8 + 6
+
+  doc.setFillColor(240, 253, 244) // green-50
+  doc.setDrawColor(187, 247, 208) // green-200
+  doc.roundedRect(margin, currentY, contentWidth, valBoxHeight, 1.5, 1.5, 'FD')
+
+  doc.setFont('helvetica', 'normal')
+  doc.setFontSize(7.8)
+  doc.setTextColor(colorEmerald[0], colorEmerald[1], colorEmerald[2])
+  doc.text(valSplit, margin + 4, currentY + 4)
+
+  currentY += valBoxHeight + 6
+
+  // ==========================================
+  // RODAPÉ EM TODAS AS PÁGINAS
+  // ==========================================
+  // @ts-expect-error getNumberOfPages exists on jsPDF
+  const totalPages = doc.internal.getNumberOfPages()
+
+  for (let i = 1; i <= totalPages; i++) {
+    doc.setPage(i)
+    doc.setFont('helvetica', 'normal')
+    doc.setFontSize(7.5)
+    doc.setTextColor(110, 120, 130)
+
+    doc.setDrawColor(colorBorder[0], colorBorder[1], colorBorder[2])
+    doc.setLineWidth(0.3)
+    doc.line(margin, pageHeight - 12, pageWidth - margin, pageHeight - 12)
+
+    doc.text('Network Soluções — Network Office · ME001', margin, pageHeight - 7)
+    doc.text(`Página ${i} de ${totalPages}`, pageWidth - margin, pageHeight - 7, { align: 'right' })
+  }
+
+  return doc
+}
+
+/**
+ * Dispara o download ou fallback gracioso do Resumo Técnico para o Mecânico
+ */
+export function exportMechanicSummaryPdf(
+  data: MechanicSummaryPdfData,
+  fileName?: string,
+): { success: boolean; method: 'DOWNLOAD' | 'PRINT_FALLBACK' } {
+  const dateStr = new Date().toISOString().split('T')[0]
+  const finalFileName =
+    fileName || `ResumoMecanico_${data.vehicle.plate || 'DRE0E59'}_${dateStr}.pdf`
+
+  try {
+    const doc = generateMechanicSummaryPdfDocument(data)
+
+    const isBlobDownloadSupported =
+      typeof window !== 'undefined' &&
+      typeof window.document !== 'undefined' &&
+      'download' in document.createElement('a')
+
+    const isAndroidWebView =
+      typeof navigator !== 'undefined' &&
+      /wv|Android.*Version\/[0-9.]+/i.test(navigator.userAgent) &&
+      !window.matchMedia('(display-mode: standalone)').matches
+
+    if (isBlobDownloadSupported && !isAndroidWebView) {
+      doc.save(finalFileName)
+      return { success: true, method: 'DOWNLOAD' }
+    } else {
+      const blobUrl = doc.output('bloburl')
+      const printWin = window.open(blobUrl, '_blank')
+      if (printWin) {
+        printWin.focus()
+        return { success: true, method: 'PRINT_FALLBACK' }
+      } else {
+        doc.save(finalFileName)
+        return { success: true, method: 'DOWNLOAD' }
+      }
+    }
+  } catch (err) {
+    console.error('[MechanicSummaryPdf] Falha ao exportar PDF do mecânico:', err)
+    fallbackMechanicSummaryPrintHtml(data)
+    return { success: false, method: 'PRINT_FALLBACK' }
+  }
+}
+
+/**
+ * Fallback imprimível em HTML para o Resumo Técnico do Mecânico
+ */
+function fallbackMechanicSummaryPrintHtml(data: MechanicSummaryPdfData) {
+  const printWindow = window.open('', '_blank')
+  if (!printWindow) return
+
+  const html = `
+    <!DOCTYPE html>
+    <html lang="pt-BR">
+    <head>
+      <meta charset="utf-8">
+      <title>Resumo Técnico para o Mecânico - ${data.vehicle.plate}</title>
+      <style>
+        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Arial, sans-serif; margin: 20px; color: #111; font-size: 11pt; line-height: 1.4; }
+        .header { border-bottom: 2px solid #0B0F14; padding-bottom: 8px; margin-bottom: 16px; }
+        .title { font-size: 15pt; font-weight: bold; margin: 0; }
+        .badge { background: #FFB300; padding: 2px 6px; font-weight: bold; font-size: 9pt; border-radius: 3px; }
+        .box { border: 1px solid #ccc; padding: 10px; border-radius: 4px; margin-bottom: 12px; background: #fafafa; }
+        table { width: 100%; border-collapse: collapse; margin-top: 8px; font-size: 9.5pt; }
+        th, td { border: 1px solid #ddd; padding: 6px 8px; text-align: left; }
+        th { background: #f0f0f0; }
+        .alert-box { background: #fef3c7; border: 1px solid #f59e0b; padding: 10px; border-radius: 4px; color: #92400e; margin-bottom: 12px; }
+        .footer { margin-top: 24px; padding-top: 8px; border-top: 1px solid #ccc; font-size: 8pt; color: #666; text-align: center; }
+        @media print { body { margin: 0; } .no-print { display: none; } }
+      </style>
+    </head>
+    <body>
+      <div class="no-print" style="margin-bottom:12px;">
+        <button onclick="window.print()" style="padding:8px 16px; background:#0B0F14; color:#fff; border:none; border-radius:4px; font-weight:bold; cursor:pointer;">IMPRIMIR / SALVAR PDF</button>
+      </div>
+      <div class="header">
+        <h1 class="title">Network Car — Diagnóstico 360 · <span class="badge">Resumo Técnico e Plano de Serviço</span></h1>
+        <div>Data de Emissão: ${data.emissionDate} · Versão do App: ${data.appVersion}</div>
+      </div>
+      <div class="box">
+        <strong>1. Veículo e Contexto:</strong><br>
+        ${data.vehicle.make} ${data.vehicle.model} ${data.vehicle.yearModel} ${data.vehicle.engine} | Placa: ${data.vehicle.plate} | VIN: ${data.vehicle.vin} | ${data.vehicle.odometerKm.toLocaleString('pt-BR')} km<br>
+        <strong>Sintomas:</strong> ${data.symptoms.join('; ')}<br>
+        <strong>Histórico:</strong> ${data.history}
+      </div>
+      <div class="box">
+        <strong>2. Evidência de Telemetria:</strong><br>
+        Sessão: ${data.telemetryEvidence.sessionLabel} (${data.telemetryEvidence.sampleCount} amostras, ${data.telemetryEvidence.device}, ${data.telemetryEvidence.protocol})<br>
+        • LTFT Banco 1: <strong style="color:#c62828;">${data.telemetryEvidence.ltftRange} (FORA DO INTERVALO NORMAL ±10%)</strong><br>
+        • STFT Banco 1: ${data.telemetryEvidence.stftRange}<br>
+        • RPM Idle: ${data.telemetryEvidence.idleRpm} | Carga: ${data.telemetryEvidence.engineLoad} | Temp: ${data.telemetryEvidence.coolantTemp}<br>
+        • DTCs: ${data.telemetryEvidence.dtcsSummary}<br>
+        <em>${data.telemetryEvidence.coldStartNote}</em>
+      </div>
+      <div class="alert-box">
+        <strong>3. Análise Técnica:</strong><br>
+        • ${data.technicalAnalysis.ignitionDiscarded}<br>
+        • ${data.technicalAnalysis.ltftDiagnosis}<br>
+        • ${data.technicalAnalysis.mainHypothesis}<br>
+        <em>${data.technicalAnalysis.flexFuelNote}</em>
+      </div>
+      <h3>4. Plano de Serviço — Amanhã (Checklist)</h3>
+      <table>
+        <thead><tr><th>Status</th><th>#</th><th>Etapa</th><th>Instruções</th></tr></thead>
+        <tbody>
+          ${data.servicePlanChecklist.map((c) => `<tr><td style="text-align:center;">[ &nbsp; ]</td><td><strong>${c.step}</strong></td><td><strong>${c.title}</strong></td><td>${c.detail}</td></tr>`).join('')}
+        </tbody>
+      </table>
+      <div class="box" style="margin-top:12px; background:#f0fdf4; border-color:#bbf7d0;">
+        <strong>5. Validação pelo Network Car (Pós-Troca):</strong><br>
+        ${data.postRepairValidation}
+      </div>
+      <div class="footer">
+        Network Soluções — Network Office · ME001
+      </div>
+    </body>
+    </html>
+  `
+  printWindow.document.write(html)
+  printWindow.document.close()
+}
+
 export function exportDiagnostic360Pdf(
   data: Diagnostic360PdfData,
   fileName?: string,

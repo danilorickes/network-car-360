@@ -2,6 +2,10 @@ import { describe, it, expect } from 'vitest'
 import {
   buildDiagnostic360PdfData,
   generateDiagnostic360PdfDocument,
+  exportDiagnostic360Pdf,
+  buildMechanicSummaryPdfData,
+  generateMechanicSummaryPdfDocument,
+  exportMechanicSummaryPdf,
 } from '@/services/diagnostic-pdf-service'
 import { SessionModel, VehicleModel, EventModel, DtcModel } from '@/types/obd'
 
@@ -344,6 +348,92 @@ describe('Diagnostic360PdfService — Exportar PDF do Diagnóstico 360', () => {
       expect(data.rankedHypotheses[0].sourceType).toBe('TELEMETRIA_AUTOMATICA')
       expect(data.manualMechanicTests).toBeDefined()
       expect(data.manualMechanicTests?.[0].title).toBe('Inspeção Visual de Cabos')
+    })
+  })
+
+  describe('3. Resumo Técnico para o Mecânico + Plano de Serviço (v0.0.45)', () => {
+    it('(a) buildMechanicSummaryPdfData deve conter todas as 5 seções obrigatórias com valores exatos para o EcoSport DRE0E59', () => {
+      const data = buildMechanicSummaryPdfData({
+        session: mockRealSession,
+        vehicle: mockRealVehicle,
+        appVersion: '0.0.45',
+      })
+
+      // Metadados e versão
+      expect(data.appVersion).toBe('0.0.45')
+      expect(data.emissionDate).toBeDefined()
+
+      // Seção 1: Veículo e Contexto
+      expect(data.vehicle.plate).toBe('DRE0E59')
+      expect(data.vehicle.make).toBe('Ford')
+      expect(data.vehicle.model).toBe('EcoSport')
+      expect(data.vehicle.yearModel).toBe('2020')
+      expect(data.vehicle.engine).toBe('1.5 Dragon Flex (TiVCT)')
+      expect(data.vehicle.vin).toBe('9BFBJ55E6L8104921')
+      expect(data.vehicle.odometerKm).toBe(90040)
+      expect(data.symptoms.length).toBeGreaterThanOrEqual(3)
+      expect(data.symptoms[0]).toContain('quase apagar')
+      expect(data.history).toContain('correia dentada anterior estava se esfarelando')
+      expect(data.history).toContain('solenoide VCT')
+
+      // Seção 2: Evidência de Telemetria
+      expect(data.telemetryEvidence.sessionLabel).toContain('HARDWARE_REAL')
+      expect(data.telemetryEvidence.sampleCount).toBe(1218)
+      expect(data.telemetryEvidence.device).toBe('ELM327')
+      expect(data.telemetryEvidence.protocol).toBe('ISO 15765-4 CAN 11/500')
+      expect(data.telemetryEvidence.ltftRange).toContain('−12,5% a −13,3%')
+      expect(data.telemetryEvidence.stftRange).toContain('−13,3% a +7,0%')
+      expect(data.telemetryEvidence.idleRpm).toContain('874')
+      expect(data.telemetryEvidence.engineLoad).toContain('12,5%')
+      expect(data.telemetryEvidence.coolantTemp).toContain('65 °C')
+      expect(data.telemetryEvidence.dtcsSummary).toContain('ZERO')
+      expect(data.telemetryEvidence.dtcsSummary).toContain('MIL apagada')
+      expect(data.telemetryEvidence.coldStartNote).toContain('primeiros ~60 s')
+
+      // Seção 3: Análise Técnica
+      expect(data.technicalAnalysis.ignitionDiscarded).toContain('ignição está DESCARTADA')
+      expect(data.technicalAnalysis.ignitionDiscarded).toContain('velas trocadas recentemente')
+      expect(data.technicalAnalysis.ltftDiagnosis).toContain(
+        'LTFT −13% indica mistura rica crônica',
+      )
+      expect(data.technicalAnalysis.mainHypothesis).toContain('contaminação do circuito de óleo')
+      expect(data.technicalAnalysis.mainHypothesis).toContain('atuador TiVCT')
+      expect(data.technicalAnalysis.flexFuelNote).toContain('flex (etanol/gasolina)')
+
+      // Seção 4: Plano de Serviço — Amanhã (Checklist de 5 etapas)
+      expect(data.servicePlanChecklist).toHaveLength(5)
+      expect(data.servicePlanChecklist[0].title).toContain('trocar óleo + filtro novamente')
+      expect(data.servicePlanChecklist[1].title).toContain('Substituir a solenoide VCT')
+      expect(data.servicePlanChecklist[2].title).toContain('CONFERIR FASE DA CORREIA DENTADA')
+      expect(data.servicePlanChecklist[3].title).toContain(
+        'medir pressão de óleo na PARTIDA A FRIO',
+      )
+      expect(data.servicePlanChecklist[4].title).toContain('Após a montagem: partida a frio')
+
+      // Seção 5: Validação pelo Network Car (Pós-troca)
+      expect(data.postRepairValidation).toContain('sess_1789904984520_ilu9')
+      expect(data.postRepairValidation).toContain('2.076 amostras')
+      expect(data.postRepairValidation).toContain('antes × depois')
+    })
+
+    it('(b) generateMechanicSummaryPdfDocument deve renderizar o PDF com o rodapé oficial ME001 em todas as páginas', () => {
+      const data = buildMechanicSummaryPdfData()
+      const doc = generateMechanicSummaryPdfDocument(data)
+      expect(doc).toBeDefined()
+
+      // @ts-expect-error getNumberOfPages
+      const totalPages = doc.internal.getNumberOfPages()
+      expect(totalPages).toBeGreaterThanOrEqual(1)
+
+      const output = doc.output('datauristring')
+      expect(output).toContain('data:application/pdf')
+    })
+
+    it('(c) exportMechanicSummaryPdf deve gerar nome padrão ResumoMecanico_DRE0E59_<data>.pdf e ter download seguro', () => {
+      const data = buildMechanicSummaryPdfData()
+      const result = exportMechanicSummaryPdf(data)
+      expect(result).toBeDefined()
+      expect(['DOWNLOAD', 'PRINT_FALLBACK']).toContain(result.method)
     })
   })
 })
