@@ -7,6 +7,9 @@ import pb from '@/lib/pocketbase/client'
 import { VehicleModel, ObdCapabilityModel } from '@/types/obd'
 import { ClientModel, WorkOrderModel } from '@/types/commercial'
 import { DiagnosticInvestigationModel } from '@/types/investigation'
+import { VehicleProfileModel } from '@/types/vehicle-profile'
+import { vehicleProfileService } from '@/services/vehicle-profile'
+import { VehicleProfileEditorModal } from '@/components/diagnostic/VehicleProfileEditorModal'
 import { useTelemetry } from '@/contexts/TelemetryContext'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,6 +43,8 @@ import {
   Layers,
   Zap,
   Users,
+  ShieldCheck,
+  ShieldAlert,
 } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { useToast } from '@/hooks/use-toast'
@@ -53,6 +58,8 @@ export default function Veiculos() {
   const [editingVehicle, setEditingVehicle] = useState<VehicleModel | null>(null)
   const [loading, setLoading] = useState(false)
   const [selectedCapability, setSelectedCapability] = useState<ObdCapabilityModel | null>(null)
+  const [vehicleProfiles, setVehicleProfiles] = useState<Record<string, VehicleProfileModel>>({})
+  const [editingProfileVehicle, setEditingProfileVehicle] = useState<VehicleModel | null>(null)
 
   // Clientes para proprietário (Requisito 3)
   const [clients, setClients] = useState<ClientModel[]>([])
