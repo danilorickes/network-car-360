@@ -1,5 +1,5 @@
 {
-  "generatedAt": "2026-09-22T20:00:20.924Z",
+  "generatedAt": "2026-09-22T20:49:32.025Z",
   "collections": [
     {
       "name": "users",
@@ -1044,6 +1044,30 @@
           "required": false,
           "system": false,
           "autodateTriggers": ["onCreate", "onUpdate"]
+        },
+        {
+          "name": "vehicle_profile",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "structured_case_data",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "discarded_hypotheses",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "confirmed_diagnosis_details",
+          "type": "json",
+          "required": false,
+          "system": false
         }
       ],
       "indexes": [
@@ -2465,6 +2489,183 @@
       ],
       "indexes": [
         "CREATE INDEX idx_base_veh_ctx ON vehicle_baselines (vehicle_plate, driving_context)"
+      ]
+    },
+    {
+      "name": "vehicle_profiles",
+      "type": "base",
+      "apiRules": {
+        "list": "",
+        "view": "",
+        "create": "",
+        "update": "",
+        "delete": ""
+      },
+      "fields": [
+        {
+          "name": "vehicle",
+          "type": "relation",
+          "required": true,
+          "system": false,
+          "collectionRef": "vehicles"
+        },
+        {
+          "name": "status",
+          "type": "select",
+          "required": true,
+          "system": false,
+          "selectValues": ["RASCUNHO", "CONFIRMADO", "DIVERGENTE"]
+        },
+        {
+          "name": "make",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "model",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "version",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "year_model",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "vin",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "fuel",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "engine",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "engine_code",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "displacement",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "cylinders",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "aspiration",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "power",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "transmission",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "injection_architecture",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "obd_protocol",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "supported_pids",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "expected_sensors",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "known_particularities",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "conflicts",
+          "type": "json",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "confirmed_by",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "confirmed_at",
+          "type": "date",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "notes",
+          "type": "text",
+          "required": false,
+          "system": false
+        },
+        {
+          "name": "created",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate"]
+        },
+        {
+          "name": "updated",
+          "type": "autodate",
+          "required": false,
+          "system": false,
+          "autodateTriggers": ["onCreate", "onUpdate"]
+        }
+      ],
+      "indexes": [
+        "CREATE UNIQUE INDEX idx_vprof_vehicle ON vehicle_profiles (vehicle)",
+        "CREATE INDEX idx_vprof_status ON vehicle_profiles (status)"
       ]
     }
   ]
