@@ -616,7 +616,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       deviceCollector = 'Simulador de Telemetria Integrado'
     }
 
-    const appVersion = '0.0.41-homologacao-e6.6.1'
+    const appVersion = '0.0.45-homologacao-e6.6.1'
     const customerId = (currentVeh as any)?.client || null
     const workshopId = (currentVeh as any)?.workshop_id || null
 

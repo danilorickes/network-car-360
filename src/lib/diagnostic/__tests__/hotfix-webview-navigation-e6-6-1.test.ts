@@ -92,23 +92,31 @@ describe('Hotfix APK Android WebView — Diagnóstico 360 e Prevenção de ERR_F
     })
   })
 
-  describe('4. Versionamento da Aplicação e APK Android (v0.0.41 / versionCode 10)', () => {
-    it('package.json deve ter versão semver válida maior ou igual a 0.0.41', () => {
+  describe('4. Versionamento da Aplicação e APK Android (v0.0.45+ / versionCode derivado de package.json)', () => {
+    it('package.json deve ter versão semver válida maior ou igual a 0.0.45', () => {
       const pkgJson = JSON.parse(
         fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'),
       )
       expect(pkgJson.version).toMatch(/^0\.0\.\d+$/)
       const patch = parseInt(pkgJson.version.split('.')[2], 10)
-      expect(patch).toBeGreaterThanOrEqual(41)
+      expect(patch).toBeGreaterThanOrEqual(45)
     })
 
-    it('android/app/build.gradle deve estar com versionCode 10 e versionName "0.0.41-homologacao-e6.6.1"', () => {
+    it('android/app/build.gradle deve estar sincronizado com package.json (versionName correspondente)', () => {
+      const pkgJson = JSON.parse(
+        fs.readFileSync(path.resolve(process.cwd(), 'package.json'), 'utf-8'),
+      )
       const gradleContent = fs.readFileSync(
         path.resolve(process.cwd(), 'android/app/build.gradle'),
         'utf-8',
       )
-      expect(gradleContent).toMatch(/versionCode\s+10/)
-      expect(gradleContent).toMatch(/versionName\s+"0\.0\.41-homologacao-e6\.6\.1"/)
+      const versionNameMatch = gradleContent.match(/versionName\s+"([^"]+)"/)
+      expect(versionNameMatch).not.toBeNull()
+      expect(versionNameMatch![1]).toBe(pkgJson.version)
+
+      const versionCodeMatch = gradleContent.match(/versionCode\s+(\d+)/)
+      expect(versionCodeMatch).not.toBeNull()
+      expect(parseInt(versionCodeMatch![1], 10)).toBeGreaterThanOrEqual(45)
     })
   })
 })

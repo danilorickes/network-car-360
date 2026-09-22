@@ -11,8 +11,8 @@ android {
         applicationId "br.com.networkcar.diagnostico360"
         minSdk 24
         targetSdk 34
-        versionCode 10
-        versionName "0.0.41-homologacao-e6.6.1"
+        versionCode 45
+        versionName "0.0.45"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }

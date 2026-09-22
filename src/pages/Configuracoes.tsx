@@ -36,7 +36,18 @@ import {
   getAssistantDisplayName,
 } from '@/lib/assistant/assistant-identity-store'
 import { getDriveStartupPreference, setDriveStartupPreference } from '@/lib/drive-startup-pref'
-import { Bot, Sparkles, Volume2, Mic, CheckCircle2, Car, Compass } from 'lucide-react'
+import {
+  Bot,
+  Sparkles,
+  Volume2,
+  Mic,
+  CheckCircle2,
+  Car,
+  Compass,
+  Smartphone,
+  Info,
+} from 'lucide-react'
+import { APP_VERSION, APP_BUILD_LABEL, APP_HOMOLOGATION_CODENAME } from '@/lib/version'
 
 export default function Configuracoes() {
   const { activeScenario, setActiveScenario, selectedVehicle } = useTelemetry()
@@ -735,6 +746,73 @@ export default function Configuracoes() {
                 />
               </div>
             </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Seção 5: Sobre a Aplicação & Informações de Versão */}
+      <div className="bg-[#131A22] border border-[#263340] rounded-lg p-5 space-y-4">
+        <div className="flex items-center justify-between border-b border-[#263340] pb-3">
+          <div className="flex items-center space-x-2">
+            <Smartphone className="w-5 h-5 text-[#FFB300]" />
+            <div>
+              <h2 className="text-sm font-bold text-white uppercase tracking-wider flex items-center space-x-2">
+                <span>Sobre o App & Versão do Sistema</span>
+                <span className="text-[10px] bg-emerald-950 text-emerald-400 border border-emerald-800 px-2 py-0.5 rounded font-mono font-bold">
+                  v{APP_VERSION}
+                </span>
+              </h2>
+              <p className="text-xs text-[#9AA7B4]">
+                Identificação e proveniência do build instalado (sincronizado com package.json e
+                APK).
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] space-y-1">
+            <span className="text-[#9AA7B4] text-[11px] block font-medium">Versão Oficial:</span>
+            <div className="font-mono text-base font-bold text-[#FFB300]">v{APP_VERSION}</div>
+            <span className="text-[10px] text-gray-400">Fonte: package.json</span>
+          </div>
+
+          <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] space-y-1">
+            <span className="text-[#9AA7B4] text-[11px] block font-medium">
+              Canal de Homologação:
+            </span>
+            <div className="font-mono text-sm font-bold text-white">
+              {APP_HOMOLOGATION_CODENAME}
+            </div>
+            <span className="text-[10px] text-cyan-400">Hardware & Telemetria</span>
+          </div>
+
+          <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] space-y-1">
+            <span className="text-[#9AA7B4] text-[11px] block font-medium">
+              Ambiente em Execução:
+            </span>
+            <div className="font-mono text-sm font-bold text-emerald-400">
+              {platform.isAndroid ? 'Android (Container / APK)' : 'Navegador Web / Desktop'}
+            </div>
+            <span className="text-[10px] text-gray-400">
+              {platform.hasWebBluetooth ? 'BT BLE OK' : 'Sem BLE Direto'} •{' '}
+              {platform.hasWebSerial ? 'Serial OK' : 'Sem Serial Direto'}
+            </span>
+          </div>
+        </div>
+
+        <div className="bg-[#0B0F14] p-3 rounded border border-[#263340] text-[11px] text-gray-300 flex items-start space-x-2">
+          <Info className="w-4 h-4 text-cyan-400 shrink-0 mt-0.5" />
+          <div className="space-y-1">
+            <span className="font-semibold text-white">
+              Como verificar se seu APK está atualizado:
+            </span>
+            <p className="text-gray-400">
+              Se esta tela ou o rodapé do menu lateral exibir qualquer versão anterior a{' '}
+              <strong className="text-white font-mono">v{APP_VERSION}</strong> (como a antiga
+              0.0.21), o dispositivo está executando um build defasado. Baixe o artefato mais
+              recente no GitHub Actions nomeado com a versão correspondente.
+            </p>
           </div>
         </div>
       </div>

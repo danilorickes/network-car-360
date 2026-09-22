@@ -11,6 +11,7 @@
     "build": "vite build",
     "build:android": "vite build --base=./",
     "build:dev": "vite build --mode development",
+    "sync:version": "node scripts/sync-android-version.mjs",
     "generate:icons": "node scripts/generate-android-icons.mjs",
     "lint": "oxlint src",
     "lint:fix": "oxlint src --fix",

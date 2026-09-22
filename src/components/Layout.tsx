@@ -21,6 +21,7 @@ import {
   MOBILE_SECONDARY_ITEMS,
   type NavItemConfig,
 } from '@/lib/navigation'
+import { APP_VERSION, APP_BUILD_LABEL } from '@/lib/version'
 
 export default function Layout() {
   const { telemetry } = useTelemetry()
@@ -246,7 +247,7 @@ export default function Layout() {
                     )}
                     <div className="flex items-center justify-between text-[10px] text-gray-500 pt-1 border-t border-[#263340]/40">
                       <span>Network Car 360 PRO</span>
-                      <span className="font-mono text-[#FFB300]">v0.0.21</span>
+                      <span className="font-mono text-[#FFB300]">v{APP_VERSION}</span>
                     </div>
                   </div>
                 </SheetContent>
@@ -493,7 +494,9 @@ export default function Layout() {
             <span className="font-mono text-[#FFB300] bg-[#FFB300]/10 px-2 py-0.5 rounded border border-[#FFB300]/30">
               ME001-E5 — Etapa 5
             </span>
-            <span>Versão 0.0.21 (Navegação Responsiva Mobile)</span>
+            <span>
+              Versão {APP_VERSION} ({APP_BUILD_LABEL})
+            </span>
           </div>
         </div>
       </footer>

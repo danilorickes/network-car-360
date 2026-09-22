@@ -31,6 +31,19 @@ jobs:
       - name: Instalar Dependências Frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Extrair Versão do Aplicativo (package.json)
+        id: app_version
+        run: |
+          APP_VER=$(node -p "require('./package.json').version")
+          echo "VERSION=$APP_VER" >> $GITHUB_OUTPUT
+          echo "=== Versão do Aplicativo Detectada: $APP_VER ==="
+
+      - name: Sincronizar Versão Android (versionName e versionCode no build.gradle)
+        run: |
+          node scripts/sync-android-version.mjs
+          echo "=== android/app/build.gradle atualizado ==="
+          grep -E 'versionCode|versionName' android/app/build.gradle
+
       - name: Gerar Recursos e Ícones Android (Mipmaps E6.6.1)
         run: node scripts/generate-android-icons.mjs
 
@@ -83,22 +96,27 @@ jobs:
           cd android
           ./gradlew assembleDebug --no-daemon --stacktrace
 
-      - name: Renomear APK de Homologação
+      - name: Renomear APK de Homologação com Versão
         run: |
+          VERSION="${{ steps.app_version.outputs.VERSION }}"
           APK_PATH=$(find android/app/build/outputs/apk/debug/ -name "*.apk" | head -n 1)
           if [ -n "$APK_PATH" ] && [ -f "$APK_PATH" ]; then
+            TARGET_APK="NetworkCar-v${VERSION}-homologacao.apk"
+            cp "$APK_PATH" "$TARGET_APK"
+            echo "APK preparado: $TARGET_APK a partir de $APK_PATH"
+            # Cópia de compatibilidade
             cp "$APK_PATH" network-car-teste-homologacao-e6.6.1.apk
-            echo "APK preparado: network-car-teste-homologacao-e6.6.1.apk a partir de $APK_PATH"
           else
             echo "Erro: APK não encontrado no diretório android/app/build/outputs/apk/debug/"
             exit 1
           fi
 
-      - name: Publicar Artefato APK (Download Direto)
+      - name: Publicar Artefato APK (Download Direto com Versão)
         uses: actions/upload-artifact@v4
         with:
-          name: network-car-homologacao-apk
+          name: network-car-homologacao-apk-v${{ steps.app_version.outputs.VERSION }}
           path: |
+            NetworkCar-v${{ steps.app_version.outputs.VERSION }}-homologacao.apk
             network-car-teste-homologacao-e6.6.1.apk
             android/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
