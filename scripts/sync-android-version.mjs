@@ -25,7 +25,7 @@ function syncAndroidVersion() {
   const minor = parts[1] || 0
   const patch = parts[2] || 0
 
-  // versionCode numérico incremental: ex: 0.0.45 -> 45; 1.0.0 -> 10000
+  // versionCode numérico incremental: ex: 0.0.48 -> 48; 1.0.0 -> 10000
   const computedVersionCode = major * 10000 + minor * 100 + patch
 
   console.log(`[sync-android-version] Sincronizando versão a partir de package.json: ${semver}`)

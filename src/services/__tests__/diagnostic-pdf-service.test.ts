@@ -351,16 +351,16 @@ describe('Diagnostic360PdfService — Exportar PDF do Diagnóstico 360', () => {
     })
   })
 
-  describe('3. Resumo Técnico para o Mecânico + Plano de Serviço (v0.0.45)', () => {
+  describe('3. Resumo Técnico para o Mecânico + Plano de Serviço (v0.0.45+)', () => {
     it('(a) buildMechanicSummaryPdfData deve conter todas as 5 seções obrigatórias com valores exatos para o EcoSport DRE0E59', () => {
       const data = buildMechanicSummaryPdfData({
         session: mockRealSession,
         vehicle: mockRealVehicle,
-        appVersion: '0.0.45',
+        appVersion: '0.0.48',
       })
 
       // Metadados e versão
-      expect(data.appVersion).toBe('0.0.45')
+      expect(data.appVersion).toBe('0.0.48')
       expect(data.emissionDate).toBeDefined()
 
       // Seção 1: Veículo e Contexto

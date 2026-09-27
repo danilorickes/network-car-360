@@ -44,6 +44,16 @@ jobs:
           echo "=== android/app/build.gradle atualizado ==="
           grep -E 'versionCode|versionName' android/app/build.gradle
 
+      - name: Garantir Keystore Fixo de Homologação (Assinatura Estável para Updates)
+        # Assinatura de homologação/debug com keystore fixo versionado no repo.
+        # Credenciais padrão de debug: alias=androiddebugkey, senha=android (documentado para homologação).
+        # Evita a geração de keystores efêmeros pelo runner do CI, prevenindo o erro
+        # "INSTALL_FAILED_UPDATE_INCOMPATIBLE" ao atualizar o APK no dispositivo.
+        run: |
+          mkdir -p android/keystore
+          node scripts/ensure-fixed-keystore.mjs
+          ls -la android/keystore/
+
       - name: Gerar Recursos e Ícones Android (Mipmaps E6.6.1)
         run: node scripts/generate-android-icons.mjs
 

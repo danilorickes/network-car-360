@@ -13,7 +13,7 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
   it('1. Constante APP_VERSION em src/lib/version.ts deve bater exatamente com package.json', () => {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
     expect(APP_VERSION).toBe(pkg.version)
-    expect(APP_VERSION).toBe('0.0.45')
+    expect(APP_VERSION).toBe('0.0.48')
   })
 
   it('2. android/app/build.gradle deve ter versionName e versionCode correspondentes', () => {
@@ -21,7 +21,7 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
 
     expect(gradle).toContain(`versionName "${pkg.version}"`)
-    expect(gradle).toMatch(/versionCode\s+45/)
+    expect(gradle).toMatch(/versionCode\s+48/)
   })
 
   it('3. Script sync-android-version.mjs deve existir e atualizar build.gradle corretamente', () => {
@@ -46,5 +46,24 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
     )
     // Deve renomear o arquivo APK com a versão
     expect(workflow).toContain('NetworkCar-v${VERSION}-homologacao.apk')
+  })
+
+  it('5. android/app/build.gradle deve configurar signingConfig com keystore estável para evitar erros de conflito de pacote', () => {
+    const gradle = readFileSync(gradlePath, 'utf-8')
+
+    expect(gradle).toContain('signingConfigs {')
+    expect(gradle).toContain("storeFile file('../keystore/debug.keystore')")
+    expect(gradle).toContain("storePassword 'android'")
+    expect(gradle).toContain("keyAlias 'androiddebugkey'")
+    expect(gradle).toContain("keyPassword 'android'")
+    expect(gradle).toContain('signingConfig signingConfigs.debug')
+  })
+
+  it('6. Script ensure-fixed-keystore.mjs deve gerar o keystore estável corretamente', () => {
+    const ensureScriptPath = resolve(root, 'scripts/ensure-fixed-keystore.mjs')
+    expect(existsSync(ensureScriptPath)).toBe(true)
+    const script = readFileSync(ensureScriptPath, 'utf-8')
+    expect(script).toContain('androiddebugkey')
+    expect(script).toContain('FIXED_DEBUG_KEYSTORE_BASE64')
   })
 })

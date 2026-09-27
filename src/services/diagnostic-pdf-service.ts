@@ -1083,7 +1083,7 @@ export function generateDiagnostic360PdfDocument(data: Diagnostic360PdfData): js
  * Dispara o download ou fallback gracioso (window.print / preview) para WebView / APK
  */
 // ============================================================================
-// RESUMO TÉCNICO PARA O MECÂNICO + PLANO DE SERVIÇO (V0.0.45)
+// RESUMO TÉCNICO PARA O MECÂNICO + PLANO DE SERVIÇO (V0.0.48)
 // ============================================================================
 
 export interface ServicePlanChecklistItem {
@@ -1163,7 +1163,7 @@ export function buildMechanicSummaryPdfData(options?: {
   const protocol = session?.detected_protocol || session?.protocol || 'ISO 15765-4 CAN 11/500'
 
   return {
-    appVersion: options?.appVersion || session?.app_version || '0.0.45',
+    appVersion: options?.appVersion || session?.app_version || '0.0.48',
     emissionDate: new Date().toLocaleDateString('pt-BR', {
       day: '2-digit',
       month: '2-digit',
@@ -1285,7 +1285,7 @@ export function generateMechanicSummaryPdfDocument(data: MechanicSummaryPdfData)
       margin,
       currentY,
     )
-    doc.text(`Versão: ${data.appVersion || '0.0.45'}`, pageWidth - margin, currentY, {
+    doc.text(`Versão: ${data.appVersion || '0.0.48'}`, pageWidth - margin, currentY, {
       align: 'right',
     })
     currentY += 3
@@ -1352,7 +1352,7 @@ export function generateMechanicSummaryPdfDocument(data: MechanicSummaryPdfData)
     currentY + 8.5,
     { align: 'right' },
   )
-  doc.text(`Versão App: ${data.appVersion || '0.0.45'}`, pageWidth - margin - 6, currentY + 16, {
+  doc.text(`Versão App: ${data.appVersion || '0.0.48'}`, pageWidth - margin - 6, currentY + 16, {
     align: 'right',
   })
 

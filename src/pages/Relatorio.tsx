@@ -172,7 +172,7 @@ export default function Relatorio() {
       const mechanicData = buildMechanicSummaryPdfData({
         session: currentSelectedSession,
         vehicle: currentSelectedVehicle,
-        appVersion: '0.0.45',
+        appVersion: '0.0.48',
       })
 
       const dateStr = new Date().toISOString().split('T')[0]
@@ -616,7 +616,7 @@ export default function Relatorio() {
               <div className="space-y-1">
                 <span className="text-[10px] font-mono text-emerald-400 font-bold uppercase tracking-wider flex items-center space-x-1.5">
                   <Wrench className="w-3.5 h-3.5" />
-                  <span>Novo Documento Técnico (v0.0.45)</span>
+                  <span>Novo Documento Técnico (v0.0.48)</span>
                 </span>
                 <h4 className="text-sm font-bold text-white">
                   Resumo Técnico para o Mecânico + Plano de Serviço (Solenoide VCT)

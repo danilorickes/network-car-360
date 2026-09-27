@@ -132,7 +132,7 @@ export const Diagnostic360View: React.FC<Diagnostic360ViewProps> = ({
               const mechanicData = buildMechanicSummaryPdfData({
                 session: fallbackSession,
                 vehicle,
-                appVersion: '0.0.45',
+                appVersion: '0.0.48',
               })
               exportMechanicSummaryPdf(mechanicData)
             }}
