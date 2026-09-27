@@ -23,11 +23,13 @@ android {
     // sem erro de conflito de pacote (INSTALL_FAILED_UPDATE_INCOMPATIBLE).
     signingConfigs {
         debug {
-            // Caminho para o keystore fixo de homologação committed no projeto
-            storeFile file('../keystore/debug.keystore')
-            storePassword 'android'
-            keyAlias 'androiddebugkey'
-            keyPassword 'android'
+            def fixedKeystore = file('../keystore/debug.keystore')
+            if (fixedKeystore.exists()) {
+                storeFile fixedKeystore
+                storePassword 'android'
+                keyAlias 'androiddebugkey'
+                keyPassword 'android'
+            }
         }
     }
 

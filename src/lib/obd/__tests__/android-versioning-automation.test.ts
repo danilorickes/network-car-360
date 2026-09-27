@@ -52,7 +52,7 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
     const gradle = readFileSync(gradlePath, 'utf-8')
 
     expect(gradle).toContain('signingConfigs {')
-    expect(gradle).toContain("storeFile file('../keystore/debug.keystore')")
+    expect(gradle).toContain("file('../keystore/debug.keystore')")
     expect(gradle).toContain("storePassword 'android'")
     expect(gradle).toContain("keyAlias 'androiddebugkey'")
     expect(gradle).toContain("keyPassword 'android'")
@@ -64,6 +64,6 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
     expect(existsSync(ensureScriptPath)).toBe(true)
     const script = readFileSync(ensureScriptPath, 'utf-8')
     expect(script).toContain('androiddebugkey')
-    expect(script).toContain('FIXED_DEBUG_KEYSTORE_BASE64')
+    expect(script).toContain('ensureFixedKeystore')
   })
 })

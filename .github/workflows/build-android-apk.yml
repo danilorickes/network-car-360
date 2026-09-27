@@ -31,6 +31,12 @@ jobs:
       - name: Instalar Dependências Frontend
         run: pnpm install --frozen-lockfile
 
+      - name: Configurar JDK 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'zulu'
+          java-version: 17
+
       - name: Extrair Versão do Aplicativo (package.json)
         id: app_version
         run: |
@@ -76,12 +82,6 @@ jobs:
           else
             echo "SUCESSO: Todas as referências do index.html utilizam caminhos relativos (./assets/ ou assets/)."
           fi
-
-      - name: Configurar JDK 17
-        uses: actions/setup-java@v4
-        with:
-          distribution: 'zulu'
-          java-version: 17
 
       - name: Configurar Android SDK
         uses: android-actions/setup-android@v3
