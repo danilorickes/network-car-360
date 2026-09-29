@@ -501,16 +501,19 @@ export const ConnectionControlPanel: React.FC = () => {
               </>
             )}
 
-            {isConnected && (
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={readDtcsManual}
-                className="border-[#263340] text-[#9AA7B4] hover:text-white hover:bg-[#1A232E] text-xs"
-              >
-                Ler DTCs Agora
-              </Button>
-            )}
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={readDtcsManual}
+              className="border-[#263340] text-[#9AA7B4] hover:text-white hover:bg-[#1A232E] text-xs"
+              title={
+                isConnected
+                  ? 'Realizar varredura de DTCs na ECU'
+                  : 'Conecte o adaptador para ler DTCs'
+              }
+            >
+              Ler DTCs Agora
+            </Button>
           </div>
         </div>
       </div>

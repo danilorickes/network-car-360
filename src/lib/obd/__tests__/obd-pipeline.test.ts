@@ -105,7 +105,36 @@ describe('OBD-II Core Pipeline Suite (ME001-E1)', () => {
       const raw = '43 01 03 01 00 00\r\n>'
       const parsed = ElmProtocolParser.parseDtcResponse(raw, '03')
       expect(parsed.isError).toBe(false)
+      expect(parsed.status).toBe('COM_CODIGOS')
       expect(parsed.codes).toContain('P0301')
+    })
+
+    it('deve distinguir explicitamente SEM_CODIGOS quando NO DATA ou resposta vazia', () => {
+      const raw = 'NO DATA\r\n>'
+      const parsed = ElmProtocolParser.parseDtcResponse(raw, '03')
+      expect(parsed.isError).toBe(false)
+      expect(parsed.status).toBe('SEM_CODIGOS')
+      expect(parsed.codes).toHaveLength(0)
+
+      const rawZero = '43 00\r\n>'
+      const parsedZero = ElmProtocolParser.parseDtcResponse(rawZero, '03')
+      expect(parsedZero.isError).toBe(false)
+      expect(parsedZero.status).toBe('SEM_CODIGOS')
+      expect(parsedZero.codes).toHaveLength(0)
+    })
+
+    it('deve distinguir explicitamente FALHA_DE_LEITURA em caso de UNABLE TO CONNECT ou BUS BUSY', () => {
+      const rawUnable = 'UNABLE TO CONNECT\r\n>'
+      const parsedUnable = ElmProtocolParser.parseDtcResponse(rawUnable, '03')
+      expect(parsedUnable.isError).toBe(true)
+      expect(parsedUnable.status).toBe('FALHA_DE_LEITURA')
+      expect(parsedUnable.errorMessage).toContain('UNABLE TO CONNECT')
+
+      const rawBusy = 'BUS BUSY\r\n>'
+      const parsedBusy = ElmProtocolParser.parseDtcResponse(rawBusy, '03')
+      expect(parsedBusy.isError).toBe(true)
+      expect(parsedBusy.status).toBe('FALHA_DE_LEITURA')
+      expect(parsedBusy.errorMessage).toContain('BUS BUSY')
     })
   })
 

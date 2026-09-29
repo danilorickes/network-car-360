@@ -1,7 +1,14 @@
 import { OBDTransport } from './transports/obd-transport'
-import { ElmProtocolParser } from './elm-parser'
-import { DtcModel, DtcStatus } from '../types/obd'
+import { ElmProtocolParser, DtcReadStatus } from './elm-parser'
+import { DtcModel } from '../types/obd'
 import pb from '../pocketbase/client'
+
+export interface DtcServiceResult {
+  status: DtcReadStatus
+  dtcs: DtcModel[]
+  milOn: boolean
+  errorMessage?: string
+}
 
 /**
  * DtcService: Leitura de DTCs (Modo 03 Ativos e Modo 07 Pendentes).
@@ -32,51 +39,97 @@ export class DtcService {
     return this.milOn
   }
 
-  async readDtcs(): Promise<{ dtcs: DtcModel[]; milOn: boolean }> {
+  async readDtcs(): Promise<DtcServiceResult> {
     if (!this.transport.isConnected()) {
-      return { dtcs: this.currentDtcs, milOn: this.milOn }
+      return {
+        status: 'FALHA_DE_LEITURA',
+        dtcs: this.currentDtcs,
+        milOn: this.milOn,
+        errorMessage: 'Adaptador OBD desconectado.',
+      }
     }
 
     try {
       // 1. Ler status MIL e quantidade de DTCs via PID 01 01
       // 41 01 XX YY ZZ WW -> Bit 7 de XX indica se a lâmpada MIL está acesa
-      const milRaw = await this.transport.send('0101', 2000).catch(() => '')
-      const parsedMil = ElmProtocolParser.parseMode01(milRaw, '01')
-      if (!parsedMil.isError && parsedMil.bytes.length > 0) {
-        this.milOn = (parsedMil.bytes[0] & 0x80) !== 0
+      try {
+        const milRaw = await this.transport.send('0101', 2000)
+        const parsedMil = ElmProtocolParser.parseMode01(milRaw, '01')
+        if (!parsedMil.isError && parsedMil.bytes.length > 0) {
+          this.milOn = (parsedMil.bytes[0] & 0x80) !== 0
+        }
+      } catch {
+        // Falha no PID 0101 não impede leitura dos Modos 03/07
       }
 
       const foundList: DtcModel[] = []
       const readAt = new Date().toISOString()
+      let mode03Failed = false
+      let mode07Failed = false
+      let commErrorMessage: string | undefined
 
       // 2. Ler DTCs confirmados/ativos (Modo 03)
-      const mode03Raw = await this.transport.send('03', 2500).catch(() => '')
-      const parsed03 = ElmProtocolParser.parseDtcResponse(mode03Raw, '03')
-      for (const code of parsed03.codes) {
-        foundList.push({
-          dtc_code: code,
-          status: 'ATIVO',
-          mil_on: this.milOn,
-          read_at_utc: readAt,
-          session: this.dbSessionRecordId || undefined,
-          session_id: this.sessionUniqueId,
-        })
+      try {
+        const mode03Raw = await this.transport.send('03', 2500)
+        const parsed03 = ElmProtocolParser.parseDtcResponse(mode03Raw, '03')
+        if (parsed03.isError) {
+          mode03Failed = true
+          commErrorMessage = parsed03.errorMessage || 'Falha ao consultar Modo 03 (DTCs ativos)'
+        } else {
+          for (const code of parsed03.codes) {
+            foundList.push({
+              dtc_code: code,
+              status: 'ATIVO',
+              mil_on: this.milOn,
+              read_at_utc: readAt,
+              session: this.dbSessionRecordId || undefined,
+              session_id: this.sessionUniqueId,
+            })
+          }
+        }
+      } catch (err: any) {
+        mode03Failed = true
+        commErrorMessage = err?.message || 'Timeout/Erro no envio do comando Modo 03'
       }
 
       // 3. Ler DTCs pendentes (Modo 07)
-      const mode07Raw = await this.transport.send('07', 2500).catch(() => '')
-      const parsed07 = ElmProtocolParser.parseDtcResponse(mode07Raw, '07')
-      for (const code of parsed07.codes) {
-        // Evita duplicar se já estiver em ativos
-        if (!foundList.some((d) => d.dtc_code === code)) {
-          foundList.push({
-            dtc_code: code,
-            status: 'PENDENTE',
-            mil_on: this.milOn,
-            read_at_utc: readAt,
-            session: this.dbSessionRecordId || undefined,
-            session_id: this.sessionUniqueId,
-          })
+      try {
+        const mode07Raw = await this.transport.send('07', 2500)
+        const parsed07 = ElmProtocolParser.parseDtcResponse(mode07Raw, '07')
+        if (parsed07.isError) {
+          mode07Failed = true
+          if (!commErrorMessage) {
+            commErrorMessage =
+              parsed07.errorMessage || 'Falha ao consultar Modo 07 (DTCs pendentes)'
+          }
+        } else {
+          for (const code of parsed07.codes) {
+            if (!foundList.some((d) => d.dtc_code === code)) {
+              foundList.push({
+                dtc_code: code,
+                status: 'PENDENTE',
+                mil_on: this.milOn,
+                read_at_utc: readAt,
+                session: this.dbSessionRecordId || undefined,
+                session_id: this.sessionUniqueId,
+              })
+            }
+          }
+        }
+      } catch (err: any) {
+        mode07Failed = true
+        if (!commErrorMessage) {
+          commErrorMessage = err?.message || 'Timeout/Erro no envio do comando Modo 07'
+        }
+      }
+
+      // Se ambos os modos falharam e nenhum DTC foi obtido, caracteriza FALHA_DE_LEITURA
+      if (mode03Failed && mode07Failed && foundList.length === 0) {
+        return {
+          status: 'FALHA_DE_LEITURA',
+          dtcs: this.currentDtcs,
+          milOn: this.milOn,
+          errorMessage: commErrorMessage || 'Falha de comunicação com o barramento OBD da ECU',
         }
       }
 
@@ -87,7 +140,7 @@ export class DtcService {
 
       this.currentDtcs = foundList
 
-      // Persiste oportunisticamente no PocketBase
+      // Persiste oportunisticamente no PocketBase quando houver códigos confirmados
       if (this.dbSessionRecordId && foundList.length > 0) {
         for (const item of foundList) {
           if (!item.id) {
@@ -107,9 +160,20 @@ export class DtcService {
         }
       }
 
-      return { dtcs: this.currentDtcs, milOn: this.milOn }
-    } catch {
-      return { dtcs: this.currentDtcs, milOn: this.milOn }
+      const finalStatus: DtcReadStatus = foundList.length > 0 ? 'COM_CODIGOS' : 'SEM_CODIGOS'
+
+      return {
+        status: finalStatus,
+        dtcs: this.currentDtcs,
+        milOn: this.milOn,
+      }
+    } catch (err: any) {
+      return {
+        status: 'FALHA_DE_LEITURA',
+        dtcs: this.currentDtcs,
+        milOn: this.milOn,
+        errorMessage: err?.message || 'Erro inesperado durante leitura de DTCs',
+      }
     }
   }
 }

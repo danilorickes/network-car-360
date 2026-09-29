@@ -15,10 +15,14 @@ export interface ParsedPidResponse {
   errorMessage?: string
 }
 
+export type DtcReadStatus = 'COM_CODIGOS' | 'SEM_CODIGOS' | 'FALHA_DE_LEITURA'
+
 export interface ParsedDtcResponse {
+  status: DtcReadStatus
   codes: string[]
   rawText: string
   isError: boolean
+  errorMessage?: string
 }
 
 export class ElmProtocolParser {
@@ -105,20 +109,60 @@ export class ElmProtocolParser {
   /**
    * Decodifica resposta de DTCs (Modo 03 ou Modo 07)
    * Resposta ex: "43 01 03 01 00 00" -> P0301
+   * Resposta ex sem códigos: "43 00" ou "NO DATA" -> SEM_CODIGOS
+   * Resposta com falha: "UNABLE TO CONNECT", "BUS BUSY", "CAN ERROR", "?" -> FALHA_DE_LEITURA
    */
   static parseDtcResponse(raw: string, expectedMode = '03'): ParsedDtcResponse {
     const cleaned = this.cleanResponse(raw)
-    if (!cleaned || cleaned.includes('NO DATA')) {
-      return { codes: [], rawText: raw, isError: false }
+    const upperRaw = (raw || '').toUpperCase()
+    const upperClean = (cleaned || '').toUpperCase()
+
+    // 1. Verificação de falhas de comunicação explícitas
+    if (
+      !raw ||
+      upperRaw.includes('UNABLE TO CONNECT') ||
+      upperRaw.includes('CAN ERROR') ||
+      upperRaw.includes('BUS BUSY') ||
+      upperRaw.includes('BUS ERROR') ||
+      upperRaw.includes('FB ERROR') ||
+      upperRaw.includes('TIMEOUT') ||
+      upperClean === '?' ||
+      upperRaw.includes('?') ||
+      (upperRaw.includes('ERROR') && !upperRaw.includes('43'))
+    ) {
+      let errDetail = 'Falha de comunicação com a ECU'
+      if (upperRaw.includes('UNABLE TO CONNECT'))
+        errDetail = 'UNABLE TO CONNECT (ECU não respondeu)'
+      else if (upperRaw.includes('BUS BUSY')) errDetail = 'Barramento CAN ocupado (BUS BUSY)'
+      else if (upperRaw.includes('CAN ERROR')) errDetail = 'Erro de barramento (CAN ERROR)'
+      else if (upperRaw.includes('TIMEOUT'))
+        errDetail = 'Tempo limite de resposta excedido (TIMEOUT)'
+      else if (upperClean === '?' || upperRaw.includes('?'))
+        errDetail = 'Comando não reconhecido pelo adaptador (?)'
+
+      return {
+        status: 'FALHA_DE_LEITURA',
+        codes: [],
+        rawText: raw,
+        isError: true,
+        errorMessage: errDetail,
+      }
     }
 
-    if (cleaned.includes('UNABLE TO CONNECT') || cleaned.includes('ERROR')) {
-      return { codes: [], rawText: raw, isError: true }
+    // 2. NO DATA ou resposta vazia padrão OBD-II quando não há códigos armazenados
+    if (upperClean.includes('NO DATA')) {
+      return {
+        status: 'SEM_CODIGOS',
+        codes: [],
+        rawText: raw,
+        isError: false,
+      }
     }
 
     const responseHeader = (parseInt(expectedMode, 16) + 0x40).toString(16).toUpperCase() // Modo 03 -> 43, 07 -> 47
     const codes: string[] = []
     const lines = cleaned.split('\n')
+    let foundHeader = false
 
     for (const line of lines) {
       const tokens = line
@@ -128,6 +172,7 @@ export class ElmProtocolParser {
         .filter(Boolean)
       for (let i = 0; i < tokens.length; i++) {
         if (tokens[i].toUpperCase() === responseHeader) {
+          foundHeader = true
           // Os bytes seguintes vêm em pares de 2 bytes por DTC
           const dataBytes = tokens.slice(i + 1).map((t) => parseInt(t, 16))
           // Se houver um byte indicador de quantidade (ex: 43 01 xx xx...), pode pular ou tratar
@@ -146,6 +191,32 @@ export class ElmProtocolParser {
       }
     }
 
-    return { codes, rawText: raw, isError: false }
+    // Se o header foi encontrado: se extraiu códigos => COM_CODIGOS, senão (ex: 43 00 ou 43 00 00 00) => SEM_CODIGOS
+    if (foundHeader) {
+      return {
+        status: codes.length > 0 ? 'COM_CODIGOS' : 'SEM_CODIGOS',
+        codes,
+        rawText: raw,
+        isError: false,
+      }
+    }
+
+    // Se a resposta tem conteúdo mas nenhum header do modo foi reconhecido (resposta truncada ou ruído)
+    if (cleaned.length > 0) {
+      return {
+        status: 'FALHA_DE_LEITURA',
+        codes: [],
+        rawText: raw,
+        isError: true,
+        errorMessage: `Resposta truncada ou sem cabeçalho ${responseHeader}: "${cleaned.substring(0, 40)}"`,
+      }
+    }
+
+    return {
+      status: 'SEM_CODIGOS',
+      codes: [],
+      rawText: raw,
+      isError: false,
+    }
   }
 }

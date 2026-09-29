@@ -437,7 +437,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
           // Mode 03: Leitura de DTCs
           const dtcResp = await transportRef.current.send('03', 2500)
           const parsedDtc = ElmProtocolParser.parseDtcResponse(dtcResp, '03')
-          if (!parsedDtc.isError && parsedDtc.codes.length > 0) {
+          if (parsedDtc.status === 'COM_CODIGOS') {
             dtcCodes = parsedDtc.codes
           }
         } catch (initialPidErr) {
@@ -549,16 +549,65 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
   }
 
   const readDtcsManual = async () => {
-    if (dtcServiceRef.current) {
-      const res = await dtcServiceRef.current.readDtcs()
+    // Se o transporte não estiver conectado, alerta visivelmente com toast destrutivo
+    if (!transportRef.current || !transportRef.current.isConnected()) {
+      toast({
+        title: 'Conexão Necessária',
+        description: 'Conecte o adaptador OBD antes de ler códigos de falha.',
+        variant: 'destructive',
+      })
+      return
+    }
+
+    // Leitura avulsa sob demanda se não houver sessão ativa
+    let service = dtcServiceRef.current
+    if (!service) {
+      const sessionUid = activeSessionUniqueIdRef.current || `leitura_avulsa_${Date.now()}`
+      service = new DtcService(
+        transportRef.current,
+        sessionUid,
+        dbSessionIdRef.current || undefined,
+      )
+      // Mantém ref atualizado para reaproveitamento
+      dtcServiceRef.current = service
+    }
+
+    try {
+      const res = await service.readDtcs()
+
+      if (res.status === 'FALHA_DE_LEITURA') {
+        toast({
+          title: 'Falha na Leitura de DTCs',
+          description:
+            res.errorMessage || 'Falha de comunicação com a ECU do veículo ao consultar códigos.',
+          variant: 'destructive',
+        })
+        return
+      }
+
       setTelemetry((prev) => ({
         ...prev,
         dtcList: res.dtcs,
         milOn: res.milOn,
       }))
+
+      if (res.status === 'COM_CODIGOS') {
+        toast({
+          title: 'Falhas Detectadas no Veículo',
+          description: `${res.dtcs.length} código(s) de falha identificado(s). Lâmpada MIL: ${res.milOn ? 'ACESO' : 'APAGADO'}.`,
+        })
+      } else {
+        // SEM_CODIGOS: ECU respondeu OK com zero falhas
+        toast({
+          title: 'Varredura DTC Concluída',
+          description: `0 falhas detectadas. MIL: ${res.milOn ? 'ACESO' : 'APAGADO'}`,
+        })
+      }
+    } catch (err: any) {
       toast({
-        title: 'Varredura DTC Concluída',
-        description: `${res.dtcs.length} falha(s) identificada(s). MIL: ${res.milOn ? 'ACESO' : 'APAGADO'}`,
+        title: 'Falha de Comunicação',
+        description: err?.message || 'Erro inesperado ao consultar códigos de falha da ECU.',
+        variant: 'destructive',
       })
     }
   }
@@ -616,7 +665,7 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       deviceCollector = 'Simulador de Telemetria Integrado'
     }
 
-    const appVersion = '0.0.48-homologacao-e6.6.1'
+    const appVersion = '0.0.51-homologacao-e6.6.1'
     const customerId = (currentVeh as any)?.client || null
     const workshopId = (currentVeh as any)?.workshop_id || null
 
@@ -747,11 +796,13 @@ export const TelemetryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     if (dtcTimerRef.current) clearInterval(dtcTimerRef.current)
     dtcTimerRef.current = setInterval(() => {
       dtcService.readDtcs().then((res) => {
-        setTelemetry((prev) => ({
-          ...prev,
-          dtcList: res.dtcs,
-          milOn: res.milOn,
-        }))
+        if (res.status !== 'FALHA_DE_LEITURA') {
+          setTelemetry((prev) => ({
+            ...prev,
+            dtcList: res.dtcs,
+            milOn: res.milOn,
+          }))
+        }
       })
     }, config.dtcIntervalMs)
 

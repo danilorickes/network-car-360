@@ -13,7 +13,7 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
   it('1. Constante APP_VERSION em src/lib/version.ts deve bater exatamente com package.json', () => {
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
     expect(APP_VERSION).toBe(pkg.version)
-    expect(APP_VERSION).toBe('0.0.48')
+    expect(APP_VERSION).toBe('0.0.51')
   })
 
   it('2. android/app/build.gradle deve ter versionName e versionCode correspondentes', () => {
@@ -21,7 +21,7 @@ describe('Validação de Versionamento Automático e Consistência de Build (v0.
     const pkg = JSON.parse(readFileSync(pkgPath, 'utf-8'))
 
     expect(gradle).toContain(`versionName "${pkg.version}"`)
-    expect(gradle).toMatch(/versionCode\s+48/)
+    expect(gradle).toMatch(/versionCode\s+51/)
   })
 
   it('3. Script sync-android-version.mjs deve existir e atualizar build.gradle corretamente', () => {

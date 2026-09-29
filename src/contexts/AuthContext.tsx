@@ -54,6 +54,57 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   }, [])
 
+  // Helper para identificar falha definitiva de autenticação (401 / 403 / token revogado)
+  // versus falha temporária de rede (status 0, timeout, Failed to fetch, offline)
+  const isDefinitiveAuthFailure = (err: any): boolean => {
+    const status = err?.status
+    if (status === 401 || status === 403) return true
+    if (err?.data?.message?.includes('The request requires valid record authorization token'))
+      return true
+    // Se for status 0, abort, timeout ou erro de rede, NÃO é falha definitiva
+    if (
+      status === 0 ||
+      err?.isAbort ||
+      err?.message?.includes('Failed to fetch') ||
+      err?.message?.includes('NetworkError') ||
+      err?.message?.includes('timeout') ||
+      err?.message?.includes('Timeout')
+    ) {
+      return false
+    }
+    return false
+  }
+
+  // Renovação preventiva do token quando há sessão ativa
+  const performTokenRefresh = useCallback(async (): Promise<void> => {
+    if (!pb.authStore.isValid || !pb.authStore.token) return
+
+    try {
+      const res = await pb.collection('users').authRefresh()
+      setUser(res.record)
+      setBackendStatus('available')
+      setBackendError(null)
+    } catch (err: any) {
+      if (isDefinitiveAuthFailure(err)) {
+        // Falha definitiva: credenciais revogadas ou expiradas de fato
+        console.warn(
+          '[AuthContext] Sessão definitivamente inválida ou revogada pelo servidor. Limpando authStore.',
+        )
+        pb.authStore.clear()
+        setUser(null)
+      } else {
+        // Falha transitória de rede (offline, timeout, dados móveis oscilando):
+        // Retém a sessão local intacta para não derrubar a operação técnica em andamento
+        console.warn(
+          '[AuthContext] Falha transitória de rede durante renovação de token. Sessão local preservada:',
+          err?.message,
+        )
+        setBackendStatus('unavailable')
+        setBackendError('Perda momentânea de conexão com o servidor. Operação local mantida.')
+      }
+    }
+  }, [])
+
   useEffect(() => {
     // Escuta mudanças no authStore (ex.: login/logout manual)
     const unsub = pb.authStore.onChange((_token, model) => {
@@ -74,6 +125,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }
 
+    // Com token prévio: preserva user do cache imediatamente e valida em background
+    setUser(pb.authStore.record)
+
     // Sondagem de integridade com timeout de proteção quando há token prévio
     checkBackendHealth()
       .then((isHealthy) => {
@@ -87,11 +141,17 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
                 setUser(res.record)
               }
             })
-            .catch(() => {
-              // Token expirou ou foi revogado
-              if (!isCancelled) {
+            .catch((err) => {
+              if (isCancelled) return
+              if (isDefinitiveAuthFailure(err)) {
+                // Token expirou ou foi revogado
                 pb.authStore.clear()
                 setUser(null)
+              } else {
+                // Falha de rede: preserva usuário logado
+                console.warn(
+                  '[AuthContext] Falha de rede no authRefresh inicial, preservando sessão local.',
+                )
               }
             })
             .finally(() => {
@@ -100,7 +160,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
               }
             })
         } else {
-          // Backend indisponível com token prévio: encerra loading
+          // Backend indisponível com token prévio: encerra loading preservando a sessão local
           if (!isCancelled) {
             setLoading(false)
           }
@@ -113,7 +173,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       })
 
     // Timeout de segurança máximo para NUNCA travar em loader infinito,
-    // mas JAMAIS conceder autenticação caso expire.
+    // mas JAMAIS conceder autenticação caso não haja token válido.
     const safetyTimer = setTimeout(() => {
       if (!isCancelled) {
         setLoading((prev) => {
@@ -129,12 +189,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       }
     }, HEALTH_TIMEOUT_MS + 500)
 
+    // Agendamento periódico de renovação preventiva (a cada 10 minutos)
+    const REFRESH_INTERVAL_MS = 10 * 60 * 1000
+    const refreshTimer = setInterval(() => {
+      if (!isCancelled && pb.authStore.isValid) {
+        performTokenRefresh().catch(() => {})
+      }
+    }, REFRESH_INTERVAL_MS)
+
     return () => {
       isCancelled = true
       clearTimeout(safetyTimer)
+      clearInterval(refreshTimer)
       unsub()
     }
-  }, [checkBackendHealth])
+  }, [checkBackendHealth, performTokenRefresh])
 
   const login = async (
     email: string,
